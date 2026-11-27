@@ -35,20 +35,22 @@
   "bundle": {
     "active": true,
     "targets": [
-      "nsis",
       "msi",
       "deb",
       "rpm",
-      "appimage"
+      "appimage",
+      "dmg",
+      "app"
     ],
     "category": "SocialNetworking",
     "shortDescription": "Customisable Telegram client",
-    "longDescription": "MelloGram is a Telegram desktop client with a plugin manager, themes and QuickCSS.",
+    "longDescription": "MelloGram is a customizable Telegram client with a plugin manager, themes, QuickCSS, wallpapers and workspaces.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.png",
+      "icons/icon.icns",
       "icons/icon.ico"
     ],
     "linux": {
@@ -59,26 +61,14 @@
         ]
       }
     },
-    "publisher": "MelloGram",
-    "copyright": "MelloGram contributors \u00b7 GPL-3.0-or-later",
-    "homepage": "https://github.com/foulfoxhacks/MelloGram",
+    "publisher": "FoulFoxHacks",
+    "copyright": "Copyright \u00a9 FoulFoxHacks \u00b7 GPL-3.0-or-later",
+    "homepage": "https://mellogram.foulfoxhacks.dev",
     "license": "GPL-3.0-or-later",
     "windows": {
       "webviewInstallMode": {
         "type": "embedBootstrapper",
         "silent": true
-      },
-      "nsis": {
-        "installMode": "both",
-        "installerIcon": "icons/icon.ico",
-        "headerImage": "icons/nsis-header.bmp",
-        "sidebarImage": "icons/nsis-sidebar.bmp",
-        "displayLanguageSelector": false,
-        "languages": [
-          "English"
-        ],
-        "startMenuFolder": "MelloGram",
-        "compression": "lzma"
       },
       "wix": {
         "language": "en-US",
@@ -91,6 +81,15 @@
     },
     "iOS": {
       "minimumSystemVersion": "14.0"
+    },
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "dmg": {
+        "windowSize": {
+          "width": 660,
+          "height": 400
+        }
+      }
     }
   }
 }
