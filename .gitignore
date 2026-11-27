@@ -7,3 +7,7 @@
 .env
 .env.*
 !.env.example
+
+# MelloID public-profile Worker secrets and local variables
+services/melloid-public/.dev.vars
+services/melloid-public/.wrangler/

@@ -1,111 +1,96 @@
-# MelloRPC — protocol foundation
+# MelloRPC — native presence and Discord compatibility
 
-MelloRPC is MelloGram's transport-neutral rich-presence protocol. It is kept
-separate from Telegram MTProto and from the profile editor.
+MelloRPC is MelloGram's local Rich Presence engine. It is separate from
+Telegram MTProto and normal chat state. It accepts native MelloRPC activity
+messages and a supported subset of Discord Rich Presence IPC commands.
 
-## Implemented in the protocol core
+## Features implemented
 
-- Versioned native MelloRPC request and response types.
+- Versioned native MelloRPC request/response model.
 - Four-byte little-endian length-prefixed JSON framing for native clients.
-- Discord IPC packet decoding using the eight-byte little-endian opcode/length
-  header.
-- Discord opcode definitions for handshake, frame, close, ping and pong.
-- Translation of Discord SET_ACTIVITY and CLEAR_ACTIVITY payloads into the
-  shared MelloID PresenceActivity model.
-- Mapping of activity details/state, type, start/end timestamps, party size,
-  and large/small image identifiers.
-- Per-client in-memory presence leases with a bounded 10–300 second lifetime.
-- Input limits for activity labels, client IDs, URLs, party sizes and frame
-  sizes.
-- Tests for framing, translation, secret non-disclosure, validation and expiry.
+- Discord IPC eight-byte little-endian opcode/length framing.
+- Discord handshake and READY response.
+- Supported Discord commands: SET_ACTIVITY and CLEAR_ACTIVITY.
+- Discord IPC PING/PONG and CLOSE handling.
+- Activity conversion for details, state, type, timestamps, party size, and
+  large/small image identifiers.
+- Discord secret tokens are deliberately not exposed as public join URLs.
+- Per-client in-memory activity leases, bounded to 10–300 seconds.
+- Native client activity refresh, connection cleanup, and expiry.
+- Windows named-pipe transport and Unix-domain socket transport.
+- Local MelloID presence projection and UI event when profile presence is on.
+- No TCP, LAN, or public network listener.
 
-## Native client example
+## Settings and endpoints
 
-A minimal Node.js example is available at
-`docs/examples/mellorpc-node-example.js`. It connects to the local endpoint,
-sends the v1 Hello frame, sets an activity with a 120-second lease, refreshes
-that lease every 45 seconds, and clears the activity on shutdown.
+Both listeners are disabled by default. Enable them in
+Settings → MelloRPC Presence, then restart MelloGram.
+
+| Platform | Native MelloRPC | Discord compatibility |
+|---|---|---|
+| Windows | \\\\.\\pipe\\mellorpc-v1 | \\\\.\\pipe\\discord-ipc-N |
+| Linux/macOS | mellorpc.sock inside the MelloGram config directory | discord-ipc-N in the selected local temp/runtime directory |
+
+On Unix-like systems, the native socket is created with owner-only filesystem
+permissions. The Discord compatibility listener searches the usual runtime
+and temporary directories. On Windows, the listeners use named pipes with the
+operating system's default named-pipe security descriptor; an explicit
+current-user SID ACL remains a hardening item.
+
+Only local IPC endpoints are created. No public TCP server is started.
+
+## Native client protocol
+
+A dependency-free Node.js example is available at
+docs/examples/mellorpc-node-example.js. It connects to the endpoint, sends
+the v1 Hello handshake, sets a 120-second activity lease, refreshes it every
+45 seconds, and clears activity on shutdown.
 
 Native clients send a four-byte little-endian payload length followed by UTF-8
 JSON. Example handshake:
 
-```json
-{"type":"hello","protocol_version":1,"client_id":"com.example.game","client_name":"Example game"}
-```
+    {"type":"hello","protocol_version":1,"client_id":"com.example.game","client_name":"Example game"}
 
 Example activity:
 
-```json
-{"type":"set_activity","client_id":"com.example.game","lease_seconds":120,"activity":{"application":"Example Game","activity":"Playing","kind":"playing"}}
-```
+    {"type":"set_activity","client_id":"com.example.game","lease_seconds":120,"activity":{"application":"Example Game","activity":"Playing","kind":"playing"}}
 
-Optional `PresenceActivity` fields include details, state, start/end timestamps,
-party size, join URL, and image identifiers. The server validates required
-fields and applies a bounded lease. Clients should refresh well before expiry.
+Optional activity fields include details, state, started_at, ends_at,
+party_current, party_max, join_url, large_image, and small_image. A native
+client should refresh its lease before expiry. The server accepts only a
+matching client ID after a successful Hello.
 
-## Compatibility boundary
+## Discord compatibility limits
 
-The compatibility layer currently parses protocol frames and translates the
-supported Rich Presence activity updates. It does not yet open a Discord IPC
-socket, impersonate a Discord application, implement every Discord RPC command,
-or guarantee full Discord SDK compatibility.
+This is a compatibility bridge, not a full Discord client. It currently
+supports the Rich Presence activity update and clear commands plus IPC
+heartbeat/close handling. It does not implement every Discord RPC command,
+all Discord SDK side channels, invitation/join flows, or guarantee parity with
+every Discord SDK version.
 
-Discord secret values are opaque join tokens, not public URLs. They are never
-copied to the MelloID join URL field.
+When Discord is already running and owns the first IPC endpoint, MelloGram
+tries a free subsequent endpoint. Some SDKs only use the first discovered
+endpoint, so testing may require closing Discord or configuring the SDK to
+connect to the MelloGram endpoint.
 
-## Security model for the transport stage
+## Security and privacy model
 
-The future desktop listener must:
+- User opt-in is required before either listener starts.
+- Endpoints are local IPC only, never TCP.
+- Frame size is capped at 1 MiB.
+- Activity fields and URLs are validated.
+- Leases expire and activity is cleared on client disconnect.
+- Profile activity is hidden when the MelloID show_presence setting is off.
+- No Discord secret token or join secret is copied into public profile fields.
 
-- Bind only to the current user's local IPC endpoint (Unix domain socket on
-  Unix-like systems and a restricted named pipe on Windows).
-- Never open a TCP listener on a public or LAN interface.
-- Validate the handshake and client ID before accepting activity.
-- Restrict frame size, concurrent clients, request rate and activity lease.
-- Associate each lease with the originating local process/client.
-- Clear activity on disconnect or lease expiry.
-- Require user opt-in and expose per-application block/allow controls.
-- Publish only the fields the user has allowed in MelloID presence settings.
+The next hardening pass should add explicit Windows named-pipe ACLs, per-app
+allow/block controls, connection concurrency/rate limits, fuzz testing, and
+socket-level integration tests.
 
-## Local transport implementation
+## Next MelloRPC work
 
-The desktop client can now opt into two local listeners from Settings → MelloRPC
-Presence. Both are off by default and require an application restart after
-changing the settings.
-
-- Native MelloRPC uses `mellorpc.sock` under the MelloGram config directory on
-  Unix-like desktops, or the `mellorpc-v1` named pipe on Windows.
-- Discord compatibility searches the standard local `discord-ipc-N` endpoint
-  locations on Unix-like desktops and `discord-ipc-N` named pipes on Windows.
-- The bridge accepts the v1 handshake and supported Rich Presence
-  `SET_ACTIVITY` / `CLEAR_ACTIVITY` commands, plus PING/PONG and CLOSE.
-- A connected Discord client renews its local activity lease while connected;
-  closing the IPC connection clears its activity immediately.
-- The local registry projects the newest unexpired lease into the profile and
-  emits a local `mellorpc://presence` UI event. Public profile hosting/sync is
-  still separate.
-
-Both listeners are disabled by default. Users opt in under Settings → MelloRPC Presence and restart the client to apply changes. Only local sockets/named pipes are opened. No TCP, LAN, or public network listener is created. On Unix sockets, filesystem permissions are restricted
-to the current user. On Windows, the named-pipe security descriptor is the
-OS process default; a later hardening pass should explicitly constrain ACLs to
-the current user SID.
-
-When Discord itself is already running and owns the first standard IPC path,
-MelloGram will try a free subsequent endpoint. Some SDKs prefer the first live
-Discord endpoint and will keep using Discord, so compatibility testing may
-require closing Discord or configuring the app's IPC path. This bridge does
-not claim full Discord RPC parity.
-
-## Next transport work
-
-1. Implement the native MelloRPC local IPC listener and a small client SDK.
-2. Implement the Discord IPC handshake and SET_ACTIVITY/CLEAR_ACTIVITY
-   compatibility endpoint over the platform's local IPC mechanism.
-3. Add application-specific privacy controls and activity presentation in
-   MelloGram profiles.
-4. Add integration tests using local socket pairs and Windows named pipes.
-5. Connect the lease registry to the optional hosted MelloID presence service.
-
-The protocol crate currently has no network or socket dependencies. Keeping the
-transport outside this crate makes its framing and translation testable without
-starting the application or exposing a listening endpoint.
+1. Integration tests against Unix sockets and Windows named pipes.
+2. Per-application approval and revocation UI.
+3. Application registration/identity metadata and a small Rust/TS SDK.
+4. Improved Discord RPC command coverage based on a compatibility matrix.
+5. Optional authenticated remote presence leases for hosted MelloID profiles.

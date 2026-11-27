@@ -160,3 +160,23 @@ jobs:
         with:
           generate_release_notes: true
           files: release-assets/**/*
+
+  melloid-public-service:
+    name: MelloID public service tests
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate Worker and website JavaScript
+        working-directory: services/melloid-public
+        run: |
+          node --check src/worker.js
+          node --check src/profile.js
+          node --check public/index.js
+          node --check public/dashboard.js
+          node --check public/profile.js
+      - name: Test profile validation and public projection
+        working-directory: services/melloid-public
+        run: node --test test/*.test.js

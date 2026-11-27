@@ -1,3 +1,11 @@
+## MelloID Public Profiles service scaffold — 2026-11-27
+
+- Added a Cloudflare Worker/D1 service with Telegram OpenID Connect login and PKCE.
+- Added owner-only publishing, unique profile handles, public/unlisted/private visibility, and public projection filtering.
+- Added dashboard import from MelloGram JSON exports and public profile pages.
+- Sanitized uploaded connection verification and badge awards so profile imports cannot forge trust.
+- Added Node.js tests for profile validation, public filtering, unsafe links, and trusted badge stripping.
+
 ## MelloID profile appearance presets — 2026-11-27
 
 - Added six built-in profile themes, five avatar frame styles, and five profile effects.
