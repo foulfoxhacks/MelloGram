@@ -108,6 +108,10 @@ pub struct ChatSummary {
     pub presence: Option<Presence>,
     pub verified: bool,
     pub bot: bool,
+    /// Current profile photo id, as a string (it does not fit a JS number).
+    /// `None` when the chat has no photo; changes when the photo changes, so
+    /// it doubles as a cache key.
+    pub photo: Option<String>,
 }
 
 /// A user's online status as precisely as their privacy settings allow.
@@ -353,6 +357,7 @@ impl Telegram {
                 presence: match peer { Peer::User(u) => Some(user_presence(u)), _ => None },
                 verified: match peer { Peer::User(u) => u.verified(), _ => false },
                 bot: matches!(peer, Peer::User(u) if u.is_bot()),
+                photo: peer_photo_id(peer).map(|id| id.to_string()),
             });
         }
         Ok(out)
@@ -997,7 +1002,40 @@ pub enum MediaVariant {
     Thumbnail,
 }
 
+/// The id of a peer's current profile photo, if it has one.
+pub fn peer_photo_id(peer: &Peer) -> Option<i64> {
+    match peer {
+        Peer::User(u) => u.photo().map(|p| p.photo_id),
+        Peer::Group(g) => g.photo().map(|p| p.photo_id),
+        Peer::Channel(c) => c.photo().map(|p| p.photo_id),
+        _ => None,
+    }
+}
+
 impl Telegram {
+    /// Downloads the small (160px) version of a chat's profile photo to `dest`.
+    /// Uses the photo id from the chat list, so a changed photo gets a new file.
+    pub async fn download_profile_photo(&self, chat_id: i64, photo_id: i64, dest: &std::path::Path) -> Result<bool> {
+        const MAX_BYTES: u64 = 512 * 1024;
+        let peer = self.peer_ref(chat_id).await?;
+        let photo = grammers_client::media::ChatPhoto {
+            raw: tl::enums::InputFileLocation::InputPeerPhotoFileLocation(tl::types::InputPeerPhotoFileLocation {
+                big: false,
+                peer: peer.into(),
+                photo_id,
+            }),
+        };
+        let tmp = dest.with_extension("part");
+        self.client.download_media(&photo, &tmp).await?;
+        let len = tokio::fs::metadata(&tmp).await.map(|m| m.len()).unwrap_or(0);
+        if len == 0 || len > MAX_BYTES {
+            let _ = tokio::fs::remove_file(&tmp).await;
+            return Ok(false);
+        }
+        tokio::fs::rename(&tmp, dest).await?;
+        Ok(true)
+    }
+
     /// Downloads a message's media (or its thumbnail) to `dest`. Refuses files
     /// larger than `max_bytes`. Writes to a temporary file and renames it, so a
     /// partial download never looks complete. Returns `false` if there is nothing to download.

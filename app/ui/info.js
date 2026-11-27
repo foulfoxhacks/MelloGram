@@ -118,9 +118,11 @@
     if (!info) { panel.replaceChildren(closeBtn(), h("p", { class: "mg-hint", text: "No details are available for this chat." })); return; }
     const kindLabel = { user: info.bot ? "Bot" : "User", group: "Group", supergroup: "Supergroup", channel: "Channel" }[info.kind] || info.kind;
     panelPresence.textContent = info.kind === "user" ? formatPresence(presences.get(Number(chat.id)) || info.presence) : "";
-    const avatar = h("div", { class: "mg-avatar mg-info-avatar", text: (info.title || chat.title || "?").split(/\s+/).map((w) => [...w][0] || "").join("").slice(0, 2).toUpperCase() });
     const src = document.querySelector(`.mg-chat-item[data-chat-id="${chat.id}"] .mg-avatar`);
-    if (src) avatar.style.background = src.style.background;
+    // Reuse the list avatar (with its photo, if loaded); otherwise initials.
+    const avatar = src ? src.cloneNode(true) : h("div", { class: "mg-avatar", text: (info.title || chat.title || "?").split(/\s+/).map((w) => [...w][0] || "").join("").slice(0, 2).toUpperCase() });
+    avatar.classList.add("mg-info-avatar");
+    avatar.classList.remove("mg-avatar-online");
     const link = info.username ? `https://t.me/${info.username}` : info.invite_link;
 
     const members = h("div", { class: "mg-info-members" });

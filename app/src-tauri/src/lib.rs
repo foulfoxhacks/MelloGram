@@ -78,6 +78,7 @@ pub fn run() {
             commands::chat_members,
             media::media_file,
             media::media_lottie,
+            media::chat_photo,
             media::save_media,
             media::send_location,
             media::get_media_settings,
