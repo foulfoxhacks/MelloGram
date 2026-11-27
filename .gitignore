@@ -11,3 +11,7 @@
 # MelloID public-profile Worker secrets and local variables
 services/melloid-public/.dev.vars
 services/melloid-public/.wrangler/
+installer/windows/Output/
+installer/windows/MicrosoftEdgeWebview2Setup.exe
+branding/__pycache__/
+scripts/__pycache__/

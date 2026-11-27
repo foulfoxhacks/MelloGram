@@ -28,6 +28,7 @@ pub struct Workspace {
     pub plugins: std::collections::BTreeMap<String, PluginState>,
     pub themes: ThemeSettings,
     pub appearance: Appearance,
+    pub wallpapers: crate::wallpaper::WallpaperSettings,
     pub notifications: NotificationSettings,
     pub updated_at: String,
 }
@@ -42,6 +43,7 @@ impl Default for Workspace {
             plugins: Default::default(),
             themes: ThemeSettings::default(),
             appearance: Appearance::default(),
+            wallpapers: Default::default(),
             notifications: NotificationSettings::default(),
             updated_at: String::new(),
         }
@@ -89,6 +91,7 @@ impl Settings {
             plugins: self.plugins.clone(),
             themes: self.themes.clone(),
             appearance: self.appearance.clone(),
+            wallpapers: self.wallpapers.clone(),
             notifications: self.notifications.clone(),
             updated_at: now(),
             ..Workspace::default()
@@ -99,6 +102,7 @@ impl Settings {
         self.plugins = ws.plugins.clone();
         self.themes = ws.themes.clone();
         self.appearance = ws.appearance.clone();
+        self.wallpapers = ws.wallpapers.clone();
         self.notifications = ws.notifications.clone();
     }
 
@@ -137,6 +141,7 @@ impl Settings {
             ws.plugins = snap.plugins;
             ws.themes = snap.themes;
             ws.appearance = snap.appearance;
+            ws.wallpapers = snap.wallpapers;
             ws.notifications = snap.notifications;
             ws.updated_at = snap.updated_at;
         }

@@ -52,8 +52,14 @@ pub fn get_settings(state: S<'_>) -> Value {
 
 #[tauri::command]
 pub fn set_general(state: S<'_>, general: GeneralSettings) -> R<()> {
+    let launch = general.launch_at_login;
+    let changed = state.store.lock().unwrap().settings.general.launch_at_login != launch;
     state.store.lock().unwrap().settings.general = general;
-    state.save()
+    state.save()?;
+    if changed {
+        crate::background::apply_autostart(&state.app, launch);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -178,7 +184,14 @@ pub async fn logout(state: S<'_>) -> R<()> {
 
 #[tauri::command]
 pub async fn list_chats(state: S<'_>, limit: Option<usize>) -> R<Vec<ChatSummary>> {
-    state.telegram().await?.dialogs(limit.unwrap_or(200)).await.map_err(err)
+    let chats = state.telegram().await?.dialogs(limit.unwrap_or(200)).await.map_err(err)?;
+    {
+        let mut titles = state.background.chat_titles.lock().unwrap();
+        for c in &chats {
+            titles.insert(c.id, c.title.clone());
+        }
+    }
+    Ok(chats)
 }
 
 #[tauri::command]

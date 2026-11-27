@@ -30,6 +30,7 @@ pub struct Settings {
     pub active_workspace: Option<String>,
     pub privacy: PrivacySettings,
     pub rpc: RpcSettings,
+    pub wallpapers: crate::wallpaper::WallpaperSettings,
 }
 
 /// Local-only privacy controls. These change what this screen shows; they
@@ -59,6 +60,7 @@ impl Default for Settings {
             active_workspace: None,
             privacy: PrivacySettings::default(),
             rpc: RpcSettings::default(),
+            wallpapers: Default::default(),
         }
     }
 }
@@ -74,6 +76,10 @@ pub struct GeneralSettings {
     pub close_to_tray: bool,
     /// Turn off the window frame and draw our own title bar.
     pub frameless: bool,
+    /// Start hidden in the tray (desktop).
+    pub start_minimized: bool,
+    /// Start MelloGram when you sign in to your computer (desktop).
+    pub launch_at_login: bool,
 }
 
 impl Default for GeneralSettings {
@@ -83,6 +89,8 @@ impl Default for GeneralSettings {
             developer_mode: false,
             close_to_tray: false,
             frameless: false,
+            start_minimized: false,
+            launch_at_login: false,
         }
     }
 }
@@ -165,6 +173,20 @@ pub struct NotificationSettings {
     pub position: ToastPosition,
     pub timeout_ms: u32,
     pub use_native: bool,
+    /// Native notifications for new messages while MelloGram is hidden or unfocused.
+    pub desktop: bool,
+    /// Include sender and text; off shows only "New message".
+    pub show_previews: bool,
+    /// Do Not Disturb: no message notifications at all.
+    pub dnd: bool,
+    pub quiet_hours: bool,
+    /// Local hours, 0–23. A range that wraps midnight (22 → 7) is supported.
+    pub quiet_start: u8,
+    pub quiet_end: u8,
+    /// Chats that never notify.
+    pub muted_chats: Vec<i64>,
+    /// Notify for your own messages sent from other devices.
+    pub notify_own: bool,
 }
 
 impl Default for NotificationSettings {
@@ -173,6 +195,14 @@ impl Default for NotificationSettings {
             position: ToastPosition::BottomRight,
             timeout_ms: 5000,
             use_native: false,
+            desktop: true,
+            show_previews: true,
+            dnd: false,
+            quiet_hours: false,
+            quiet_start: 22,
+            quiet_end: 7,
+            muted_chats: Vec::new(),
+            notify_own: false,
         }
     }
 }

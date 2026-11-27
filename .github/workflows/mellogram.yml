@@ -27,6 +27,9 @@ jobs:
           node --check app/ui/app.js
           node --check app/ui/settings.js
           node --check app/ui/extras.js
+          node --check app/ui/studio.js
+          node --check app/ui/wallpapers.js
+          node --check app/ui/mg.js
           node --check docs/examples/mellorpc-node-example.js
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -46,7 +49,9 @@ jobs:
             platform: linux
           - os: windows-latest
             platform: windows
-          - os: macos-14
+          # macos-14 runners are being retired (jobs were cancelled before
+          # getting a runner); macos-latest is Apple Silicon.
+          - os: macos-latest
             platform: macos
     runs-on: ${{ matrix.os }}
     steps:
@@ -57,42 +62,67 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev patchelf rpm
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: .
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2" --locked
-      - name: Build platform packages
-        working-directory: app/src-tauri
-        run: cargo tauri build
-      - name: Upload Linux packages
+
+      # ---- Linux: .deb, .rpm, AppImage --------------------------------------
+      - name: Build Linux packages
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: mellogram-${{ matrix.platform }}
-          path: |
-            target/release/bundle/deb/*.deb
-            target/release/bundle/rpm/*.rpm
-            target/release/bundle/appimage/*.AppImage
-          if-no-files-found: error
-      - name: Upload Windows packages
+        working-directory: app/src-tauri
+        run: cargo tauri build --bundles deb,rpm,appimage
+      - name: Collect Linux packages
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p dist
+          cp target/release/bundle/deb/*.deb           dist/MelloGram-linux-amd64.deb
+          cp target/release/bundle/rpm/*.rpm           dist/MelloGram-linux-x86_64.rpm
+          cp target/release/bundle/appimage/*.AppImage dist/MelloGram-linux-x86_64.AppImage
+
+      # ---- Windows: Inno Setup installer + MSI --------------------------------
+      - name: Build Windows app and MSI
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
-        with:
-          name: mellogram-${{ matrix.platform }}
-          path: |
-            target/release/bundle/msi/*.msi
-            target/release/bundle/nsis/*.exe
-          if-no-files-found: error
-      - name: Upload macOS packages
+        working-directory: app/src-tauri
+        run: cargo tauri build --bundles msi
+      - name: Build Inno Setup installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" -OutFile installer/windows/MicrosoftEdgeWebview2Setup.exe
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw "Inno Setup install failed" }
+          }
+          & $iscc "/DAppVersion=$version" "/DSourceDir=$PWD\target\release" installer\windows\mellogram.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item installer/windows/Output/MelloGram-Setup-x64.exe dist/MelloGram-Setup-x64.exe
+          Copy-Item (Get-ChildItem target/release/bundle/msi/*.msi | Select-Object -First 1).FullName dist/MelloGram-windows-x64.msi
+
+      # ---- macOS: universal .dmg (Apple Silicon + Intel) ------------------------
+      - name: Build macOS universal app and DMG
         if: runner.os == 'macOS'
+        working-directory: app/src-tauri
+        run: cargo tauri build --target universal-apple-darwin --bundles app,dmg
+      - name: Collect macOS packages
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p dist
+          cp target/universal-apple-darwin/release/bundle/dmg/*.dmg dist/MelloGram-macos-universal.dmg
+
+      - name: Upload ${{ matrix.platform }} packages
         uses: actions/upload-artifact@v4
         with:
           name: mellogram-${{ matrix.platform }}
-          path: |
-            target/release/bundle/dmg/*.dmg
-            target/release/bundle/macos/*.app
+          path: dist/*
           if-no-files-found: error
+          retention-days: 30
 
   android:
     name: Android APK and AAB
@@ -126,21 +156,42 @@ jobs:
         run: cargo tauri android init --ci
       - name: Add Firebase Messaging service to Android manifest
         run: python3 scripts/configure-android-firebase.py
-      - name: Build debug APKs (arm64 and x86_64)
+      - name: Build debug APKs (arm64, armv7 and x86_64)
         working-directory: app/src-tauri
-        run: cargo tauri android build --apk --debug --target aarch64 --target x86_64
+        run: cargo tauri android build --apk --debug --target aarch64 --target armv7 --target x86_64
       - name: Build release APKs (arm64 and armv7)
         working-directory: app/src-tauri
         run: cargo tauri android build --apk --target aarch64 --target armv7
       - name: Build release Android App Bundle
         working-directory: app/src-tauri
         run: cargo tauri android build --aab --target aarch64 --target armv7
+      - name: Sign and collect Android packages
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          out=app/src-tauri/gen/android/app/build/outputs
+          mkdir -p dist
+          bt="$ANDROID_SDK_ROOT/build-tools/34.0.0"
+          if [ -n "${KEYSTORE_B64:-}" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > release.jks
+            unsigned=$(ls $out/apk/universal/release/*.apk | head -1)
+            "$bt/zipalign" -f -p 4 "$unsigned" aligned.apk
+            "$bt/apksigner" sign --ks release.jks --ks-pass env:KEYSTORE_PASSWORD --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASSWORD --out dist/MelloGram-android.apk aligned.apk
+            "$bt/apksigner" verify dist/MelloGram-android.apk
+            rm -f release.jks aligned.apk
+          else
+            echo "::notice::ANDROID_KEYSTORE_BASE64 is not set; publishing the debug-signed universal APK."
+            cp "$(ls $out/apk/universal/debug/*.apk | head -1)" dist/MelloGram-android.apk
+          fi
+          cp "$(ls $out/bundle/universalRelease/*.aab | head -1)" dist/MelloGram-android-unsigned.aab
       - uses: actions/upload-artifact@v4
         with:
-          name: mellogram-android-apk-aab
-          path: |
-            app/src-tauri/gen/android/app/build/outputs/apk/**/*.apk
-            app/src-tauri/gen/android/app/build/outputs/bundle/**/*.aab
+          name: mellogram-android
+          path: dist/*
           if-no-files-found: error
           retention-days: 30
 
@@ -154,12 +205,21 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: release-assets
-          merge-multiple: false
+          merge-multiple: true
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: release-assets/**/*
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/MelloGram-Setup-x64.exe
+            release-assets/MelloGram-windows-x64.msi
+            release-assets/MelloGram-macos-universal.dmg
+            release-assets/MelloGram-linux-amd64.deb
+            release-assets/MelloGram-linux-x86_64.rpm
+            release-assets/MelloGram-linux-x86_64.AppImage
+            release-assets/MelloGram-android.apk
+            release-assets/MelloGram-android-unsigned.aab
 
   melloid-public-service:
     name: MelloID public service tests

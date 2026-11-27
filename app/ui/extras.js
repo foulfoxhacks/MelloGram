@@ -181,6 +181,29 @@
     if (mod && !e.shiftKey && e.key.toLowerCase() === "l") { e.preventDefault(); Lock.lockNow(); }
   });
 
+  // ---- background / tray integration ---------------------------------------------------------
+
+  Bridge.listen("mg://lock-now", () => Lock.lockNow());
+  Bridge.listen("mg://dnd-changed", (on) => UI.toast(on ? "Do Not Disturb on" : "Do Not Disturb off", "info"));
+
+  // "Mute notifications" in every chat's context menu.
+  window.MelloGram.Hooks.chatActions.set("core:mute", {
+    id: "mute",
+    label: (chat) => (mutedChats.has(chat.id) ? "Unmute notifications" : "Mute notifications"),
+    async onClick(chat) {
+      const s = await Bridge.invoke("get_settings");
+      const n = s.notifications;
+      const set = new Set(n.muted_chats || []);
+      set.has(chat.id) ? set.delete(chat.id) : set.add(chat.id);
+      n.muted_chats = [...set];
+      await Bridge.invoke("set_notifications", { notifications: n });
+      mutedChats = set;
+      UI.toast(set.has(chat.id) ? `Muted ${chat.title}` : `Unmuted ${chat.title}`, "success");
+    },
+  });
+  let mutedChats = new Set();
+  Bridge.invoke("get_settings").then((s) => { mutedChats = new Set(s.notifications.muted_chats || []); }).catch(() => {});
+
   // ---- startup -------------------------------------------------------------------------------
 
   function banner(text, actions) {

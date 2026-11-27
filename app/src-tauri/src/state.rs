@@ -88,6 +88,7 @@ pub struct AppState {
     pub plugins: Mutex<PluginManager>,
     pub themes: ThemeManager,
     pub cache: Mutex<MessageCache>,
+    pub background: crate::background::BackgroundState,
     pub tg: AsyncMutex<Option<Arc<Telegram>>>,
 }
 
@@ -133,6 +134,7 @@ impl AppState {
             plugins: Mutex::new(plugins),
             themes,
             cache: Mutex::new(MessageCache::default()),
+            background: Default::default(),
             tg: AsyncMutex::new(None),
         })
     }
@@ -206,6 +208,9 @@ impl AppState {
                     _ => {}
                 }
                 let ui = state.process_event(event);
+                if let UiEvent::NewMessage(m) = &ui {
+                    crate::background::notify_message(&state, m);
+                }
                 let _ = state.app.emit("mg://event", ui);
             }
         });
@@ -260,6 +265,11 @@ impl AppState {
         let appearance = store.settings.appearance.to_css();
         if !appearance.is_empty() {
             css.push(("appearance-studio".to_owned(), appearance));
+        }
+        let dir = self.dir.clone();
+        let wallpaper = store.settings.wallpapers.to_css(&|f| crate::wallpapers::image_url(&dir, f));
+        if !wallpaper.is_empty() {
+            css.push(("wallpaper-engine".to_owned(), wallpaper));
         }
         css.extend(self.plugins.lock().unwrap().css());
         self.themes.compose(&store.settings.themes, &css)
