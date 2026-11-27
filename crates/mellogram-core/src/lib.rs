@@ -14,6 +14,7 @@ pub mod model;
 pub mod plugin;
 pub mod settings;
 pub mod theme;
+pub mod wallpaper;
 pub mod workspace;
 
 pub use manager::{PluginInfo, PluginManager};
@@ -25,6 +26,7 @@ pub use plugin::{
 pub use settings::{Backup, Settings, SettingsStore};
 pub use theme::{Theme, ThemeManager, ThemeMeta};
 pub use appearance::Appearance;
+pub use wallpaper::{Wallpaper, WallpaperSettings};
 pub use workspace::{ProfilePackage, Workspace, WorkspaceSummary};
 
 #[derive(Debug, thiserror::Error)]

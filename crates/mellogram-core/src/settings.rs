@@ -30,6 +30,7 @@ pub struct Settings {
     pub active_workspace: Option<String>,
     pub privacy: PrivacySettings,
     pub rpc: RpcSettings,
+    pub wallpapers: crate::wallpaper::WallpaperSettings,
 }
 
 /// Local-only privacy controls. These change what this screen shows; they
@@ -59,6 +60,7 @@ impl Default for Settings {
             active_workspace: None,
             privacy: PrivacySettings::default(),
             rpc: RpcSettings::default(),
+            wallpapers: Default::default(),
         }
     }
 }

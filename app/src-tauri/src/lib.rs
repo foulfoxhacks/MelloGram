@@ -5,6 +5,7 @@ mod commands;
 mod extras;
 mod mellorpc;
 mod state;
+mod wallpapers;
 
 use std::sync::Arc;
 
@@ -38,6 +39,13 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            wallpapers::get_wallpapers,
+            wallpapers::set_wallpapers,
+            wallpapers::wallpaper_presets,
+            wallpapers::wallpaper_preview_css,
+            wallpapers::list_wallpaper_images,
+            wallpapers::import_wallpaper_image,
+            wallpapers::delete_wallpaper_image,
             commands::app_info,
             commands::get_melloid_profile,
             commands::save_melloid_profile,

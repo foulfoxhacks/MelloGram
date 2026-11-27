@@ -22,7 +22,7 @@ mellogram-plugins.workspace = true
 mellogram-telegram.workspace = true
 melloid-core.workspace = true
 mellorpc-core.workspace = true
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["protocol-asset"] }
 serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
@@ -31,3 +31,4 @@ tokio.workspace = true
 ureq = "2"
 sha2 = "0.10"
 getrandom = "0.2"
+base64 = "0.22"

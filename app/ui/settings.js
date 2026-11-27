@@ -22,6 +22,7 @@
 
   const pages = {
     appearance: { group: "Customize", label: "Appearance Studio", render: () => P().appearance() },
+    wallpapers: { group: "Customize", label: "Wallpapers", render: () => P().wallpapers() },
     plugins: { group: "Customize", label: "Plugins", render: renderPlugins },
     themes: { group: "Customize", label: "Themes", render: renderThemes },
     quickcss: { group: "Customize", label: "QuickCSS", render: renderQuickCss },
