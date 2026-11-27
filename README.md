@@ -41,6 +41,7 @@ first-class client instead of a patch.
   `--variables` with colour pickers. Three bundled themes.
 - **QuickCSS** — live CSS editor.
 - **Backup & Restore** — one JSON file; Telegram credentials never exported.
+- **MelloRPC core** — native length-prefixed protocol model, Discord IPC packet decoder, Rich Presence translation and short-lived activity leases (transport listener is staged separately).
 - **MelloID** — dedicated profile studio with structured Bio Studio sections, banner/avatar/accent customization, profile visibility, connection cards, live preview, JSON backup, static public HTML export, badge showcase, and a versioned local identity store. Public hosting, OAuth verification, and live RPC are staged separately.\n- **Telegram** — phone + code + 2FA login, chat list, history with infinite
   scroll, send/reply/edit/delete, file attachments by drag & drop, live updates.
 

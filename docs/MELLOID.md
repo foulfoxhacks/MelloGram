@@ -49,6 +49,10 @@ The Discord adapter should begin with the local desktop IPC transport and suppor
 
 Native MelloRPC should have a documented local SDK/protocol, application registration, activity expiry, process ownership, and explicit user privacy controls. The public presence service should accept short-lived signed leases, not trust arbitrary client timestamps indefinitely.
 
+## Profile Studio implementation
+
+The desktop client now includes MelloID Studio: structured Bio Studio sections, display-name and slug editing, public/unlisted/private visibility intent, avatar/banner/accent customization, connection cards, per-item visibility, and a live preview. Users can export their local profile as JSON or download a static public HTML page. The HTML export requires Public visibility, includes only visible bio sections/connections/badges, escapes user text, and is a portable file rather than a hosted or synchronized profile URL.
+
 ## Planned delivery stages
 
 1. Foundation: schema, validation, local persistence, Tauri read/write commands, and architecture boundaries.
