@@ -6,7 +6,8 @@
 
 use std::sync::Arc;
 
-use mellogram_e2e::{ChatView, E2eStatus, PeerView};
+use mellogram_e2e::{ChatView, E2eStatus, GroupView, PeerView};
+use serde::Serialize;
 use tauri::State;
 
 use crate::state::AppState;
@@ -58,4 +59,84 @@ pub fn e2e_verify_peer(state: S<'_>, peer_id: i64, digits: String) -> R<bool> {
 #[tauri::command]
 pub fn e2e_clear_history(state: S<'_>) -> R<usize> {
     state.e2e.clear_history()
+}
+
+// ---- groups ---------------------------------------------------------------
+
+/// What one round of key sharing achieved.
+#[derive(Debug, Serialize)]
+pub struct ShareReport {
+    pub group: GroupView,
+    /// Members who received our sender key.
+    pub sent: Vec<i64>,
+    /// Members we could not reach, with the reason.
+    pub skipped: Vec<(i64, String)>,
+}
+
+#[tauri::command]
+pub fn e2e_group_state(state: S<'_>, chat_id: i64) -> GroupView {
+    state.e2e.group_state(chat_id)
+}
+
+/// Turns group encryption on and creates our sender key.
+#[tauri::command]
+pub fn e2e_group_enable(state: S<'_>, chat_id: i64) -> R<GroupView> {
+    state.e2e.group_enable(chat_id)
+}
+
+#[tauri::command]
+pub fn e2e_group_disable(state: S<'_>, chat_id: i64) -> R<()> {
+    state.e2e.group_disable(chat_id)
+}
+
+/// Replaces our sender key; the group must be given the new one afterwards.
+#[tauri::command]
+pub fn e2e_group_rotate(state: S<'_>, chat_id: i64) -> R<GroupView> {
+    state.e2e.group_rotate(chat_id)
+}
+
+/// Sends our current sender key to every member we can reach. Each envelope
+/// travels inside that member's pairwise encrypted chat, so only they can read
+/// it and it is authenticated by the pairwise ratchet.
+#[tauri::command]
+pub async fn e2e_group_share(state: S<'_>, chat_id: i64) -> R<ShareReport> {
+    let tg = state.telegram().await?;
+    let me = tg.ensure_self_id().await.map_err(|e| e.to_string())?;
+    state.e2e.set_self_id(me);
+    let members = tg
+        .chat_members(chat_id, 200)
+        .await
+        .map_err(|e| e.to_string())?;
+    let ids: Vec<i64> = members
+        .iter()
+        .map(|m| m.id)
+        .filter(|id| *id != me && *id > 0)
+        .collect();
+    let envelopes = state.e2e.group_distributions(chat_id, &ids)?;
+    let mut sent = Vec::new();
+    let mut skipped = Vec::new();
+    for envelope in envelopes {
+        let armored = match state.e2e.encrypt_for_peer(envelope.peer_id, &envelope.text) {
+            Ok(armored) => armored,
+            Err(e) => {
+                skipped.push((envelope.peer_id, e));
+                continue;
+            }
+        };
+        let message = mellogram_core::OutgoingMessage {
+            chat_id: envelope.peer_id,
+            text: armored,
+            link_preview: false,
+            ..Default::default()
+        };
+        match tg.send(&message).await {
+            Ok(_) => sent.push(envelope.peer_id),
+            Err(e) => skipped.push((envelope.peer_id, e.to_string())),
+        }
+    }
+    Ok(ShareReport {
+        group: state.e2e.group_state(chat_id),
+        sent,
+        skipped,
+    })
 }

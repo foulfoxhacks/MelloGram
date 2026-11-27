@@ -63,6 +63,37 @@ sensitive.
 The lock button shows the state at a glance: grey = off, amber = on but
 waiting for the other person's key, green = on with an open session.
 
+## Groups and channels
+
+Groups use **sender keys**: each member has one symmetric chain for the whole
+group, so a message is encrypted once instead of once per member, while every
+message still binds its sender's identity and the group id.
+
+1. Open the group and click the **lock button** → **Turn on for this group**.
+   MelloGram creates your sender key.
+2. **Share my key** sends an envelope to every member you already have a
+   one-to-one overlay session with. That envelope travels inside the pairwise
+   encrypted chat, so only that member can read it and the pairwise ratchet
+   authenticates who sent it. Members you have no pairwise key with see
+   ciphertext until you exchange keys with them.
+3. Their client installs the key when the message arrives — the chat shows
+   "🔑 Shared an encryption key for a group" instead of the envelope — and
+   from then on their group messages decrypt automatically.
+
+Member keys are listed with a short fingerprint in the same dialog. A member
+whose one-to-one contact is verified shows their group key as verified too,
+because the key is pinned through that pairwise session.
+
+**When someone leaves or is removed**, MelloGram flags the group and refuses to
+send until you **Rotate key** and share the new one. A sender key is symmetric,
+so a member holding an old copy could otherwise keep reading; rotating is what
+limits that, and the composer will not let you skip it.
+
+Group keys give confidentiality towards people who are not in the group. They
+do **not** hide anything from other members: anyone in the group can read the
+group. Channels are not covered — there is no member list to deliver keys to,
+so the lock says so rather than pretending.
+
 ## What MelloGram stores
 
 - Your identity, the ratchet sessions and a bounded cache of decrypted
@@ -79,7 +110,7 @@ waiting for the other person's key, green = on with an open session.
 
 ## Limits in this build
 
-- One-to-one text only. Group and channel overlays are separate work.
+- One-to-one and group text. Channels and media are not covered.
 - Encrypted messages are limited to about 2600 bytes of UTF-8, because the
   armored text has to fit Telegram's 4096-character message limit.
 - Attachments and edits are refused while the overlay is on: files are not

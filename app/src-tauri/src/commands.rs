@@ -275,7 +275,11 @@ pub async fn send_message(state: S<'_>, request: SendRequest) -> R<SendOutcome> 
         let me = tg.ensure_self_id().await.map_err(err)?;
         state.e2e.set_self_id(me);
         let plain = msg.text.clone();
-        msg.text = state.e2e.encrypt_for_chat(msg.chat_id, &plain)?;
+        msg.text = if msg.chat_id < 0 {
+            state.e2e.group_encrypt(msg.chat_id, &plain)?
+        } else {
+            state.e2e.encrypt_for_chat(msg.chat_id, &plain)?
+        };
         msg.link_preview = false;
         encrypted_plaintext = Some(plain);
     }

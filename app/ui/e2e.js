@@ -29,17 +29,44 @@
 
   // ---- the lock button in the composer ---------------------------------------
 
+  // One shape for both overlays: a ChatView for people, a GroupView adapted to
+  // the same fields for groups and channels.
+  async function stateFor(chatId) {
+    if (chatId < 0) {
+      const group = await invoke("e2e_group_state", { chatId });
+      return {
+        chat_id: chatId,
+        enabled: group.enabled,
+        ready: group.has_sender_key,
+        rotation_needed: group.rotation_needed,
+        verified: false,
+        safety_number: null,
+        peer_key_known: false,
+        group,
+      };
+    }
+    return invoke("e2e_chat_state", { chatId });
+  }
+
   async function paint(chatId) {
     const button = $("e2e-toggle");
     if (!button || chatId == null) return;
     try {
-      const state = await invoke("e2e_chat_state", { chatId });
-      button.dataset.state = !state.enabled ? "off" : state.ready ? "on" : "waiting";
+      const state = await stateFor(chatId);
+      button.dataset.state = !state.enabled
+        ? "off"
+        : state.ready && !state.rotation_needed
+          ? "on"
+          : "waiting";
       button.title = !state.enabled
         ? "Send end-to-end encrypted (MelloGram overlay)"
-        : state.ready
-          ? "End-to-end encrypted — click for safety number and settings"
-          : "Encryption is on; waiting for the other person's key";
+        : state.rotation_needed
+          ? "Group membership changed — rotate the key before sending"
+          : state.ready
+            ? "End-to-end encrypted — click for safety number and settings"
+            : state.enabled && chatId < 0
+              ? "Group encryption is on; use the lock to share your key"
+              : "Encryption is on; waiting for the other person's key";
     } catch (e) {
       button.dataset.state = "off";
       button.title = "End-to-end overlay";
@@ -58,15 +85,12 @@
     if (!chat) return;
     let state;
     try {
-      state = await invoke("e2e_chat_state", { chatId: chat.id });
+      state = await stateFor(chat.id);
     } catch (e) {
       UI.toast(String(e), "error");
       return;
     }
-    if (chat.id <= 0) {
-      UI.toast("The encrypted overlay works in one-to-one chats. Group support is separate work.", "info");
-      return;
-    }
+    if (chat.id < 0) return groupDialog(chat, state);
     if (state.enabled) return details(chat, state);
     if (!state.peer_key_known) return askKey(chat);
     try {
@@ -77,6 +101,99 @@
     } catch (e) {
       UI.toast(String(e), "error");
     }
+  }
+
+  // ---- groups (sender keys) --------------------------------------------------
+
+  function groupDialog(chat, state) {
+    const group = state.group || { senders: [], pairwise_peers: 0 };
+    const senders = group.senders || [];
+    if (chat.kind === "channel" && !state.enabled) {
+      // A broadcast channel has subscribers, not members: there is no one to
+      // deliver sender keys to, so the overlay must not claim to cover it.
+      const close = UI.modal(`Encryption · ${chat.title}`, [
+        h("p", { text: "Channels are not covered by the overlay." }),
+        h("p", { class: "mg-hint", text: "Channel subscribers cannot receive sender keys through one-to-one encrypted chats, so encrypting here would be a claim without substance. The overlay works in groups and supergroups." }),
+        h("div", { class: "mg-toolbar" }, h("button", { class: "mg-btn", text: "Close", onclick: () => close() })),
+      ]);
+      return;
+    }
+    const close = UI.modal(`Group encryption · ${chat.title}`, [
+      h("p", {
+        text: !state.enabled
+          ? "Sender keys: each member encrypts a message once for the whole group, and every member's key is delivered inside your one-to-one encrypted chat with them."
+          : state.rotation_needed
+            ? "Membership changed. Rotate the key and share it, or the person who left could still read what you send."
+            : "On for this group.",
+      }),
+      !state.enabled
+        ? h("p", { class: "mg-hint", text: "Members who have not exchanged one-to-one overlay keys with you will see ciphertext until they do." })
+        : h("p", { class: "mg-hint", text: `${senders.length} member key${senders.length === 1 ? "" : "s"} on this device · ${group.pairwise_peers} contact${group.pairwise_peers === 1 ? "" : "s"} can receive keys.` }),
+      senders.length
+        ? h("div", { class: "mg-raw" }, senders.map((sender) =>
+            h("div", { class: "mg-hint", text: `User ${sender.sender_id} · key ${sender.key}${sender.verified ? " · verified" : ""}` })))
+        : null,
+      h("div", { class: "mg-toolbar" },
+        !state.enabled
+          ? h("button", {
+              class: "mg-btn mg-primary", text: "Turn on for this group",
+              onclick: async () => {
+                try {
+                  await invoke("e2e_group_enable", { chatId: chat.id });
+                  close();
+                  await paint(chat.id);
+                  await shareKeys(chat);
+                } catch (e) { UI.toast(String(e), "error"); }
+              },
+            })
+          : h("button", { class: "mg-btn mg-primary", text: "Share my key", onclick: () => shareKeys(chat, close) }),
+        state.enabled ? h("button", {
+          class: "mg-btn", text: "Rotate key",
+          onclick: async () => {
+            const sure = await UI.confirm(
+              "Rotate this group's key?",
+              "Your next messages use a new key. Share it with the group or nobody can read them.",
+              "Rotate",
+            );
+            if (!sure) return;
+            try {
+              await invoke("e2e_group_rotate", { chatId: chat.id });
+              close();
+              await paint(chat.id);
+              await shareKeys(chat);
+            } catch (e) { UI.toast(String(e), "error"); }
+          },
+        }) : null,
+        state.enabled ? h("button", {
+          class: "mg-btn mg-danger", text: "Turn encryption off",
+          onclick: async () => {
+            try {
+              await invoke("e2e_group_disable", { chatId: chat.id });
+              close();
+              await paint(chat.id);
+              UI.toast("Group encryption is off for this chat.", "info");
+            } catch (e) { UI.toast(String(e), "error"); }
+          },
+        }) : null,
+        h("button", { class: "mg-btn", text: "Close", onclick: () => close() })),
+      h("p", { class: "mg-hint", text: "Text only. Telegram still sees the member list and who sent what." }),
+    ]);
+  }
+
+  /// Delivers our sender key to every member we have a pairwise session with.
+  async function shareKeys(chat, close) {
+    try {
+      const report = await invoke("e2e_group_share", { chatId: chat.id });
+      if (close) close();
+      await paint(chat.id);
+      const skipped = report.skipped.length;
+      UI.toast(
+        report.sent.length
+          ? `Key sent to ${report.sent.length} member${report.sent.length === 1 ? "" : "s"}${skipped ? `; ${skipped} could not be reached` : ""}.`
+          : "No member could be reached: exchange one-to-one overlay keys with them first.",
+        skipped ? "warning" : "success",
+      );
+    } catch (e) { UI.toast(String(e), "error"); }
   }
 
   function askKey(chat) {
@@ -197,7 +314,7 @@
     keyArea.value = status.key || "";
     const rows = [
       h("h2", { text: "End-to-End Overlay" }),
-      h("p", { class: "mg-muted", text: "An extra layer of encryption on top of Telegram. Telegram's servers, and anyone reading them, only see ciphertext. Both people need MelloGram, and it covers text in one-to-one chats." }),
+      h("p", { class: "mg-muted", text: "An extra layer of encryption on top of Telegram. Telegram's servers, and anyone reading them, only see ciphertext. Both people need MelloGram. It covers text in one-to-one chats and, with sender keys, in groups." }),
       h("h3", { text: "Your key" }),
       keyArea,
       h("div", { class: "mg-toolbar" },

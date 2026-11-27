@@ -37,6 +37,10 @@ pub enum Error {
     /// The initial message targets a signed prekey we do not hold.
     #[error("initial message references an unknown signed prekey")]
     UnknownPrekey,
+    /// A group message uses a sender key this device does not have (or a key
+    /// id from before a rotation).
+    #[error("group message uses an unknown sender key")]
+    UnknownSenderKey,
     /// The peer presented our own identity key.
     #[error("peer identity equals local identity")]
     ReflectedIdentity,

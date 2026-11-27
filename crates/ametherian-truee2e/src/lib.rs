@@ -62,6 +62,7 @@
 mod at_rest;
 mod crypto;
 mod error;
+mod group;
 mod keys;
 mod padding;
 mod ratchet;
@@ -71,6 +72,10 @@ mod wire;
 
 pub use at_rest::{open as open_at_rest, seal as seal_at_rest, DeviceKey, SEALED_FORMAT_VERSION};
 pub use error::{Error, Result};
+pub use group::{
+    is_group_message, is_sender_key, GroupReceiver, SenderKey, GROUP_MESSAGE_PREFIX,
+    MAX_GROUP_SKIPPED_KEYS, MAX_GROUP_SKIP, SENDER_KEY_ID_LEN, SENDER_KEY_PREFIX,
+};
 pub use keys::{IdentityKeyPair, IdentityPublic, PublicBundle, BUNDLE_ARMOR_PREFIX};
 pub use padding::{pad, padded_len, unpad, PAD_BUCKETS};
 pub use safety::{SafetyNumber, SAFETY_QR_PREFIX};

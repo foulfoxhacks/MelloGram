@@ -289,6 +289,18 @@ impl AppState {
 
     /// Enriches, de-duplicates, logs and alerts a membership event.
     pub fn membership(&self, mut event: mellogram_core::relationships::MembershipEvent) -> UiEvent {
+        // A group that loses a member must rotate its sender keys, or the
+        // person who left could still read what is sent afterwards.
+        if event.chat_id < 0
+            && matches!(
+                event.kind,
+                mellogram_core::relationships::MembershipKind::Banned
+                    | mellogram_core::relationships::MembershipKind::Removed
+                    | mellogram_core::relationships::MembershipKind::Left
+            )
+        {
+            self.e2e.group_mark_rotation(event.chat_id);
+        }
         let bg = &self.background;
         if event.chat_title.is_none() {
             event.chat_title = bg.chat_titles.lock().unwrap().get(&event.chat_id).cloned();
