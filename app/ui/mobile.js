@@ -54,7 +54,16 @@
     if (narrow() && $("app")?.classList.contains("mg-show-chat")) {
       list.push(() => $("chat-back")?.click());
     }
-    if (visible($("settings"))) list.push(() => $("close-settings")?.click());
+    if (visible($("settings"))) {
+      list.push(() => $("close-settings")?.click());
+      // Phone shell: a settings page goes back to the settings list first.
+      const card = document.querySelector(".mg-settings");
+      if (body.classList.contains("mg-phone") && card && !card.classList.contains("mg-ph-list")) {
+        list.push(() => card.classList.add("mg-ph-list"));
+      }
+    }
+    if (visible(document.querySelector(".mg-ph-drawer"))) list.push(() => window.MelloGram.Phone?.closeDrawer());
+    if (visible(document.querySelector(".mg-info-panel"))) list.push(() => { document.querySelector(".mg-info-panel").hidden = true; });
     if (visible($("palette"))) list.push(() => { $("palette").hidden = true; });
     for (const overlay of dynamicOverlays()) {
       // Modals and the MelloID editor close on a click on their backdrop.

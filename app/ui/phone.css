@@ -1,0 +1,177 @@
+/* Phone shell (phone.js). Everything is scoped to body.mg-phone, which is only
+   set on touch phones (Android/iOS app, or the web client on a phone), so the
+   desktop layout never sees these rules. */
+
+body.mg-phone {
+  --mg-ph-bar: 56px;
+  --mg-ph-nav: 64px;
+  --mg-avatar: 52px;
+  --mg-bubble-max: 84%;
+  font-size: max(15px, var(--mg-font-size));
+}
+
+/* The desktop title bar is replaced by per-screen app bars. */
+body.mg-phone .mg-titlebar { display: none; }
+body.mg-phone .mg-app { grid-template: "main" 1fr / 1fr; }
+
+/* ---- chat list screen ------------------------------------------------------------- */
+
+body.mg-phone .mg-sidebar {
+  display: flex; flex-direction: column; min-height: 0; grid-area: main;
+  background: var(--mg-bg); border: 0; padding: 0;
+}
+body.mg-phone .mg-ph-appbar {
+  display: flex; align-items: center; gap: 4px; flex: none;
+  min-height: var(--mg-ph-bar);
+  padding: var(--mg-safe-top, 0px) max(4px, var(--mg-safe-right, 0px)) 0 max(4px, var(--mg-safe-left, 0px));
+  background: var(--mg-bg-2);
+}
+body.mg-phone .mg-ph-title { flex: 1; font-size: 1.25em; font-weight: 600; padding-left: 6px; }
+body.mg-phone .mg-ph-action { font-size: 1.35em; color: var(--mg-text); }
+
+body.mg-phone .mg-sidebar .mg-search { display: none; }
+body.mg-phone .mg-app.mg-ph-searching .mg-sidebar .mg-search { display: block; margin: 8px 12px; border-radius: 22px; padding: 10px 16px; }
+body.mg-phone .mg-app.mg-ph-searching .mg-ph-tabs { display: none; }
+
+body.mg-phone .mg-ph-tabs {
+  display: flex; gap: 6px; flex: none; overflow-x: auto; scrollbar-width: none;
+  padding: 0 12px 8px; background: var(--mg-bg-2); border-bottom: 1px solid var(--mg-border);
+}
+body.mg-phone .mg-ph-tabs::-webkit-scrollbar { display: none; }
+body.mg-phone .mg-ph-tabs button {
+  flex: none; border: 0; border-radius: 16px; padding: 6px 14px; min-height: 32px;
+  background: var(--mg-surface); color: var(--mg-muted); font: inherit; font-size: .9em;
+}
+body.mg-phone .mg-ph-tabs button.mg-active { background: var(--mg-accent); color: var(--mg-accent-text); }
+
+body.mg-phone .mg-chat-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 0 8px; }
+body.mg-phone .mg-chat-item { gap: 12px; padding: 8px 14px; border-radius: 0; min-height: 72px; }
+body.mg-phone .mg-chat-item.mg-ph-filtered { display: none; }
+body.mg-phone .mg-chat-item.mg-selected { background: none; }
+body.mg-phone .mg-chat-name { font-weight: 600; font-size: 1.02em; }
+body.mg-phone .mg-chat-last { font-size: .95em; }
+body.mg-phone .mg-unread { min-width: 22px; height: 22px; line-height: 22px; border-radius: 11px; font-size: .8em; }
+
+/* Bottom navigation (Material 3 navigation bar). */
+body.mg-phone .mg-ph-bottomnav {
+  display: flex; flex: none; justify-content: space-around;
+  min-height: var(--mg-ph-nav);
+  padding: 6px max(4px, var(--mg-safe-right, 0px)) var(--mg-safe-bottom, 0px) max(4px, var(--mg-safe-left, 0px));
+  background: var(--mg-bg-2); border-top: 1px solid var(--mg-border);
+}
+body.mg-phone .mg-ph-nav-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  border: 0; background: none; color: var(--mg-muted); font: inherit; font-size: .75em; min-height: 48px;
+}
+body.mg-phone .mg-ph-nav-icon { display: grid; place-items: center; width: 56px; height: 30px; border-radius: 15px; font-size: 1.4em; }
+body.mg-phone .mg-ph-nav-item.mg-active { color: var(--mg-text); }
+body.mg-phone .mg-ph-nav-item.mg-active .mg-ph-nav-icon { background: color-mix(in srgb, var(--mg-accent) 30%, transparent); }
+
+/* Navigation drawer. */
+body.mg-phone .mg-ph-scrim { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, .45); }
+body.mg-phone .mg-ph-drawer {
+  position: fixed; top: 0; bottom: 0; left: 0; z-index: 61; width: min(320px, 84vw);
+  display: flex; flex-direction: column; overflow-y: auto;
+  padding: var(--mg-safe-top, 0px) 0 var(--mg-safe-bottom, 0px) var(--mg-safe-left, 0px);
+  background: var(--mg-bg-2); border-radius: 0 16px 16px 0; box-shadow: 8px 0 30px rgba(0, 0, 0, .35);
+  transform: translateX(-100%); transition: transform .2s ease-out;
+}
+body.mg-phone .mg-ph-drawer.mg-open { transform: none; }
+body:not(.mg-phone) .mg-ph-drawer, body:not(.mg-phone) .mg-ph-scrim { display: none; }
+body.mg-phone .mg-ph-drawer-head { display: flex; align-items: center; gap: 12px; padding: 20px 18px; border-bottom: 1px solid var(--mg-border); }
+body.mg-phone .mg-ph-drawer-head img { width: 48px; height: 48px; }
+body.mg-phone .mg-ph-drawer-item {
+  display: flex; align-items: center; gap: 16px; min-height: 52px; padding: 0 20px;
+  border: 0; background: none; color: var(--mg-text); font: inherit; text-align: left;
+}
+body.mg-phone .mg-ph-drawer-item:active { background: var(--mg-surface); }
+body.mg-phone .mg-ph-drawer-icon { width: 24px; text-align: center; font-size: 1.15em; }
+body.mg-phone .mg-ph-drawer-sep { padding: 14px 20px 6px; color: var(--mg-muted); font-size: .8em; text-transform: uppercase; letter-spacing: .05em; border-top: 1px solid var(--mg-border); margin-top: 6px; }
+body.mg-phone .mg-ph-drawer-plugins .mg-header-buttons { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 16px 16px; overflow: visible; }
+body.mg-phone .mg-ph-drawer-plugins .mg-header-buttons:empty::after { content: "Plugins that add shortcuts show them here."; color: var(--mg-muted); font-size: .85em; padding: 0 4px; }
+body.mg-phone .mg-ph-drawer-plugins .mg-icon-btn { background: var(--mg-surface); border-radius: 12px; }
+
+/* ---- chat screen -------------------------------------------------------------------- */
+
+body.mg-phone .mg-main { grid-area: main; }
+body.mg-phone .mg-app.mg-show-chat .mg-main { animation: mg-ph-push .18s ease-out; }
+@keyframes mg-ph-push { from { transform: translateX(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+body.mg-phone .mg-chat-header {
+  min-height: var(--mg-ph-bar); gap: 6px;
+  padding: var(--mg-safe-top, 0px) max(4px, var(--mg-safe-right, 0px)) 0 max(2px, var(--mg-safe-left, 0px));
+  background: var(--mg-bg-2); border-bottom: 1px solid var(--mg-border);
+}
+body.mg-phone .mg-chat-header > div:not(.mg-ph-chat-avatar) { flex: 1; }
+body.mg-phone .mg-back { font-size: 1.4em; }
+body.mg-phone .mg-ph-chat-avatar .mg-avatar { width: 40px; height: 40px; font-size: 15px; }
+body.mg-phone .mg-ph-chat-avatar:empty { display: none; }
+body.mg-phone .mg-chat-title { font-size: 1.08em; font-weight: 600; }
+body.mg-phone .mg-chat-sub { font-size: .85em; }
+body.mg-phone .mg-ph-overflow { font-size: 1.4em; }
+
+body.mg-phone .mg-messages { padding: 8px 8px 4px; }
+body.mg-phone .mg-message { max-width: var(--mg-bubble-max); }
+
+/* Composer: one rounded field; plugin tools fold behind "+". */
+body.mg-phone .mg-composer { padding: 6px max(6px, var(--mg-safe-right, 0px)) max(6px, var(--mg-safe-bottom, 0px)) max(6px, var(--mg-safe-left, 0px)); background: var(--mg-bg-2); }
+body.mg-phone .mg-composer-row { align-items: flex-end; gap: 6px; flex-wrap: wrap; }
+body.mg-phone .mg-ph-plus { font-size: 1.5em; border-radius: 50%; background: var(--mg-surface); transition: transform .15s; }
+body.mg-phone .mg-composer-row.mg-ph-tools-open .mg-ph-plus { transform: rotate(45deg); }
+body.mg-phone .mg-composer-buttons { display: none; }
+body.mg-phone .mg-composer-row.mg-ph-tools-open .mg-composer-buttons {
+  display: flex; order: -1; flex: 1 1 100%; gap: 8px; overflow-x: auto; padding: 4px 2px 8px; scrollbar-width: none;
+}
+body.mg-phone .mg-composer-row.mg-ph-tools-open .mg-composer-buttons .mg-icon-btn { background: var(--mg-surface); border-radius: 14px; }
+body.mg-phone #composer { flex: 1; min-width: 0; border-radius: 22px; padding: 11px 16px; }
+body.mg-phone .mg-send { border-radius: 50%; width: 46px; height: 46px; flex: none; }
+
+/* Info panel as a full-screen page. */
+body.mg-phone .mg-info-panel {
+  top: 0; width: 100vw; border: 0; box-shadow: none; z-index: 40;
+  padding: calc(16px + var(--mg-safe-top, 0px)) 16px calc(16px + var(--mg-safe-bottom, 0px));
+  animation: mg-ph-push .18s ease-out;
+}
+body.mg-phone .mg-info-close { top: calc(8px + var(--mg-safe-top, 0px)); left: 8px; right: auto; }
+body.mg-phone .mg-info-avatar { width: 104px; height: 104px; font-size: 38px; }
+
+/* ---- settings: list → page ------------------------------------------------------------ */
+
+body.mg-phone .mg-settings { display: flex; flex-direction: column; padding: 0; }
+body.mg-phone .mg-settings .mg-close { display: none; }
+body.mg-phone .mg-ph-pagebar {
+  display: flex; align-items: center; gap: 8px; flex: none; min-height: var(--mg-ph-bar);
+  padding: var(--mg-safe-top, 0px) 8px 0 max(4px, var(--mg-safe-left, 0px));
+  background: var(--mg-bg-2); border-bottom: 1px solid var(--mg-border); font-size: 1.1em;
+}
+body.mg-phone .mg-ph-pagebar .mg-icon-btn { font-size: 1.3em; }
+body.mg-phone .mg-ph-listbar { display: none; }
+body.mg-phone .mg-settings.mg-ph-list .mg-ph-listbar { display: flex; }
+body.mg-phone .mg-settings.mg-ph-list .mg-ph-pagebar:not(.mg-ph-listbar) { display: none; }
+body.mg-phone .mg-settings-nav { display: none; }
+body.mg-phone .mg-settings.mg-ph-list .mg-settings-nav {
+  display: flex; flex-direction: column; flex: 1; overflow-y: auto; width: auto; padding: 0 0 24px; border: 0;
+}
+body.mg-phone .mg-settings.mg-ph-list .mg-settings-nav h4 {
+  display: block; margin: 0; padding: 18px 20px 6px; color: var(--mg-accent); font-size: .8em; text-transform: uppercase; letter-spacing: .05em;
+}
+body.mg-phone .mg-settings.mg-ph-list .mg-settings-nav button {
+  text-align: left; padding: 0 20px; min-height: 54px; border-radius: 0; background: none; font-size: 1em;
+  border-bottom: 1px solid color-mix(in srgb, var(--mg-border) 60%, transparent);
+}
+body.mg-phone .mg-settings.mg-ph-list .mg-settings-nav button::after { content: "›"; float: right; color: var(--mg-muted); font-size: 1.3em; }
+body.mg-phone .mg-settings.mg-ph-list .mg-settings-body { display: none; }
+body.mg-phone .mg-settings-body { flex: 1; overflow-y: auto; padding: 14px 16px calc(24px + var(--mg-safe-bottom, 0px)); }
+
+/* Rows must never push past the screen edge. */
+body.mg-phone .mg-sidebar, body.mg-phone .mg-chat-list { width: 100%; max-width: 100vw; overflow-x: hidden; }
+body.mg-phone .mg-chat-item { display: flex; align-items: center; width: 100%; box-sizing: border-box; }
+body.mg-phone .mg-chat-meta { flex: 1; min-width: 0; }
+body.mg-phone .mg-chat-top { display: flex; gap: 8px; min-width: 0; }
+body.mg-phone .mg-chat-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.mg-phone .mg-chat-time { flex: none; }
+body.mg-phone .mg-chat-last { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.mg-phone .mg-unread { flex: none; }
+body.mg-phone #settings { padding: 0; }
+body.mg-phone .mg-settings { width: 100vw; max-width: none; height: 100%; max-height: none; border: 0; border-radius: 0; box-sizing: border-box; }
+body.mg-phone .mg-settings.mg-ph-list .mg-settings-nav button { color: var(--mg-text); }
+body.mg-phone .mg-info-panel > :nth-child(2) { margin-top: 36px; }

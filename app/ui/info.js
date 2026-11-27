@@ -55,7 +55,7 @@
       const p = presenceFor(chat);
       sub.replaceChildren(
         h("span", { class: `mg-presence${isOnline(p) ? " mg-online" : ""}`, title: p?.state === "last-seen" ? new Date(p.at * 1000).toString() : "", text: formatPresence(p) }),
-        handle ? h("span", { class: "mg-muted", text: ` · ${handle}` }) : null);
+        handle ? h("span", { class: "mg-muted", text: formatPresence(p) ? ` · ${handle}` : handle }) : null);
       return;
     }
     sub.textContent = [handle, chat.kind].filter(Boolean).join(" · ");
@@ -115,6 +115,7 @@
       return;
     }
     if (App().currentChat()?.id !== chat.id) return;
+    if (!info) { panel.replaceChildren(closeBtn(), h("p", { class: "mg-hint", text: "No details are available for this chat." })); return; }
     const kindLabel = { user: info.bot ? "Bot" : "User", group: "Group", supergroup: "Supergroup", channel: "Channel" }[info.kind] || info.kind;
     panelPresence.textContent = info.kind === "user" ? formatPresence(presences.get(Number(chat.id)) || info.presence) : "";
     const avatar = h("div", { class: "mg-avatar mg-info-avatar", text: (info.title || chat.title || "?").split(/\s+/).map((w) => [...w][0] || "").join("").slice(0, 2).toUpperCase() });
