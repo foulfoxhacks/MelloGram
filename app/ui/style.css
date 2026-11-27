@@ -589,3 +589,5 @@ body.mg-wallpaper-target-window { background: var(--mg-bg); }
 #e2e-toggle[data-state="waiting"] { color: var(--mg-warning); }
 #e2e-toggle[data-state="on"] { color: var(--mg-success); }
 .mg-message.mg-e2e-locked .mg-text { font-family: var(--mg-mono); font-size: .82em; opacity: .75; word-break: break-all; }
+/* Safety numbers wrap in groups of five instead of scrolling sideways. */
+.mg-e2e-safety { white-space: pre-wrap; overflow-wrap: anywhere; }

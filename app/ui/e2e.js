@@ -24,7 +24,7 @@
     }
     return h("div", {},
       h("p", { class: "mg-hint", text: "Compare these 60 digits with them over a call or in person. They must match on both sides." }),
-      h("pre", { class: "mg-raw", text: state.safety_number }));
+      h("pre", { class: "mg-raw mg-e2e-safety", text: state.safety_number }));
   }
 
   // ---- the lock button in the composer ---------------------------------------
@@ -180,7 +180,7 @@
       h("div", {},
         h("label", { text: `User ${peer.peer_id}${peer.verified ? " · verified" : ""}` }),
         h("div", { class: "mg-hint", text: peer.fingerprint ? `Key ${peer.fingerprint}${peer.has_session ? " · session open" : ""}` : "No key yet" }),
-        peer.safety_number ? h("pre", { class: "mg-raw", text: peer.safety_number }) : null),
+        peer.safety_number ? h("pre", { class: "mg-raw mg-e2e-safety", text: peer.safety_number }) : null),
       h("button", {
         class: "mg-btn", text: "Forget",
         onclick: async () => {
