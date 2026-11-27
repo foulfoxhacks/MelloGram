@@ -15,6 +15,8 @@ import { pages } from "./pages.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SITE = (process.env.SITE_URL || "https://mellogram.foulfoxhacks.dev").replace(/\/+$/, "");
+// The browser client lives on its own host; it is a preview of the shell.
+const WEB = (process.env.WEB_URL || "https://wc.mellogram.foulfoxhacks.dev").replace(/\/+$/, "");
 const BASE = new URL(SITE + "/").pathname; // e.g. "/MelloGram/"
 const OUT = join(here, "dist");
 const REPO = "https://github.com/foulfoxhacks/MelloGram";
@@ -169,6 +171,10 @@ ${body}
     <nav aria-label="Product"><p class="footer-title">Product</p><ul>
       <li><a href="${href("/download/")}">Download</a></li><li><a href="${href("/plugins/")}">Plugins</a></li>
       <li><a href="${href("/themes/")}">Themes &amp; wallpapers</a></li><li><a href="${href("/faq/")}">FAQ</a></li></ul></nav>
+    <nav aria-label="Platforms"><p class="footer-title">Platforms</p><ul>
+      <li><a href="${DL("MelloGram-Setup-x64.exe")}" rel="noopener">Windows</a></li><li><a href="${DL("MelloGram-macos-universal.dmg")}" rel="noopener">macOS</a></li>
+      <li><a href="${DL("MelloGram-linux-amd64.deb")}" rel="noopener">Linux</a></li><li><a href="${DL("MelloGram-android.apk")}" rel="noopener">Android</a></li>
+      <li><a href="${WEB}" rel="noopener">Web client</a></li></ul></nav>
     <nav aria-label="Project"><p class="footer-title">Project</p><ul>
       <li><a href="${href("/developers/")}">Developers</a></li><li><a href="${href("/privacy/")}">Privacy</a></li>
       <li><a href="${REPO}" rel="noopener">Source code on GitHub</a></li><li><a href="${REPO}/releases" rel="noopener">Releases &amp; changelog</a></li></ul></nav>
@@ -189,7 +195,7 @@ const downloads = {
   linux: [["Debian / Ubuntu (.deb)", DL("MelloGram-linux-amd64.deb"), "Install with your software centre or sudo apt install ./MelloGram-linux-amd64.deb."], ["Fedora / openSUSE (.rpm)", DL("MelloGram-linux-x86_64.rpm"), "Install with sudo dnf install ./MelloGram-linux-x86_64.rpm."], ["AppImage", DL("MelloGram-linux-x86_64.AppImage"), "Portable for any distribution: chmod +x, then run it."]],
   android: [["Android app (.apk)", DL("MelloGram-android.apk"), "Allow installs from your browser when Android asks."]],
 };
-const ctx = { url, href, asset, img, esc, plugins, wallpapers, version, REPO, SITE, today, downloads };
+const ctx = { url, href, asset, img, esc, plugins, wallpapers, version, REPO, SITE, WEB, today, downloads };
 
 // ---- build ------------------------------------------------------------------
 

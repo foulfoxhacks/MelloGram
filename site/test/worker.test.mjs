@@ -31,9 +31,14 @@ test("pages are served with security headers and no-cache", async () => {
   assert.match(await response.text(), /home/);
 });
 
-test("hashed assets get a long immutable cache", async () => {
-  const response = await call("/assets/site.css", {}, { "/assets/site.css": page("body{}", "text/css") });
+test("images get a long immutable cache", async () => {
+  const response = await call("/assets/logo.png", {}, { "/assets/logo.png": page("x", "image/png") });
   assert.equal(response.headers.get("cache-control"), "public, max-age=31536000, immutable");
+});
+
+test("styles and scripts are revalidated so a redesign is not cached forever", async () => {
+  const response = await call("/assets/site.css", {}, { "/assets/site.css": page("body{}", "text/css") });
+  assert.equal(response.headers.get("cache-control"), "public, max-age=0, must-revalidate");
 });
 
 test("sitemap and robots are cached for an hour", async () => {
@@ -73,6 +78,8 @@ test("a missing assets binding is a clear 503", async () => {
 
 test("cache policy covers every asset class", () => {
   assert.equal(cacheControl("/assets/x.webp"), "public, max-age=31536000, immutable");
+  assert.equal(cacheControl("/assets/site.css"), "public, max-age=0, must-revalidate");
+  assert.equal(cacheControl("/assets/site.js"), "public, max-age=0, must-revalidate");
   assert.equal(cacheControl("/download/"), "no-cache");
   assert.equal(cacheControl("/faq/index.html"), "no-cache");
   assert.equal(cacheControl("/favicon.ico"), "public, max-age=86400");

@@ -145,6 +145,9 @@ export function pages(c) {
     <li class="card" id="${id}"><h3>MelloGram for ${name}</h3><p>${req}</p>
       <ul class="dl-list">${c.downloads[id].map(([label, link, note]) => `<li><a class="btn${label === c.downloads[id][0][0] ? "" : " btn-ghost"}" href="${link}" rel="noopener" data-os="${id}">Download ${esc(label)}</a><span class="muted small">${esc(note)}</span></li>`).join("")}</ul>
     </li>`).join("")}
+    <li class="card" id="web"><h3>MelloGram for the web</h3><p>Nothing to install.</p>
+      <ul class="dl-list"><li><a class="btn btn-ghost" href="${c.WEB}" rel="noopener">Open the web client</a><span class="muted small">A preview of the browser shell: it shows what works today and what does not. Telegram sign-in is not wired up yet, so keep using the desktop app for real chats.</span></li></ul>
+    </li>
   </ul>
   <p class="muted">All files come from the <a href="${c.REPO}/releases/latest" rel="noopener">latest GitHub release</a>, built automatically from the public source code. Older versions and checksums are on the <a href="${c.REPO}/releases" rel="noopener">releases page</a>.</p>
 </section>
@@ -177,6 +180,11 @@ export function pages(c) {
 <section class="section" aria-labelledby="verify">
   <h2 id="verify">Is the download safe?</h2>
   <p>Yes. MelloGram releases are built by GitHub Actions directly from the <a href="${c.REPO}" rel="noopener">public MelloGram repository</a>, so anyone can review exactly what goes into each installer. Only download MelloGram from the official releases page linked here.</p>
+  <p>Every release also ships a <code>SHA256SUMS</code> file next to the installers. Check the file you downloaded against it before running it:</p>
+  <pre><code>sha256sum -c SHA256SUMS                                    # Linux
+shasum -a 256 -c SHA256SUMS                                # macOS
+Get-FileHash .\MelloGram-Setup-x64.exe -Algorithm SHA256   # Windows</code></pre>
+  <p class="muted">Windows and macOS packages are code-signed when the release signing secrets are configured. Android packages use the release keystore when it is configured; without one, CI signs with a debug key so the app is still installable and Android may warn about an unknown developer.</p>
 </section>`,
     },
 

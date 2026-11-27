@@ -42,6 +42,16 @@ fn js_err(e: impl std::fmt::Display) -> JsError {
     JsError::new(&e.to_string())
 }
 
+/// Telegram chat ids reach us as JavaScript numbers, not BigInt. Accept only
+/// whole, exactly representable values so a silent rounding cannot move a
+/// message into another chat's associated data.
+fn whole_chat_id(value: f64) -> Result<i64, String> {
+    if !value.is_finite() || value.fract() != 0.0 || value.abs() > 9_007_199_254_740_991.0 {
+        return Err("chat id must be a whole number".to_owned());
+    }
+    Ok(value as i64)
+}
+
 /// A device identity. The secret bytes never leave the caller's control; keep
 /// them in browser storage that is encrypted, never in `localStorage`.
 #[wasm_bindgen]
@@ -101,16 +111,13 @@ impl WasmSession {
     pub fn start(
         identity: &WasmIdentity,
         peer_bundle: &str,
-        chat_id: i64,
+        chat_id: f64,
     ) -> Result<WasmSession, JsError> {
+        whole_chat_id(chat_id).map_err(js_err)?;
         let peer = PublicBundle::from_armored(peer_bundle).map_err(js_err)?;
         Session::initiate(&identity.inner, &peer)
             .map(|inner| WasmSession { inner })
             .map_err(js_err)
-        .map(|session| {
-            let _ = chat_id;
-            session
-        })
     }
 
     /// Restore a session from [`WasmSession::state`].
@@ -127,13 +134,13 @@ impl WasmSession {
     }
 
     /// Seals text and returns the armored message to send.
-    pub fn encrypt(&mut self, text: &str, chat_id: i64) -> Result<String, JsError> {
-        encrypt(&mut self.inner, text.as_bytes(), chat_id).map_err(js_err)
+    pub fn encrypt(&mut self, text: &str, chat_id: f64) -> Result<String, JsError> {
+        encrypt(&mut self.inner, text.as_bytes(), whole_chat_id(chat_id).map_err(js_err)?).map_err(js_err)
     }
 
     /// Opens an armored message from the peer.
-    pub fn decrypt(&mut self, armored: &str, chat_id: i64) -> Result<String, JsError> {
-        let plain = decrypt(&mut self.inner, armored, chat_id).map_err(js_err)?;
+    pub fn decrypt(&mut self, armored: &str, chat_id: f64) -> Result<String, JsError> {
+        let plain = decrypt(&mut self.inner, armored, whole_chat_id(chat_id).map_err(js_err)?).map_err(js_err)?;
         String::from_utf8(plain).map_err(js_err)
     }
 
@@ -154,8 +161,8 @@ impl WasmSession {
 /// `{"state":"<base64>","plaintext":"<the message that arrived>"}`.
 /// Store the state; reply with [`WasmSession::encrypt`] on that session.
 #[wasm_bindgen]
-pub fn accept(identity: &WasmIdentity, initial: &str, chat_id: i64) -> Result<String, JsError> {
-    let (session, plaintext) = respond(&identity.inner, initial, chat_id).map_err(js_err)?;
+pub fn accept(identity: &WasmIdentity, initial: &str, chat_id: f64) -> Result<String, JsError> {
+    let (session, plaintext) = respond(&identity.inner, initial, whole_chat_id(chat_id).map_err(js_err)?).map_err(js_err)?;
     let state = session.to_bytes().map_err(js_err)?;
     Ok(json!({
         "state": B64.encode(state.as_slice()),
@@ -188,7 +195,7 @@ mod tests {
     fn a_pairwise_conversation_works_through_the_bindings() {
         let alice = WasmIdentity::generate().unwrap();
         let bob = WasmIdentity::generate().unwrap();
-        let chat = 424242;
+        let chat = 424242.0;
 
         let mut out = WasmSession::start(&alice, &bob.bundle(), chat).unwrap();
         assert!(out.awaiting_reply());
@@ -206,11 +213,22 @@ mod tests {
         assert_eq!(out.safety_number(), inbox.safety_number());
     }
 
+    // `JsError::new` only exists in a browser, so the guard is tested directly
+    // instead of through a binding that would construct one.
+    #[test]
+    fn chat_ids_must_be_whole_numbers() {
+        for bad in [1.5, f64::NAN, f64::INFINITY, 9_007_199_254_740_992.0] {
+            assert!(whole_chat_id(bad).is_err(), "{bad} was accepted");
+        }
+        assert_eq!(whole_chat_id(4_294_967_296.0).unwrap(), 4_294_967_296);
+        assert_eq!(whole_chat_id(-1_000_000_000_000.0).unwrap(), -1_000_000_000_000);
+    }
+
     #[test]
     fn session_state_survives_a_restart() {
         let alice = WasmIdentity::generate().unwrap();
         let bob = WasmIdentity::generate().unwrap();
-        let chat = 7;
+        let chat = 7.0;
         let mut session = WasmSession::start(&alice, &bob.bundle(), chat).unwrap();
         let first = session.encrypt("before restart", chat).unwrap();
         let saved = session.state().unwrap();

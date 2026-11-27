@@ -17,7 +17,14 @@ const CSP = [
 ].join("; ");
 
 export function cacheControl(pathname) {
-  if (pathname.startsWith("/assets/")) return "public, max-age=31536000, immutable";
+  if (pathname.startsWith("/assets/")) {
+    // Images and fonts never change under the same name, so they cache for a
+    // year. Styles and scripts do change, and their names do not, so a browser
+    // must revalidate them or it keeps an old design forever.
+    return /\.(?:webp|png|jpe?g|gif|svg|ico|woff2?)$/i.test(pathname)
+      ? "public, max-age=31536000, immutable"
+      : "public, max-age=0, must-revalidate";
+  }
   if (pathname === "/" || pathname.endsWith("/") || pathname.endsWith(".html")) return "no-cache";
   if (pathname === "/sitemap.xml" || pathname === "/robots.txt" || pathname === "/site.webmanifest") {
     return "public, max-age=3600";

@@ -145,7 +145,7 @@ thead th{background:var(--surface-2)}
 
 /* Footer */
 .site-footer{border-top:1px solid rgba(169,157,255,.13);background:#0c0c15;padding:38px max(20px,calc((100vw - var(--max))/2)) 26px}
-.footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:32px}
+.footer-grid{display:grid;grid-template-columns:2fr repeat(3,minmax(0,1fr));gap:32px}
 .footer-brand,.footer-title{margin:0 0 10px;font-size:1.05rem;font-weight:850;color:#f4f2ff}
 .site-footer p{color:#9491ad}
 .site-footer ul{list-style:none;padding:0;margin:0}
@@ -157,7 +157,8 @@ thead th{background:var(--surface-2)}
   .site-header{gap:18px}
   .site-header nav ul{gap:5px 14px}
   .home-feature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .footer-grid{grid-template-columns:1.5fr 1fr 1fr}
+  .footer-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .footer-grid>div:first-child{grid-column:1/-1}
 }
 @media(max-width:700px){
   main{width:min(var(--max),calc(100% - 30px))}

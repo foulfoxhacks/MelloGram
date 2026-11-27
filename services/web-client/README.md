@@ -14,8 +14,12 @@ messages or claims encryption it does not have.
 - `GET /api/status` — service version and the capability list the page renders.
   Mutating methods are refused with `405` and an `Allow` header; unknown API
   routes are JSON `404`s.
-- Security headers on every response: strict CSP (no inline script or style),
-  `nosniff`, `DENY` framing, `Permissions-Policy`, `no-store` on JSON.
+- Security headers on every response: strict CSP (no inline script or style,
+  `wasm-unsafe-eval` for the overlay module only), `nosniff`, `DENY` framing,
+  `Permissions-Policy`, `no-store` on JSON.
+- **Run the protocol** on the page: the Rust overlay, compiled to WebAssembly,
+  generates two throwaway identities, shows their 60-digit safety number and
+  round-trips a message. Everything is in memory; nothing is stored.
 
 Capabilities live in `src/capabilities.js`, which is also what the tests assert
 against, so the page cannot drift from the code.
@@ -26,18 +30,19 @@ against, so the page cannot drift from the code.
   tested before it exists; the desktop app owns account login today.
 - **Chats and messages.** They need sign-in first. No server-side storage is
   provisioned, and none should be added for message content.
-- **The end-to-end overlay.** The protocol is Rust (`crates/ametherian-truee2e`).
-  A browser client needs it compiled to WebAssembly and a way to share the
-  device identity with the desktop app. Until that is done, the web client must
-  not offer encryption.
+- **Overlay storage and chat wiring.** The protocol runs in the browser, but
+  where a device secret lives (and how it would be shared with the desktop app)
+  is still an open design question. Until it is answered, the demo's identities
+  are discarded when the page closes and no chat uses the overlay.
 
 ## Development
 
 ```bash
 cd services/web-client
 npm install
-npm test            # node --test, no network
-npx wrangler dev    # http://localhost:8787
+npm test                     # node --test, no network
+node dev.mjs 8787            # preview the shell without Wrangler
+scripts/build-wasm.sh        # rebuild public/wasm after changing the crate
 ```
 
 Deploy with `npx wrangler deploy` once the Cloudflare account and the
@@ -51,5 +56,6 @@ that needs it.
 src/worker.js        routing, security headers, asset passthrough
 src/capabilities.js  service metadata and the capability list
 public/              static shell (index.html, styles.css, app.js)
+public/wasm/         committed wasm-bindgen output for the overlay demo
 test/                node:test suite for routing, headers and capability claims
 ```

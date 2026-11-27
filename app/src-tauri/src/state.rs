@@ -19,7 +19,9 @@ use mellogram_e2e::{E2eState, GroupDistribution};
 /// Recent messages, so edits can be compared with what was on screen.
 const MESSAGE_CACHE: usize = 20_000;
 /// How many members one sweep reads. Hitting this means the list is partial.
-const SWEEP_MEMBER_LIMIT: usize = 200;
+/// Hard cap on a roster read. Large groups are followed to this many members;
+/// above it the read is reported as incomplete, never as a full roster.
+const SWEEP_MEMBER_CAP: usize = 5_000;
 
 #[derive(Default)]
 pub struct MessageCache {
@@ -263,16 +265,13 @@ impl AppState {
         self.e2e.set_self_id(me);
         let mut flagged = 0;
         for chat_id in groups {
-            match tg.chat_members(chat_id, SWEEP_MEMBER_LIMIT).await {
-                Ok(members) => {
+            match tg.chat_members_all(chat_id, SWEEP_MEMBER_CAP).await {
+                Ok((members, complete)) => {
                     let ids: Vec<i64> = members
                         .iter()
                         .map(|m| m.id)
                         .filter(|id| *id != me)
                         .collect();
-                    // A list that hit the paging limit proves nothing about who
-                    // left, so it is recorded but not compared.
-                    let complete = members.len() < SWEEP_MEMBER_LIMIT;
                     if self.e2e.group_note_members(chat_id, &ids, complete).rotation_needed {
                         flagged += 1;
                     }
