@@ -1,0 +1,389 @@
+[
+  {
+    "id": "anonymise-uploads",
+    "name": "Anonymise Uploads",
+    "description": "Replaces the names of files you upload with random ones.",
+    "category": "privacy",
+    "default_on": false,
+    "inspired_by": "Vencord: AnonymiseFileNames",
+    "permissions": [
+      "modify-outgoing"
+    ],
+    "has_ui": false,
+    "settings": 2
+  },
+  {
+    "id": "bookmarks",
+    "name": "Bookmarks",
+    "description": "Bookmark messages and jump back to them from any chat.",
+    "category": "productivity",
+    "default_on": false,
+    "inspired_by": "Spec: MessageBookmarks / ConversationBookmarks",
+    "permissions": [
+      "ui",
+      "storage",
+      "read-messages"
+    ],
+    "has_ui": true,
+    "settings": 0
+  },
+  {
+    "id": "calculator",
+    "name": "Calculator",
+    "description": "Adds /calc: type an expression and send it with its result.",
+    "category": "utility",
+    "default_on": true,
+    "inspired_by": "Spec: QuickCalculator",
+    "permissions": [
+      "modify-outgoing"
+    ],
+    "has_ui": false,
+    "settings": 1
+  },
+  {
+    "id": "char-counter",
+    "name": "Character Counter",
+    "description": "Shows how many characters you've typed out of Telegram's 4096 limit.",
+    "category": "chat",
+    "default_on": true,
+    "inspired_by": "Vencord: CharacterCounter",
+    "permissions": [
+      "ui"
+    ],
+    "has_ui": true,
+    "settings": 1
+  },
+  {
+    "id": "chat-colorizer",
+    "name": "Chat Colorizer",
+    "description": "Gives every person a consistent name colour, with your own overrides per contact.",
+    "category": "appearance",
+    "default_on": false,
+    "inspired_by": "Vencord: IrcColors / Spec: ChatColorizer",
+    "permissions": [
+      "ui"
+    ],
+    "has_ui": true,
+    "settings": 4
+  },
+  {
+    "id": "chat-export",
+    "name": "Chat Export",
+    "description": "Export the loaded messages of a chat as text, Markdown or JSON.",
+    "category": "productivity",
+    "default_on": false,
+    "inspired_by": "Spec: MessageExport",
+    "permissions": [
+      "ui",
+      "read-messages"
+    ],
+    "has_ui": true,
+    "settings": 0
+  },
+  {
+    "id": "chat-stats",
+    "name": "Chat Statistics",
+    "description": "Statistics for the loaded part of a chat: messages per person, busiest hours, top words.",
+    "category": "productivity",
+    "default_on": false,
+    "inspired_by": "Spec: MessageStatistics / GroupActivityDashboard",
+    "permissions": [
+      "ui",
+      "read-messages"
+    ],
+    "has_ui": true,
+    "settings": 0
+  },
+  {
+    "id": "client-colors",
+    "name": "Client Colors",
+    "description": "Pick accent and background colours for the whole client.",
+    "category": "appearance",
+    "default_on": false,
+    "inspired_by": "Vencord: ClientTheme",
+    "permissions": [
+      "styles"
+    ],
+    "has_ui": false,
+    "settings": 3
+  },
+  {
+    "id": "copy-enhancer",
+    "name": "Copy Enhancer",
+    "description": "Extra copy options: as a quote, with sender and time, or as Markdown.",
+    "category": "chat",
+    "default_on": false,
+    "inspired_by": "Spec: MessageCopyEnhancer",
+    "permissions": [
+      "ui",
+      "clipboard"
+    ],
+    "has_ui": true,
+    "settings": 0
+  },
+  {
+    "id": "link-collection",
+    "name": "Link Collection",
+    "description": "Lists every link shared in the loaded part of a chat.",
+    "category": "productivity",
+    "default_on": false,
+    "inspired_by": "Spec: LinkCollection / ReadingList",
+    "permissions": [
+      "ui",
+      "read-messages"
+    ],
+    "has_ui": true,
+    "settings": 0
+  },
+  {
+    "id": "link-previews",
+    "name": "Link Preview Control",
+    "description": "Choose whether links you send get a preview card. Wrap a link in <…> to skip its preview.",
+    "category": "chat",
+    "default_on": false,
+    "inspired_by": "Vencord: UnsuppressEmbeds (inverted for Telegram)",
+    "permissions": [
+      "modify-outgoing"
+    ],
+    "has_ui": false,
+    "settings": 1
+  },
+  {
+    "id": "link-scrubber",
+    "name": "Link Scrubber",
+    "description": "Removes tracking parameters (utm_*, fbclid, si, …) from links you send.",
+    "category": "privacy",
+    "default_on": true,
+    "inspired_by": "Vencord: ClearURLs",
+    "permissions": [
+      "modify-outgoing"
+    ],
+    "has_ui": false,
+    "settings": 1
+  },
+  {
+    "id": "pin-chats",
+    "name": "Local Pins",
+    "description": "Pin chats to the top of your list on this device only, beyond Telegram's own pin limit.",
+    "category": "profiles",
+    "default_on": false,
+    "inspired_by": "Vencord: PinDMs",
+    "permissions": [
+      "ui"
+    ],
+    "has_ui": true,
+    "settings": 1
+  },
+  {
+    "id": "message-highlight",
+    "name": "Message Highlight",
+    "description": "Highlights messages containing your keywords, each with its own colour.",
+    "category": "chat",
+    "default_on": false,
+    "inspired_by": "Spec: MessageHighlight / keyword colouring",
+    "permissions": [
+      "read-messages",
+      "styles"
+    ],
+    "has_ui": false,
+    "settings": 3
+  },
+  {
+    "id": "message-history",
+    "name": "Message History",
+    "description": "Keeps deleted messages visible (struck through) and shows edit history. Stored only in memory on this device.",
+    "category": "chat",
+    "default_on": false,
+    "inspired_by": "Vencord: MessageLogger",
+    "permissions": [
+      "read-messages",
+      "styles"
+    ],
+    "has_ui": false,
+    "settings": 4
+  },
+  {
+    "id": "message-templates",
+    "name": "Message Templates",
+    "description": "Reusable message templates with {date}, {time}, {chat} and {cursor} placeholders.",
+    "category": "productivity",
+    "default_on": false,
+    "inspired_by": "Spec: MessageTemplates / CustomSnippets",
+    "permissions": [
+      "ui"
+    ],
+    "has_ui": true,
+    "settings": 1
+  },
+  {
+    "id": "name-display",
+    "name": "Name Display",
+    "description": "Show @usernames next to (or instead of) display names.",
+    "category": "appearance",
+    "default_on": false,
+    "inspired_by": "Vencord: ShowMeYourName",
+    "permissions": [
+      "read-messages"
+    ],
+    "has_ui": false,
+    "settings": 1
+  },
+  {
+    "id": "precise-timestamps",
+    "name": "Precise Timestamps",
+    "description": "Choose how message times are shown, down to the second.",
+    "category": "appearance",
+    "default_on": false,
+    "inspired_by": "Vencord: DontRoundMyTimestamps / ReplyTimestamp",
+    "permissions": [
+      "ui"
+    ],
+    "has_ui": true,
+    "settings": 1
+  },
+  {
+    "id": "privacy-mode",
+    "name": "Privacy Mode",
+    "description": "Blur chat previews, names, avatars or messages on your screen, plus a privacy screen when the window loses focus. Ctrl+Shift+H toggles a full blur.",
+    "category": "privacy",
+    "default_on": false,
+    "inspired_by": "Spec: LocalPrivacyMode / HideChatPreviews / HideAvatars / ScreenshotPrivacyOverlay",
+    "permissions": [
+      "styles",
+      "ui"
+    ],
+    "has_ui": true,
+    "settings": 7
+  },
+  {
+    "id": "quick-commands",
+    "name": "Quick Commands",
+    "description": "Adds /shrug, /tableflip, /lenny and your own text-snippet commands.",
+    "category": "chat",
+    "default_on": true,
+    "inspired_by": "Vencord: CustomCommands",
+    "permissions": [
+      "modify-outgoing"
+    ],
+    "has_ui": false,
+    "settings": 1
+  },
+  {
+    "id": "quick-notes",
+    "name": "Quick Notes",
+    "description": "A private notes panel for each chat, kept only on this device.",
+    "category": "productivity",
+    "default_on": false,
+    "inspired_by": "Spec: QuickNotes / ContactNotes",
+    "permissions": [
+      "ui",
+      "storage"
+    ],
+    "has_ui": true,
+    "settings": 0
+  },
+  {
+    "id": "read-all",
+    "name": "Read All",
+    "description": "Adds a button that marks every chat as read.",
+    "category": "notifications",
+    "default_on": false,
+    "inspired_by": "Vencord: ReadAllNotificationsButton",
+    "permissions": [
+      "ui"
+    ],
+    "has_ui": true,
+    "settings": 0
+  },
+  {
+    "id": "secret-guard",
+    "name": "Secret Guard",
+    "description": "Blocks messages that look like passwords, API keys, private keys or card numbers. Start a message with “!! ” to send anyway.",
+    "category": "privacy",
+    "default_on": true,
+    "inspired_by": "Spec: ClipboardWarning",
+    "permissions": [
+      "modify-outgoing"
+    ],
+    "has_ui": false,
+    "settings": 1
+  },
+  {
+    "id": "send-latency",
+    "name": "Send Latency",
+    "description": "Shows how long Telegram took to accept each message you send.",
+    "category": "developer",
+    "default_on": false,
+    "inspired_by": "Vencord: MessageLatency",
+    "permissions": [
+      "ui"
+    ],
+    "has_ui": true,
+    "settings": 1
+  },
+  {
+    "id": "silent-send",
+    "name": "Silent Send",
+    "description": "Adds a bell toggle and /silent to send messages without a notification sound.",
+    "category": "chat",
+    "default_on": true,
+    "inspired_by": "Vencord: SilentMessageToggle",
+    "permissions": [
+      "modify-outgoing",
+      "ui"
+    ],
+    "has_ui": true,
+    "settings": 2
+  },
+  {
+    "id": "silent-typing",
+    "name": "Silent Typing",
+    "description": "Don't show others that you're typing.",
+    "category": "privacy",
+    "default_on": false,
+    "inspired_by": "Vencord: SilentTyping",
+    "permissions": [],
+    "has_ui": false,
+    "settings": 1
+  },
+  {
+    "id": "text-replace",
+    "name": "Text Replace",
+    "description": "Automatically replaces text in messages you send using your own rules.",
+    "category": "chat",
+    "default_on": false,
+    "inspired_by": "Vencord: TextReplace",
+    "permissions": [
+      "modify-outgoing"
+    ],
+    "has_ui": false,
+    "settings": 1
+  },
+  {
+    "id": "unindent",
+    "name": "Unindent",
+    "description": "Trims shared indentation from code blocks you paste and send.",
+    "category": "chat",
+    "default_on": true,
+    "inspired_by": "Vencord: Unindent",
+    "permissions": [
+      "modify-outgoing"
+    ],
+    "has_ui": false,
+    "settings": 0
+  },
+  {
+    "id": "view-raw",
+    "name": "View Raw",
+    "description": "Adds “View raw” to the message menu, showing the message exactly as the client sees it.",
+    "category": "developer",
+    "default_on": false,
+    "inspired_by": "Vencord: ViewRaw",
+    "permissions": [
+      "ui",
+      "read-messages"
+    ],
+    "has_ui": true,
+    "settings": 0
+  }
+]

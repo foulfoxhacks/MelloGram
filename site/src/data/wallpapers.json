@@ -1,0 +1,77 @@
+[
+  {
+    "name": "Midnight Aurora",
+    "css": "background: linear-gradient(120deg, #1a1446, #3b2a8f, #0e5e6f, #5b2a86, #1a1446); background-size: 400% 400%; animation: mg-wp-pan 30s ease-in-out infinite alternate; --mg-wp-dim: 0.00;",
+    "type": "animated"
+  },
+  {
+    "name": "Nebula",
+    "css": "background: radial-gradient(circle at 15% 20%, #8b7cf680 0, transparent 45%), radial-gradient(circle at 45% 57%, #ff8fab66 0, transparent 45%), radial-gradient(circle at 75% 24%, #43c59e55 0, transparent 45%), var(--mg-bg); background-size: 160% 160%; animation: mg-wp-drift 40s ease-in-out infinite alternate; --mg-wp-dim: 0.00;",
+    "type": "animated"
+  },
+  {
+    "name": "Ocean Waves",
+    "css": "background: repeating-linear-gradient(160deg, #0b2545, #13315c, #134074, #0b2545 40%); background-size: 200% 200%; animation: mg-wp-pan 60s linear infinite; --mg-wp-dim: 0.00;",
+    "type": "animated"
+  },
+  {
+    "name": "Breathe",
+    "css": "background: #2a1f4f; animation: mg-wp-hue 20s ease-in-out infinite alternate; --mg-wp-dim: 0.00;",
+    "type": "animated"
+  },
+  {
+    "name": "Lavender",
+    "css": "background: linear-gradient(160deg, #b8a9ff, #8b7cf6, #5b4bc4); --mg-wp-dim: 0.00;",
+    "type": "gradient"
+  },
+  {
+    "name": "Sunset",
+    "css": "background: linear-gradient(200deg, #ff9a8b, #ff6a88, #7f53ac); --mg-wp-dim: 0.00;",
+    "type": "gradient"
+  },
+  {
+    "name": "Forest",
+    "css": "background: linear-gradient(170deg, #0f2e1d, #1e5631, #4c9a2a); --mg-wp-dim: 0.00;",
+    "type": "gradient"
+  },
+  {
+    "name": "Pastel",
+    "css": "background: linear-gradient(135deg, #ffd6e8, #d6e4ff, #d8ffe8); --mg-wp-dim: 0.00;",
+    "type": "gradient"
+  },
+  {
+    "name": "Glow",
+    "css": "background: radial-gradient(circle at 30% 20%, #3b2a8f, #0f1222); --mg-wp-dim: 0.00;",
+    "type": "gradient"
+  },
+  {
+    "name": "Paw Prints",
+    "css": "background: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' opacity='0.35'%3E%3Cg transform='translate(16 16) scale(1.6)' fill='%238b7cf6'%3E%3Cellipse cx='10' cy='13' rx='5' ry='4'/%3E%3Ccircle cx='4' cy='7' r='2'/%3E%3Ccircle cx='8' cy='4' r='2'/%3E%3Ccircle cx='12' cy='4' r='2'/%3E%3Ccircle cx='16' cy='7' r='2'/%3E%3C/g%3E%3C/svg%3E\") repeat, #151933; --mg-wp-dim: 0.00;",
+    "type": "pattern"
+  },
+  {
+    "name": "Hearts",
+    "css": "background: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' opacity='0.30'%3E%3Cpath transform='translate(14 14) scale(1.4)' d='M10 18L2.5 10.5A4.5 4.5 0 0 1 10 4a4.5 4.5 0 0 1 7.5 6.5z' fill='%23ff8fab'/%3E%3C/svg%3E\") repeat, #2a1730; --mg-wp-dim: 0.00;",
+    "type": "pattern"
+  },
+  {
+    "name": "Starfield",
+    "css": "background: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90' opacity='0.70'%3E%3Ccircle cx='18' cy='30' r='1' fill='%23ffffff'/%3E%3Ccircle cx='60' cy='15' r='1.5' fill='%23ffffff'/%3E%3Ccircle cx='45' cy='72' r='0.8' fill='%23ffffff'/%3E%3C/svg%3E\") repeat, #05060f; --mg-wp-dim: 0.00;",
+    "type": "pattern"
+  },
+  {
+    "name": "Blueprint",
+    "css": "background: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' opacity='0.45'%3E%3Cpath d='M24 0H0V24' fill='none' stroke='%234f7cff' stroke-width='1'/%3E%3C/svg%3E\") repeat, #0b1a3a; --mg-wp-dim: 0.00;",
+    "type": "pattern"
+  },
+  {
+    "name": "Dots",
+    "css": "background: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' opacity='0.30'%3E%3Ccircle cx='11' cy='11' r='2' fill='%239a98b3'/%3E%3C/svg%3E\") repeat, #17161f; --mg-wp-dim: 0.00;",
+    "type": "pattern"
+  },
+  {
+    "name": "AMOLED Black",
+    "css": "background: #000000; --mg-wp-dim: 0.00;",
+    "type": "solid"
+  }
+]
