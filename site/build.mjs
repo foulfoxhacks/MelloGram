@@ -65,8 +65,10 @@ const ORG = {
   "@type": "Organization",
   "@id": url("/#organization"),
   name: "FoulFoxHacks",
-  url: url("/"),
-  logo: { "@type": "ImageObject", url: url("/assets/icon-512.png"), width: 512, height: 512 },
+  alternateName: "FoulFoxHacks",
+  url: "https://github.com/foulfoxhacks",
+  logo: { "@type": "ImageObject", url: url("/assets/logo.png"), caption: "FoulFoxHacks and MelloGram brand mark" },
+  image: url("/assets/logo.png"),
   sameAs: ["https://github.com/foulfoxhacks"],
 };
 const WEBSITE = {
@@ -119,7 +121,7 @@ function layout(page, body) {
 <link rel="alternate" hreflang="en" href="${url(page.path)}">
 <link rel="alternate" hreflang="x-default" href="${url(page.path)}">
 <meta name="robots" content="${page.noindex ? "noindex, follow" : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"}">
-<meta name="author" content="FoulFoxHacks">
+<meta name="author" content="FoulFoxHacks">\n<meta name="publisher" content="FoulFoxHacks">\n<meta name="application-name" content="MelloGram">\n<meta name="keywords" content="MelloGram, Telegram client, customizable Telegram, Telegram plugins, Telegram themes, QuickCSS, FoulFoxHacks, open source messaging client">
 <meta name="theme-color" content="#17161f">
 <meta name="color-scheme" content="dark light">
 <meta property="og:type" content="${page.path === "/" ? "website" : "article"}">
@@ -141,7 +143,7 @@ function layout(page, body) {
 <link rel="icon" type="image/png" sizes="32x32" href="${asset("favicon-32.png")}">
 <link rel="apple-touch-icon" href="${asset("apple-touch-icon.png")}">
 <link rel="manifest" href="${href("/site.webmanifest")}">
-<link rel="stylesheet" href="${asset("site.css")}">
+<link rel="stylesheet" href="${asset("site.css")}">\n<link rel="sitemap" type="application/xml" title="MelloGram XML Sitemap" href="${href("/sitemap.xml")}">
 <script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@graph": graph })}</script>
 </head>
 <body>
@@ -244,7 +246,7 @@ writeFileSync(join(OUT, "site.webmanifest"), JSON.stringify({
 
 // llms.txt: a plain-language map for AI assistants and answer engines.
 const { llms } = await import("./pages.mjs");
-writeFileSync(join(OUT, "llms.txt"), llms(ctx));
+writeFileSync(join(OUT, "llms.txt"), llms(ctx));\nwriteFileSync(join(OUT, "llms-full.txt"), llms(ctx, { full: true }));\ncpSync(join(here, "sitemap.xsl"), join(OUT, "sitemap.xsl"));
 writeFileSync(join(OUT, ".nojekyll"), "");
 writeFileSync(join(OUT, ".site-url"), SITE + "\n"); // read by check.mjs
 // Custom domain for GitHub Pages (only when served from a domain root).
