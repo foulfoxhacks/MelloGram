@@ -115,89 +115,87 @@ export function pages(c) {
       images: ["screenshot-chat.webp", "screenshot-plugins.webp", "screenshot-wallpapers.webp", "screenshot-appearance-studio.webp", "og-image.png"],
       jsonld: (c) => [softwareApp(c), faqJsonLd(home)],
       body: () => `
-<section class="hero">
-  <div class="hero-text">
-    <p class="eyebrow">Free · Open source · Built in Rust</p>
-    <h1>MelloGram, the customizable Telegram client</h1>
-    <p class="lead">MelloGram is a free, open-source Telegram client that you can make your own: ${c.plugins.length} built-in plugins, CSS themes and QuickCSS, animated and per-chat wallpapers, and workspaces — on Windows, macOS, Linux and Android.</p>
-    <div class="cta">
+<section class="home-hero">
+  <div class="home-hero-copy">
+    <p class="eyebrow">A customizable Telegram client by FoulFoxHacks</p>
+    <h1>Make Telegram <span class="gradient-text">your own.</span></h1>
+    <p class="lead">The client-mod experience, built into a standalone Telegram app. Explore ${c.plugins.length} built-in plugins, themes, live QuickCSS, custom wallpapers and workspaces — without patching another app.</p>
+    <div class="cta home-cta">
       <a class="btn" href="${href("/download/")}" data-download>Download MelloGram</a>
-      <a class="btn btn-ghost" href="${c.REPO}" rel="noopener">View source on GitHub</a>
+      <a class="btn btn-ghost" href="${href("/plugins/")}">Explore plugins</a>
     </div>
-    <p class="muted small">Version ${esc(c.version)} · Windows, Linux, Android · Unofficial client, not affiliated with Telegram</p>
+    <p class="home-meta">Free and open source · Windows · macOS · Linux · Android</p>
   </div>
-  <figure class="hero-shot">
-    ${img("screenshot-chat.webp", "MelloGram chat window with a paw-print wallpaper, custom name colours and the plugin command popup", "MelloGram chat window", { eager: true })}
+  <figure class="home-hero-shot">
+    ${img("screenshot-chat.webp", "MelloGram chat interface with custom colours and a paw-print wallpaper", "See MelloGram in action", { eager: true })}
   </figure>
 </section>
 
-<section class="section" aria-labelledby="what">
-  <h2 id="what">What is MelloGram?</h2>
-  <p><strong>MelloGram is a standalone Telegram client focused on customization.</strong> It signs in with your normal Telegram account through Telegram's official API and gives you the control that Discord users get from client mods like Vencord — without patching or injecting into anyone else's app.</p>
-  <p>Everything is built in and works offline-first: plugins run inside the client with declared permissions, themes are plain CSS, and your settings, plugin data and diagnostics never leave your device. Optional MelloGram services, such as MelloID public profiles and MelloRPC rich presence, only add to the client; messaging keeps working without them.</p>
-</section>
-
-<section class="section" aria-labelledby="features">
-  <h2 id="features">Features</h2>
-  <ul class="cards">
-    ${featureCards(c).map(([t, d, l]) => `<li class="card"><h3>${t}</h3><p>${d}</p><a href="${href(l)}">Learn more about ${t.toLowerCase()}</a></li>`).join("")}
+<section class="home-features section" aria-labelledby="home-features-title">
+  <div class="home-section-heading">
+    <p class="eyebrow">Built around your Telegram experience</p>
+    <h2 id="home-features-title">More than a different look.</h2>
+    <p class="lead">Useful tools, thoughtful customization and control over how your client behaves.</p>
+  </div>
+  <ul class="home-feature-grid">
+    <li class="home-feature-card">
+      ${img("screenshot-plugins.webp", "MelloGram plugin manager with searchable plugins and permission labels", "Built-in plugin manager", { cls: "home-feature-image" })}
+      <div><h3>Plugins, ready to use</h3><p>${c.plugins.length} built-in plugins for privacy, productivity, chat tools and quality-of-life improvements. Enable what you want and inspect permissions before switching it on.</p><a href="${href("/plugins/")}">Browse plugins</a></div>
+    </li>
+    <li class="home-feature-card">
+      ${img("screenshot-appearance-studio.webp", "MelloGram Appearance Studio with live interface customization controls", "Appearance Studio", { cls: "home-feature-image" })}
+      <div><h3>Make it look like yours</h3><p>Customize message bubbles, spacing, fonts, density, colours and animations with a live preview — no CSS knowledge required.</p><a href="${href("/themes/#appearance-studio")}">Explore Appearance Studio</a></div>
+    </li>
+    <li class="home-feature-card">
+      ${img("screenshot-wallpapers.webp", "MelloGram wallpaper gallery with gradients, animated scenes and paw-print patterns", "Themes and wallpapers", { cls: "home-feature-image" })}
+      <div><h3>Themes, wallpapers and QuickCSS</h3><p>Install CSS themes, edit theme variables, create your own styles and set image, gradient, patterned or animated chat backgrounds.</p><a href="${href("/themes/")}">Explore customization</a></div>
+    </li>
+    <li class="home-feature-card">
+      ${img("screenshot-workspaces.webp", "MelloGram workspace selector showing saved client configurations", "MelloGram workspaces", { cls: "home-feature-image" })}
+      <div><h3>Workspaces that switch with you</h3><p>Save complete setups for work, gaming or privacy, then switch between plugins, themes, CSS and appearance settings in one step.</p><a href="${href("/faq/#how-do-i-back-up-or-share-my-mellogram-setup")}">Learn about workspaces</a></div>
+    </li>
+    <li class="home-feature-card">
+      ${img("screenshot-diagnostics.webp", "MelloGram local diagnostics and testing centre", "MelloGram diagnostics", { cls: "home-feature-image" })}
+      <div><h3>Privacy and diagnostics</h3><p>Keep settings and diagnostics local, use app lock and privacy blur, and troubleshoot with the built-in testing centre and safe mode.</p><a href="${href("/privacy/")}">Read about privacy</a></div>
+    </li>
+    <li class="home-feature-card">
+      ${img("screenshot-android.webp", "MelloGram running on an Android phone", "MelloGram on Android", { cls: "home-feature-image" })}
+      <div><h3>Your client across platforms</h3><p>Take the MelloGram experience to Windows, macOS, Linux and Android, with platform-specific installers from the project releases.</p><a href="${href("/download/")}">Choose your platform</a></div>
+    </li>
   </ul>
 </section>
 
-<section class="section split" aria-labelledby="plugins-preview">
-  <div>
-    <h2 id="plugins-preview">${c.plugins.length} plugins, switched on with one click</h2>
-    <p>MelloGram's plugin manager works like the one Discord modders know: search, filter by category, favourite, and configure each plugin in an auto-generated settings panel. Every plugin declares what it can access — for example "changes what you send" — before you enable it.</p>
+<section class="home-showcase section" aria-labelledby="home-showcase-title">
+  <div class="home-showcase-copy">
+    <p class="eyebrow">Your Telegram, your rules</p>
+    <h2 id="home-showcase-title">A familiar messenger. A much more personal client.</h2>
+    <p>Sign in with your existing Telegram account. MelloGram is a standalone client built around the official Telegram API, with its own customization platform — not a patch, injector or modified Telegram Desktop installation.</p>
     <ul class="ticks">
-      <li><strong>Link Scrubber</strong> removes tracking parameters from links you send.</li>
-      <li><strong>Message History</strong> keeps deleted messages and edit history on your screen.</li>
-      <li><strong>Secret Guard</strong> stops you from sending API keys, private keys or card numbers.</li>
-      <li><strong>Templates, Bookmarks, Quick Notes and Chat Statistics</strong> for productivity.</li>
+      <li>Plugins declare their permissions before you enable them.</li>
+      <li>Themes are CSS and QuickCSS applies changes live.</li>
+      <li>Backups never include your Telegram login credentials.</li>
     </ul>
-    <p><a href="${href("/plugins/")}">Browse all ${c.plugins.length} MelloGram plugins</a></p>
+    <p><a href="${href("/faq/")}">Read the FAQ and getting-started guide</a></p>
   </div>
-  <figure>${img("screenshot-plugins.webp", "MelloGram plugin manager listing plugins with toggles, categories and permission tags", "MelloGram plugin manager")}</figure>
+  <figure class="home-showcase-shot">
+    ${img("screenshot-plugins.webp", "MelloGram plugin manager showing built-in extensions and permission information", "MelloGram plugin experience")}
+  </figure>
 </section>
 
-<section class="section split reverse" aria-labelledby="look">
-  <div>
-    <h2 id="look">Make Telegram look the way you want</h2>
-    <p>Three layers of customization stack together: <strong>themes</strong> (CSS files with editable colour variables), the <strong>Appearance Studio</strong> (bubble styles, radius, spacing, fonts, density and animations with a live preview), and <strong>QuickCSS</strong> for anything else, applied live.</p>
-    <p>The <strong>wallpaper engine</strong> puts your own images, gradients, patterns or animated scenes behind your chats or the whole window, with blur, dim and parallax, a dark-mode variant and per-chat wallpapers.</p>
-    <p><a href="${href("/themes/")}">See themes, wallpapers and the Appearance Studio</a></p>
-  </div>
-  <figure>${img("screenshot-wallpapers.webp", "MelloGram wallpaper gallery with aurora, nebula, gradient and paw-print presets", "MelloGram wallpaper engine")}</figure>
-</section>
-
-<section class="section" aria-labelledby="compare">
-  <h2 id="compare">MelloGram vs. Telegram Desktop</h2>
-  <p>Both are Telegram clients that use the official API; MelloGram adds a customization layer on top of messaging.</p>
-  <div class="table-wrap"><table>
-    <caption>Feature comparison between MelloGram and the official Telegram Desktop client</caption>
-    <thead><tr><th scope="col">Feature</th><th scope="col">MelloGram</th><th scope="col">Telegram Desktop</th></tr></thead>
-    <tbody>
-      <tr><th scope="row">Price and licence</th><td>Free, GPL-3.0 open source</td><td>Free, GPL-3.0 open source</td></tr>
-      <tr><th scope="row">Plugin manager</th><td>Yes, ${c.plugins.length} built-in plugins</td><td>No</td></tr>
-      <tr><th scope="row">Custom CSS themes and QuickCSS</th><td>Yes</td><td>No (colour themes only)</td></tr>
-      <tr><th scope="row">Animated and per-chat wallpapers</th><td>Yes</td><td>Chat backgrounds</td></tr>
-      <tr><th scope="row">Workspaces and shareable setups</th><td>Yes</td><td>No</td></tr>
-      <tr><th scope="row">App lock with PIN</th><td>Yes</td><td>Local passcode</td></tr>
-      <tr><th scope="row">Command palette</th><td>Yes (Ctrl+P)</td><td>No</td></tr>
-      <tr><th scope="row">Photos, video and calls</th><td>In development</td><td>Yes</td></tr>
-    </tbody>
-  </table></div>
-</section>
-
-<section class="section" aria-labelledby="faq">
-  <h2 id="faq">Frequently asked questions</h2>
+<section class="home-faq section" aria-labelledby="faq">
+  <div class="home-section-heading"><p class="eyebrow">Good to know</p><h2 id="faq">Frequently asked questions</h2></div>
   ${home.map(([q, a]) => `<details class="faq"><summary><h3>${esc(q)}</h3></summary><p>${esc(a)}</p></details>`).join("")}
-  <p><a href="${href("/faq/")}">Read all MelloGram questions and answers</a></p>
+  <p><a href="${href("/faq/")}">Read all questions and answers</a></p>
 </section>
 
-<section class="section cta-band" aria-labelledby="get">
-  <h2 id="get">Get MelloGram</h2>
-  <p>Download the latest release for Windows, Linux or Android and sign in with your Telegram account in under a minute.</p>
-  <a class="btn" href="${href("/download/")}" data-download>Download MelloGram</a>
+<section class="home-download section" aria-labelledby="get">
+  <p class="eyebrow">Ready when you are</p>
+  <h2 id="get">Give your Telegram a little more you.</h2>
+  <p>Free, open source and available across your devices. Download MelloGram and start customizing.</p>
+  <div class="cta home-cta">
+    <a class="btn" href="${href("/download/")}" data-download>Download MelloGram</a>
+    <a class="btn btn-ghost" href="${c.REPO}" rel="noopener">View source on GitHub</a>
+  </div>
 </section>`,
     },
 
