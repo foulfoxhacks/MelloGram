@@ -363,6 +363,19 @@ impl Telegram {
         Ok(self.client.upload_stream(&mut f, size, file.file_name.clone()).await?)
     }
 
+    /// Sends a location pin.
+    pub async fn send_location(&self, chat_id: i64, lat: f64, long: f64, silent: bool) -> Result<IncomingMessage> {
+        if !(-90.0..=90.0).contains(&lat) || !(-180.0..=180.0).contains(&long) || !lat.is_finite() || !long.is_finite() {
+            return Err(TgError::Login("coordinates are out of range".into()));
+        }
+        let peer = self.peer_ref(chat_id).await?;
+        let media = tl::types::InputMediaGeoPoint {
+            geo_point: tl::enums::InputGeoPoint::Point(tl::types::InputGeoPoint { lat, long, accuracy_radius: None }),
+        };
+        let sent = self.client.send_message(peer, InputMessage::new().silent(silent).media(media)).await?;
+        Ok(convert(&sent))
+    }
+
     pub async fn send_typing(&self, chat_id: i64) -> Result<()> {
         let peer = self.peer_ref(chat_id).await?;
         self.client
@@ -602,6 +615,8 @@ pub fn convert(m: &grammers_client::message::Message) -> IncomingMessage {
         deleted: false,
         classes: Vec::new(),
         highlight: None,
+        media: m.media().map(|media| media_info(&media)),
+        grouped_id: m.grouped_id(),
     }
 }
 
@@ -771,5 +786,203 @@ mod tests {
     fn channel_change_is_reported() {
         let u = tl::enums::Update::Channel(tl::types::UpdateChannel { channel_id: 99 });
         assert!(matches!(membership_from_raw(&u, 1), Some(TgEvent::ChatChanged { chat_id: -1_000_000_000_099 })));
+    }
+}
+
+// ---- media ---------------------------------------------------------------------
+
+use grammers_client::media::Media;
+use mellogram_core::model::{ContactInfo, GeoInfo, MediaInfo, MediaKind, PollInfo, WebPreview};
+
+fn text_of(t: &tl::enums::TextWithEntities) -> String {
+    let tl::enums::TextWithEntities::Entities(t) = t;
+    t.text.clone()
+}
+
+fn geo_of(g: &grammers_client::media::Geo) -> GeoInfo {
+    GeoInfo { lat: g.latitue() /* sic: grammers spelling */, long: g.longitude(), accuracy_m: g.accuracy_radius(), ..Default::default() }
+}
+
+/// Describes a message attachment for the UI.
+pub fn media_info(media: &Media) -> MediaInfo {
+    let mut info = MediaInfo::default();
+    match media {
+        Media::Photo(p) => {
+            info.kind = MediaKind::Photo;
+            info.mime = Some("image/jpeg".into());
+            info.size = p.size().map(|s| s as u64);
+            info.spoiler = p.is_spoiler();
+            info.has_thumbnail = !p.thumbs().is_empty();
+            if let Some(tl::enums::Photo::Photo(raw)) = &p.raw.photo {
+                if let Some((w, h)) = raw.sizes.iter().filter_map(|s| match s {
+                    tl::enums::PhotoSize::Size(s) => Some((s.w, s.h)),
+                    tl::enums::PhotoSize::Progressive(s) => Some((s.w, s.h)),
+                    _ => None,
+                }).max_by_key(|(w, h)| i64::from(*w) * i64::from(*h)) {
+                    info.width = u32::try_from(w).ok();
+                    info.height = u32::try_from(h).ok();
+                }
+            }
+        }
+        Media::Sticker(s) => {
+            let mime = s.document.mime_type().unwrap_or("");
+            info.kind = if mime == "application/x-tgsticker" {
+                MediaKind::AnimatedSticker
+            } else if mime == "video/webm" {
+                MediaKind::VideoSticker
+            } else {
+                MediaKind::Sticker
+            };
+            info.mime = Some(mime.to_owned());
+            info.size = s.document.size().map(|v| v as u64);
+            info.emoji = Some(s.emoji().to_owned()).filter(|e| !e.is_empty());
+            if let Some((w, h)) = s.document.resolution() {
+                info.width = u32::try_from(w).ok();
+                info.height = u32::try_from(h).ok();
+            }
+        }
+        Media::Document(d) => {
+            info.mime = d.mime_type().map(str::to_owned);
+            info.file_name = d.name().map(str::to_owned).filter(|n| !n.is_empty());
+            info.size = d.size().map(|v| v as u64);
+            info.duration = d.duration();
+            info.title = d.audio_title().map(str::to_owned);
+            info.performer = d.performer().map(str::to_owned);
+            info.spoiler = d.is_spoiler();
+            info.has_thumbnail = !d.thumbs().is_empty();
+            if let Some((w, h)) = d.resolution() {
+                info.width = u32::try_from(w).ok();
+                info.height = u32::try_from(h).ok();
+            }
+            let attrs: Vec<tl::enums::DocumentAttribute> = match &d.raw.document {
+                Some(tl::enums::Document::Document(doc)) => doc.attributes.clone(),
+                _ => Vec::new(),
+            };
+            let animated = attrs.iter().any(|a| matches!(a, tl::enums::DocumentAttribute::Animated));
+            let voice = d.raw.voice || attrs.iter().any(|a| matches!(a, tl::enums::DocumentAttribute::Audio(x) if x.voice));
+            let round = d.raw.round || attrs.iter().any(|a| matches!(a, tl::enums::DocumentAttribute::Video(x) if x.round_message));
+            let video = attrs.iter().any(|a| matches!(a, tl::enums::DocumentAttribute::Video(_)));
+            let audio = attrs.iter().any(|a| matches!(a, tl::enums::DocumentAttribute::Audio(_)));
+            info.kind = if animated {
+                MediaKind::Gif
+            } else if voice {
+                MediaKind::Voice
+            } else if round {
+                MediaKind::RoundVideo
+            } else if video {
+                MediaKind::Video
+            } else if audio {
+                MediaKind::Audio
+            } else if info.mime.as_deref().is_some_and(|m| m.starts_with("image/")) && info.mime.as_deref() != Some("image/svg+xml") {
+                MediaKind::Photo
+            } else {
+                MediaKind::Document
+            };
+        }
+        Media::Contact(c) => {
+            info.kind = MediaKind::Contact;
+            info.contact = Some(ContactInfo {
+                name: format!("{} {}", c.raw.first_name, c.raw.last_name).trim().to_owned(),
+                phone: c.raw.phone_number.clone(),
+            });
+        }
+        Media::Poll(p) => {
+            info.kind = MediaKind::Poll;
+            let tl::enums::PollResults::Results(r) = &tl::enums::PollResults::Results(p.raw_results.clone());
+            info.poll = Some(PollInfo {
+                question: text_of(&p.raw.question),
+                options: p.raw.answers.iter().filter_map(|a| match a { tl::enums::PollAnswer::Answer(a) => Some(text_of(&a.text)), _ => None }).collect(),
+                voters: r.total_voters,
+                closed: p.raw.closed,
+                quiz: p.raw.quiz,
+            });
+        }
+        Media::Geo(g) => {
+            info.kind = MediaKind::Location;
+            info.geo = Some(geo_of(g));
+        }
+        Media::GeoLive(g) => {
+            info.kind = MediaKind::LiveLocation;
+            let mut geo = g.geo.as_ref().map(geo_of).unwrap_or_default();
+            geo.live_period = Some(g.period());
+            info.geo = Some(geo);
+        }
+        Media::Venue(v) => {
+            info.kind = MediaKind::Venue;
+            let mut geo = v.geo.as_ref().map(geo_of).unwrap_or_default();
+            geo.title = Some(v.title().to_owned());
+            geo.address = Some(v.address().to_owned()).filter(|a| !a.is_empty());
+            info.geo = Some(geo);
+        }
+        Media::Dice(d) => {
+            info.kind = MediaKind::Dice;
+            info.emoji = Some(d.raw.emoticon.clone());
+            info.value = Some(d.raw.value);
+        }
+        Media::WebPage(w) => {
+            info.kind = MediaKind::WebPage;
+            if let tl::enums::WebPage::Page(p) = &w.raw.webpage {
+                info.web = Some(WebPreview { url: p.url.clone(), site_name: p.site_name.clone(), title: p.title.clone(), description: p.description.clone() });
+            }
+        }
+        _ => info.kind = MediaKind::Unsupported,
+    }
+    info
+}
+
+/// Which file to fetch for a message's media.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MediaVariant {
+    Full,
+    Thumbnail,
+}
+
+impl Telegram {
+    /// Downloads a message's media (or its thumbnail) to `dest`. Refuses files
+    /// larger than `max_bytes`. Writes to a temporary file and renames it, so a
+    /// partial download never looks complete. Returns `false` if there is nothing to download.
+    pub async fn download_media(&self, chat_id: i64, message_id: i32, variant: MediaVariant, dest: &std::path::Path, max_bytes: u64) -> Result<bool> {
+        let peer = self.peer_ref(chat_id).await?;
+        let msgs = self.client.get_messages_by_id(peer, &[message_id]).await?;
+        let Some(Some(msg)) = msgs.into_iter().next() else { return Ok(false) };
+        let Some(media) = msg.media() else { return Ok(false) };
+        let tmp = dest.with_extension("part");
+        let ok = match variant {
+            MediaVariant::Thumbnail => {
+                let thumbs = match &media {
+                    Media::Photo(p) => p.thumbs(),
+                    Media::Document(d) => d.thumbs(),
+                    Media::Sticker(s) => s.document.thumbs(),
+                    _ => Vec::new(),
+                };
+                // The largest thumbnail that is still small.
+                let Some(thumb) = thumbs.into_iter().filter(|t| t.size() <= 512 * 1024).max_by_key(|t| t.size()) else { return Ok(false) };
+                self.client.download_media(&thumb, &tmp).await?;
+                true
+            }
+            MediaVariant::Full => {
+                let size = match &media {
+                    Media::Photo(p) => p.size(),
+                    Media::Document(d) => d.size(),
+                    Media::Sticker(s) => s.document.size(),
+                    _ => return Ok(false),
+                };
+                if size.is_some_and(|s| s as u64 > max_bytes) {
+                    return Err(TgError::Login(format!("file is larger than the {} MB limit", max_bytes / 1024 / 1024)));
+                }
+                self.client.download_media(&media, &tmp).await?;
+                true
+            }
+        };
+        if !ok {
+            let _ = tokio::fs::remove_file(&tmp).await;
+            return Ok(false);
+        }
+        if tokio::fs::metadata(&tmp).await?.len() > max_bytes {
+            let _ = tokio::fs::remove_file(&tmp).await;
+            return Err(TgError::Login("downloaded file exceeded the size limit".into()));
+        }
+        tokio::fs::rename(&tmp, dest).await?;
+        Ok(true)
     }
 }

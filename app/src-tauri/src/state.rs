@@ -96,6 +96,7 @@ pub struct AppState {
     pub themes: ThemeManager,
     pub cache: Mutex<MessageCache>,
     pub background: crate::background::BackgroundState,
+    pub media: crate::media::MediaState,
     pub tg: AsyncMutex<Option<Arc<Telegram>>>,
 }
 
@@ -142,6 +143,7 @@ impl AppState {
             themes,
             cache: Mutex::new(MessageCache::default()),
             background: Default::default(),
+            media: Default::default(),
             tg: AsyncMutex::new(None),
         })
     }

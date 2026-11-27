@@ -20,7 +20,7 @@ pub mod wallpaper;
 pub mod workspace;
 
 pub use manager::{PluginInfo, PluginManager};
-pub use model::{IncomingMessage, MessageBadge, OutgoingFile, OutgoingMessage};
+pub use model::{GeoInfo, IncomingMessage, MediaInfo, MediaKind, MessageBadge, OutgoingFile, OutgoingMessage};
 pub use plugin::{
     Category, CommandDef, Permission, CommandOutcome, Platform, Plugin, PluginContext, PluginError,
     PluginManifest, SendDecision, SettingDef, SettingKind, Toast, ToastLevel,

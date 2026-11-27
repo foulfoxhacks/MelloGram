@@ -47,12 +47,18 @@ pub fn image_url(config: &Path, file: &str) -> Option<String> {
     if !path.is_file() {
         return None;
     }
+    Some(asset_url(&path))
+}
+
+/// URL for a file the webview may load through the (scoped) asset protocol,
+/// in the form `convertFileSrc` produces for the current platform.
+pub fn asset_url(path: &Path) -> String {
     let encoded = encode_component(&path.to_string_lossy());
-    Some(if cfg!(any(windows, target_os = "android")) {
+    if cfg!(any(windows, target_os = "android")) {
         format!("http://asset.localhost/{encoded}")
     } else {
         format!("asset://localhost/{encoded}")
-    })
+    }
 }
 
 fn changed(state: &AppState) -> R<()> {

@@ -3,6 +3,7 @@
 
 mod background;
 mod commands;
+mod media;
 mod extras;
 mod mellorpc;
 mod state;
@@ -58,6 +59,13 @@ pub fn run() {
             commands::membership_log,
             commands::chat_info,
             commands::chat_members,
+            media::media_file,
+            media::media_lottie,
+            media::save_media,
+            media::send_location,
+            media::get_media_settings,
+            media::set_media_settings,
+            media::clear_media_cache,
             commands::get_melloid_profile,
             commands::save_melloid_profile,
             commands::get_settings,

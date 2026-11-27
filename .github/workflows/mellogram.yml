@@ -32,6 +32,7 @@ jobs:
           node --check app/ui/wallpapers.js
           node --check app/ui/mg.js
           node --check app/ui/info.js
+          node --check app/ui/media.js
           node --check docs/examples/mellorpc-node-example.js
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2

@@ -31,6 +31,30 @@ pub struct Settings {
     pub privacy: PrivacySettings,
     pub rpc: RpcSettings,
     pub wallpapers: crate::wallpaper::WallpaperSettings,
+    pub media: MediaSettings,
+}
+
+/// How media is fetched and shown.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MediaSettings {
+    /// Download photos, stickers and GIFs up to this size automatically (MB, 0 = never).
+    pub auto_download_mb: u32,
+    /// Largest file you can download at all (MB).
+    pub max_download_mb: u32,
+    pub autoplay_gifs: bool,
+    pub autoplay_video_stickers: bool,
+    /// Location previews load map tiles from OpenStreetMap (reveals the
+    /// location you view to the tile server). Off = coordinates only.
+    pub load_map_tiles: bool,
+    /// Blur media marked as spoiler until clicked.
+    pub respect_spoilers: bool,
+}
+
+impl Default for MediaSettings {
+    fn default() -> Self {
+        Self { auto_download_mb: 8, max_download_mb: 2000, autoplay_gifs: true, autoplay_video_stickers: true, load_map_tiles: false, respect_spoilers: true }
+    }
 }
 
 /// Local-only privacy controls. These change what this screen shows; they
@@ -61,6 +85,7 @@ impl Default for Settings {
             privacy: PrivacySettings::default(),
             rpc: RpcSettings::default(),
             wallpapers: Default::default(),
+            media: MediaSettings::default(),
         }
     }
 }
