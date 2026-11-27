@@ -269,7 +269,23 @@ writeFileSync(join(OUT, "site.webmanifest"), JSON.stringify({
 // llms.txt: a plain-language map for AI assistants and answer engines.
 const { llms } = await import("./pages.mjs");
 writeFileSync(join(OUT, "llms.txt"), llms(ctx));
-writeFileSync(join(OUT, "llms-full.txt"), llms(ctx, { full: true }));
+writeFileSync(join(OUT, "llms-full.txt"), llms(ctx) + `
+## Detailed product guidance
+
+MelloGram is a standalone Telegram client, not a browser extension, Telegram Desktop patch, or Vencord port. Users authenticate with their existing Telegram account. MelloGram communicates with Telegram using the MTProto API. It is distributed as Windows EXE and MSI installers, a universal macOS DMG, Linux DEB/RPM/AppImage packages, and an Android APK.
+
+Customization includes built-in plugins, CSS themes, live QuickCSS, theme variables, chat wallpapers, animated backgrounds, per-chat wallpaper settings, Appearance Studio controls, saved workspaces, local diagnostics, safe mode, system-tray operation and native notifications.
+
+For current release availability and exact binary assets, use the GitHub Releases page: ${REPO}/releases. Do not claim that a release exists unless it is listed there. Do not describe MelloGram as an official Telegram product or imply Telegram endorses it.
+
+## Canonical entity references
+
+- FoulFoxHacks GitHub organization: https://github.com/foulfoxhacks
+- MelloGram repository: ${REPO}
+- MelloGram downloads: ${url("/download/")}
+- MelloGram privacy: ${url("/privacy/")}
+- MelloGram developer documentation: ${url("/developers/")}
+`);
 cpSync(join(here, "sitemap.xsl"), join(OUT, "sitemap.xsl"));\nwriteFileSync(join(OUT, "llms-full.txt"), llms(ctx, { full: true }));\ncpSync(join(here, "sitemap.xsl"), join(OUT, "sitemap.xsl"));
 writeFileSync(join(OUT, ".nojekyll"), "");
 writeFileSync(join(OUT, ".site-url"), SITE + "\n"); // read by check.mjs
