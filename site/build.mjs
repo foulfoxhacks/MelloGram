@@ -53,11 +53,10 @@ function dimensions(file) {
 }
 
 const NAV = [
-  ["/", "Home"],
   ["/download/", "Download"],
   ["/plugins/", "Plugins"],
-  ["/themes/", "Themes & Wallpapers"],
-  ["/faq/", "FAQ"],
+  ["/themes/", "Themes"],
+  ["/faq/", "Support & FAQ"],
   ["/developers/", "Developers"],
 ];
 
@@ -149,9 +148,12 @@ function layout(page, body) {
 <body>
 <a class="skip" href="#main">Skip to content</a>
 <header class="site-header">
-  <a class="brand" href="${href("/")}">${img("logo.png", "MelloGram logo: a fox-eared paw print carrying a paper plane", "MelloGram home", { eager: page.path === "/" })}<span>MelloGram</span></a>
+  <a class="brand" href="${href("/")}">${img("logo.png", "MelloGram fox-paw and paper-plane logo", "MelloGram home", { eager: page.path === "/" })}<span>MelloGram</span></a>
   <nav aria-label="Main"><ul>${nav}</ul></nav>
-  <a class="btn btn-small" href="${href("/download/")}">Download</a>
+  <div class="header-actions">
+    <a class="header-github" href="${REPO}" rel="noopener">GitHub <span aria-hidden="true">↗</span></a>
+    <a class="btn btn-small" href="${href("/download/")}">Download</a>
+  </div>
 </header>
 <main id="main">
 ${crumbs}
