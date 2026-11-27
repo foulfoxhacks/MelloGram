@@ -121,12 +121,13 @@ if (!robots.includes(`Sitemap: ${SITE}/sitemap.xml`)) problems.push("robots.txt:
 if (/Disallow:\s*\/\s*$/m.test(robots)) problems.push("robots.txt: disallows everything");
 if (!existsSync(join(DIST, "llms.txt"))) problems.push("llms.txt missing");
 if (!existsSync(join(DIST, "llms-full.txt"))) problems.push("llms-full.txt missing");
-if (!existsSync(join(DIST, "sitemap.xsl"))) problems.push("sitemap.xsl missing");
+if (!existsSync(join(DIST, "assets", "sitemap.css"))) problems.push("CSS sitemap stylesheet missing");
 else {
-  const xsl = readFileSync(join(DIST, "sitemap.xsl"), "utf8");
-  if (!xsl.includes("/assets/logo.png")) problems.push("sitemap.xsl does not use the MelloGram logo");
+  const css = readFileSync(join(DIST, "assets", "sitemap.css"), "utf8");
+  if (!css.includes("#8b7cf6") || !css.includes("urlset")) problems.push("sitemap.css is missing MelloGram styling or XML selectors");
 }
-if (!sitemap.includes('<?xml-stylesheet type="text/xsl" href="/sitemap.xsl"?>')) problems.push("sitemap.xml missing branded XSL stylesheet reference");
+if (!sitemap.includes('<?xml-stylesheet type="text/css" href="/assets/sitemap.css"?>')) problems.push("sitemap.xml missing CSS stylesheet reference");
+if (sitemap.includes("text/xsl") || existsSync(join(DIST, "sitemap.xsl"))) problems.push("deprecated XSL sitemap stylesheet is still present");
 if (sitemapLocs.some((l) => l.includes("404"))) problems.push("sitemap lists the 404 page");
 for (const loc of sitemapLocs) {
   if (!loc.startsWith(SITE)) problems.push(`sitemap loc outside site: ${loc}`);
