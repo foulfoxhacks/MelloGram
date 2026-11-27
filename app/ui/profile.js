@@ -35,7 +35,7 @@
     for (const option of options) {
       const value = typeof option === "string" ? option : option.value;
       const title = typeof option === "string" ? option : option.label;
-      el.append(h("option", { value, text: title, selected: value === value }));
+      el.append(h("option", { value, text: title }));
     }
     el.value = value;
     return el;
@@ -181,6 +181,72 @@
     previewUpdate();
   }
 
+
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    })[char]);
+  }
+
+  function exportPublicHtml() {
+    const data = currentDraft();
+    if (data.visibility !== "public") {
+      UI.toast("Set profile visibility to Public before exporting a public page.", "warning");
+      return;
+    }
+    const accent = safeColor(data.accent_color);
+    const avatar = safeUrl(data.avatar_url);
+    const banner = safeUrl(data.banner_url);
+    const sections = (data.bio_sections || []).filter((item) => item.visible)
+      .map((item) => `<section><h2>${escapeHtml(item.heading)}</h2><p>${escapeHtml(item.body)}</p></section>`).join("");
+    const connections = (data.connections || []).filter((item) => item.visible)
+      .map((item) => {
+        const href = safeUrl(item.profile_url);
+        const link = href ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">Visit ↗</a>` : "";
+        return `<li><b>${escapeHtml(item.provider)}</b><span>${escapeHtml(item.display_name)}</span>${link}</li>`;
+      }).join("");
+    const badges = (data.badges || []).filter((item) => item.visible)
+      .map((item) => `<span class="badge">${escapeHtml(item.title)}</span>`).join("");
+    const activity = data.show_presence && data.presence
+      ? `<section><h2>Activity</h2><p>${escapeHtml(data.presence.application)} · ${escapeHtml(data.presence.activity)}</p></section>`
+      : "";
+    const avatarMarkup = avatar
+      ? `<img class="avatar" src="${escapeHtml(avatar)}" alt="Profile avatar">`
+      : `<div class="avatar initials">${escapeHtml((data.display_name || "M").split(/\s+/).slice(0, 2).map((part) => part[0] || "").join("").toUpperCase())}</div>`;
+    const bannerMarkup = banner
+      ? '<div class="banner"><img src="' + escapeHtml(banner) + '" alt="Profile banner"></div>'
+      : '<div class="banner"></div>';
+    const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(data.display_name)} · MelloID</title>
+<meta name="description" content="${escapeHtml(data.headline || "MelloID public profile")}">
+<style>
+:root{color-scheme:dark;--accent:${accent};font-family:Inter,system-ui,sans-serif;background:#10121c;color:#f4f5fa}
+*{box-sizing:border-box}body{margin:0;padding:32px 16px;background:radial-gradient(ellipse at top,color-mix(in srgb,var(--accent) 14%,transparent),transparent 55%),#10121c}
+main{max-width:760px;margin:auto;background:#1a1d2b;border:1px solid #303449;border-radius:22px;overflow:hidden;box-shadow:0 24px 80px #0008}
+.banner{height:190px;background:linear-gradient(120deg,var(--accent),#171a29);background-size:cover;background-position:center}.banner img{width:100%;height:100%;object-fit:cover}
+.identity{padding:0 28px 18px}.avatar{width:112px;height:112px;object-fit:cover;border:5px solid #1a1d2b;border-radius:28px;margin-top:-54px;background:var(--accent)}
+.initials{display:grid;place-items:center;font-size:34px;font-weight:800;color:white}
+h1{margin:10px 0 0;font-size:30px}.slug{color:#aeb4c9;font-family:ui-monospace,monospace}.headline{color:#c4c9d9}
+.content{padding:0 28px 30px}section{border-top:1px solid #303449;padding:18px 0}h2{font-size:16px;color:var(--accent);margin:0 0 9px}p{white-space:pre-wrap;line-height:1.65;color:#c8ccda;margin:0;overflow-wrap:anywhere}
+ul{list-style:none;padding:0;margin:0;display:grid;gap:8px}li{display:grid;grid-template-columns:1fr auto;gap:3px 12px;padding:12px;background:#24283a;border-radius:12px}li span{color:#aeb4c9;font-size:14px}li a{grid-column:2;grid-row:1/3;align-self:center;color:var(--accent);text-decoration:none}
+.badges{display:flex;flex-wrap:wrap;gap:8px}.badge{padding:6px 10px;border:1px solid var(--accent);border-radius:20px;color:var(--accent);font-size:13px}
+footer{padding:16px 28px;border-top:1px solid #303449;color:#858da6;font-size:12px}
+@media(max-width:520px){body{padding:10px}.banner{height:130px}.identity,.content{padding-left:18px;padding-right:18px}h1{font-size:24px}}
+</style></head>
+<body><main>${bannerMarkup}<div class="identity">${avatarMarkup}<h1>${escapeHtml(data.display_name)}</h1>
+<div class="slug">@${escapeHtml(data.slug)}</div><p class="headline">${escapeHtml(data.headline)}</p></div>
+<div class="content">${sections}${activity}
+<section><h2>Connections</h2>${connections ? `<ul>${connections}</ul>` : "<p>No public connections.</p>"}</section>
+<section><h2>Badges</h2><div class="badges">${badges || "<p>No public badges yet.</p>"}</div></section></div>
+<footer>Published as a static MelloID export · Profile owner controls the information included.</footer></main></body></html>`;
+    const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+    const link = h("a", { href: url, download: `melloid-${data.slug || "profile"}.html` });
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    UI.toast("Public profile HTML exported. Review it before uploading or sharing.", "success");
+  }
+
   async function open() {
     try {
       profile = await Bridge.invoke("get_melloid_profile");
@@ -206,6 +272,7 @@
         h("header", { class: "melloid-editor-header" },
           h("div", {}, h("strong", { text: "MelloID Studio" }), h("small", { text: "Your identity, your layout, your audience." })),
           h("div", { class: "mg-toolbar" },
+            h("button", { class: "mg-btn", text: "Export Public HTML", onclick: exportPublicHtml }),
             h("button", { class: "mg-btn", text: "Export JSON", onclick: () => {
               const data = JSON.stringify(currentDraft(), null, 2);
               const url = URL.createObjectURL(new Blob([data], { type: "application/json" }));

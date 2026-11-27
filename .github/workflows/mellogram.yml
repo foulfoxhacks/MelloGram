@@ -21,6 +21,11 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+      - name: Validate frontend JavaScript
+        run: |
+          node --check app/ui/profile.js
+          node --check app/ui/app.js
+          node --check app/ui/settings.js
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:

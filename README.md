@@ -41,7 +41,7 @@ first-class client instead of a patch.
   `--variables` with colour pickers. Three bundled themes.
 - **QuickCSS** — live CSS editor.
 - **Backup & Restore** — one JSON file; Telegram credentials never exported.
-- **MelloID foundation** — versioned profile schema, structured bios, public/unlisted/private visibility, connections, badge categories, profile widgets, and normalized activity data. Local profile read/write commands are available; public hosting and live RPC are staged separately.\n- **Telegram** — phone + code + 2FA login, chat list, history with infinite
+- **MelloID** — dedicated profile studio with structured Bio Studio sections, banner/avatar/accent customization, profile visibility, connection cards, live preview, JSON backup, static public HTML export, badge showcase, and a versioned local identity store. Public hosting, OAuth verification, and live RPC are staged separately.\n- **Telegram** — phone + code + 2FA login, chat list, history with infinite
   scroll, send/reply/edit/delete, file attachments by drag & drop, live updates.
 
 See [docs/CREDENTIALS.md](docs/CREDENTIALS.md) for API ID/hash setup.\n\nSee [docs/FEATURES.md](docs/FEATURES.md) for the Vencord → MelloGram map and

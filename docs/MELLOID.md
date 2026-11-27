@@ -27,7 +27,7 @@ Presence is a normalized data contract only. The current foundation does not pub
 
 ## Public profile service contract (next stage)
 
-A hosted service should provide:
+The client can export a static HTML profile when visibility is set to Public. The export includes only visible bio sections and connections, escapes user-provided text, and can be hosted independently. It does not provide synchronized updates, account ownership verification, or a canonical hosted MelloID URL.\n\nA hosted service should provide:
 
 - Immutable account/profile ID independent of the editable slug.
 - Authenticated profile writes and public read-only profile endpoints.
