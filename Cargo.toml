@@ -6,6 +6,7 @@ members = [
     "crates/mellogram-telegram",
     "crates/mellorpc-core",
     "crates/melloid-core",
+    "crates/ametherian-truee2e",
     "app/src-tauri",
 ]
 
