@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { publicProfileProjection, validateAndSanitizeProfile } from "../src/profile.js";
+import { projectVerifiedConnection, publicProfileProjection, validateAndSanitizeProfile } from "../src/profile.js";
+import { normalizeProviderIdentity } from "../src/connections.js";
 
 function sample() {
   return {
