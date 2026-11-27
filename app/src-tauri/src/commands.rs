@@ -498,3 +498,15 @@ pub fn import_backup(state: S<'_>, json: String) -> R<usize> {
 pub fn membership_log(state: S<'_>) -> Vec<mellogram_core::relationships::MembershipEvent> {
     state.background.log_snapshot()
 }
+
+/// Full info for the chat info panel (user, group, supergroup or channel).
+#[tauri::command]
+pub async fn chat_info(state: S<'_>, chat_id: i64) -> R<mellogram_telegram::ChatInfo> {
+    state.telegram().await?.chat_info(chat_id).await.map_err(err)
+}
+
+/// Members of a group or channel, where Telegram lets you see them.
+#[tauri::command]
+pub async fn chat_members(state: S<'_>, chat_id: i64, limit: Option<usize>) -> R<Vec<mellogram_telegram::Member>> {
+    state.telegram().await?.chat_members(chat_id, limit.unwrap_or(100)).await.map_err(err)
+}

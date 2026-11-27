@@ -13,7 +13,7 @@ use grammers_client::message::InputMessage;
 use grammers_client::peer::Peer;
 use grammers_client::sender::{SenderPool, UpdatesConfiguration};
 use grammers_client::session::storages::SqliteSession;
-use grammers_client::session::types::{PeerId, PeerRef};
+use grammers_client::session::types::{PeerId, PeerKind, PeerRef};
 use grammers_client::session::Session as _;
 use grammers_client::tl;
 use grammers_client::update::Update;
@@ -75,6 +75,81 @@ pub struct ChatSummary {
     pub pinned: bool,
     pub last_text: Option<String>,
     pub last_date: Option<i64>,
+    /// For one-to-one chats: the other person's online status.
+    pub presence: Option<Presence>,
+    pub verified: bool,
+    pub bot: bool,
+}
+
+/// A user's online status as precisely as their privacy settings allow.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "state", rename_all = "kebab-case")]
+pub enum Presence {
+    /// Online now; `until` is when Telegram will consider them offline.
+    Online { until: i64 },
+    /// Exact last-seen time (unix seconds).
+    LastSeen { at: i64 },
+    /// Hidden by privacy settings; only an approximation is available.
+    Recently,
+    WithinWeek,
+    WithinMonth,
+    /// Long ago, or hidden completely.
+    LongAgo,
+    Bot,
+}
+
+pub fn presence_of(status: &tl::enums::UserStatus) -> Presence {
+    match status {
+        tl::enums::UserStatus::Online(s) => Presence::Online { until: i64::from(s.expires) },
+        tl::enums::UserStatus::Offline(s) => Presence::LastSeen { at: i64::from(s.was_online) },
+        tl::enums::UserStatus::Recently(_) => Presence::Recently,
+        tl::enums::UserStatus::LastWeek(_) => Presence::WithinWeek,
+        tl::enums::UserStatus::LastMonth(_) => Presence::WithinMonth,
+        tl::enums::UserStatus::Empty => Presence::LongAgo,
+    }
+}
+
+fn user_presence(u: &grammers_client::peer::User) -> Presence {
+    if u.is_bot() { Presence::Bot } else { presence_of(u.status()) }
+}
+
+/// Full profile of a user, group or channel for the info panel.
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct ChatInfo {
+    pub id: i64,
+    pub kind: &'static str,
+    pub title: String,
+    pub username: Option<String>,
+    pub about: Option<String>,
+    pub presence: Option<Presence>,
+    pub phone: Option<String>,
+    pub bot: bool,
+    pub verified: bool,
+    pub scam: bool,
+    pub members: Option<i32>,
+    pub online: Option<i32>,
+    pub admins: Option<i32>,
+    pub banned: Option<i32>,
+    pub kicked: Option<i32>,
+    pub linked_chat_id: Option<i64>,
+    pub slow_mode_seconds: Option<i32>,
+    pub pinned_message_id: Option<i32>,
+    pub auto_delete_seconds: Option<i32>,
+    pub invite_link: Option<String>,
+    pub common_chats: Option<i32>,
+    pub can_view_members: bool,
+    pub members_hidden: bool,
+    pub blocked: bool,
+    pub birthday: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Member {
+    pub id: i64,
+    pub name: String,
+    pub username: Option<String>,
+    pub role: &'static str,
+    pub presence: Presence,
 }
 
 /// Events pushed from Telegram to the app.
@@ -88,6 +163,8 @@ pub enum TgEvent {
     Membership(mellogram_core::relationships::MembershipEvent),
     /// A channel/supergroup's state changed (often: you were banned or removed).
     ChatChanged { chat_id: i64 },
+    /// A user's online status changed.
+    Presence { user_id: i64, presence: Presence },
     Disconnected { reason: String },
 }
 
@@ -235,6 +312,9 @@ impl Telegram {
                 pinned,
                 last_text: dialog.last_message.as_ref().map(|m| preview(m.text(), m.media().is_some())),
                 last_date: dialog.last_message.as_ref().map(|m| m.date().as_second()),
+                presence: match peer { Peer::User(u) => Some(user_presence(u)), _ => None },
+                verified: match peer { Peer::User(u) => u.verified(), _ => false },
+                bot: matches!(peer, Peer::User(u) if u.is_bot()),
             });
         }
         Ok(out)
@@ -333,6 +413,100 @@ impl Telegram {
 
     pub async fn is_authorized(&self) -> bool {
         self.client.is_authorized().await.unwrap_or(false)
+    }
+
+    /// Full information for the info panel.
+    pub async fn chat_info(&self, chat_id: i64) -> Result<ChatInfo> {
+        let peer = self.peer_ref(chat_id).await?;
+        let invite = |e: &Option<tl::enums::ExportedChatInvite>| match e {
+            Some(tl::enums::ExportedChatInvite::ChatInviteExported(i)) => Some(i.link.clone()),
+            _ => None,
+        };
+        match peer.id.kind() {
+            PeerKind::User => {
+                let tl::enums::users::UserFull::Full(full) = self.client.invoke(&tl::functions::users::GetFullUser { id: (&peer).into() }).await?;
+                let tl::enums::UserFull::Full(f) = full.full_user;
+                let user = full.users.into_iter().find_map(|u| match u {
+                    tl::enums::User::User(u) if u.id == f.id => Some(u),
+                    _ => None,
+                });
+                let mut info = ChatInfo { id: chat_id, kind: "user", about: f.about.filter(|a| !a.is_empty()), common_chats: Some(f.common_chats_count), blocked: f.blocked, pinned_message_id: f.pinned_msg_id, auto_delete_seconds: f.ttl_period, can_view_members: false, ..Default::default() };
+                if let Some(tl::enums::Birthday::Birthday(b)) = f.birthday {
+                    info.birthday = Some(match b.year { Some(y) => format!("{y:04}-{:02}-{:02}", b.month, b.day), None => format!("{:02}-{:02}", b.month, b.day) });
+                }
+                if let Some(u) = user {
+                    let first = u.first_name.clone().unwrap_or_default();
+                    let last = u.last_name.clone().unwrap_or_default();
+                    info.title = format!("{first} {last}").trim().to_owned();
+                    info.username = u.username.clone();
+                    info.phone = u.phone.clone();
+                    info.bot = u.bot;
+                    info.verified = u.verified;
+                    info.scam = u.scam || u.fake;
+                    info.presence = Some(if u.bot { Presence::Bot } else { u.status.as_ref().map(presence_of).unwrap_or(Presence::LongAgo) });
+                }
+                Ok(info)
+            }
+            PeerKind::Chat => {
+                let tl::enums::messages::ChatFull::Full(full) = self.client.invoke(&tl::functions::messages::GetFullChat { chat_id: peer.id.bare_id_unchecked() }).await?;
+                let tl::enums::ChatFull::Full(f) = full.full_chat else { return Err(TgError::Login("unexpected chat type".into())) };
+                let members = match &f.participants {
+                    tl::enums::ChatParticipants::Participants(p) => Some(p.participants.len() as i32),
+                    _ => None,
+                };
+                let title = full.chats.iter().find_map(|c| match c { tl::enums::Chat::Chat(c) if c.id == f.id => Some(c.title.clone()), _ => None }).unwrap_or_default();
+                Ok(ChatInfo { id: chat_id, kind: "group", title, about: Some(f.about).filter(|a| !a.is_empty()), members, pinned_message_id: f.pinned_msg_id, auto_delete_seconds: f.ttl_period, invite_link: invite(&f.exported_invite), can_view_members: true, ..Default::default() })
+            }
+            PeerKind::Channel => {
+                let tl::enums::messages::ChatFull::Full(full) = self.client.invoke(&tl::functions::channels::GetFullChannel { channel: (&peer).into() }).await?;
+                let tl::enums::ChatFull::ChannelFull(f) = full.full_chat else { return Err(TgError::Login("unexpected chat type".into())) };
+                let ch = full.chats.iter().find_map(|c| match c { tl::enums::Chat::Channel(c) if c.id == f.id => Some(c.clone()), _ => None });
+                let mut info = ChatInfo {
+                    id: chat_id,
+                    kind: if ch.as_ref().is_some_and(|c| c.broadcast) { "channel" } else { "supergroup" },
+                    about: Some(f.about).filter(|a| !a.is_empty()),
+                    members: f.participants_count,
+                    online: f.online_count,
+                    admins: f.admins_count,
+                    banned: f.banned_count,
+                    kicked: f.kicked_count,
+                    linked_chat_id: f.linked_chat_id.map(|id| PeerId::channel_unchecked(id).bot_api_dialog_id_unchecked()),
+                    slow_mode_seconds: f.slowmode_seconds,
+                    pinned_message_id: f.pinned_msg_id,
+                    auto_delete_seconds: f.ttl_period,
+                    invite_link: invite(&f.exported_invite),
+                    can_view_members: f.can_view_participants,
+                    members_hidden: f.participants_hidden,
+                    ..Default::default()
+                };
+                if let Some(c) = ch {
+                    info.title = c.title.clone();
+                    info.username = c.username.clone();
+                    info.verified = c.verified;
+                    info.scam = c.scam || c.fake;
+                }
+                Ok(info)
+            }
+        }
+    }
+
+    /// First `limit` members of a group or channel (where you are allowed to see them).
+    pub async fn chat_members(&self, chat_id: i64, limit: usize) -> Result<Vec<Member>> {
+        use grammers_client::peer::Role;
+        let peer = self.peer_ref(chat_id).await?;
+        let mut iter = self.client.iter_participants(peer);
+        let mut out = Vec::new();
+        while out.len() < limit.min(500) {
+            let Some(p) = iter.next().await? else { break };
+            out.push(Member {
+                id: p.user.id().bare_id_unchecked(),
+                name: p.user.full_name(),
+                username: p.user.username().map(str::to_owned),
+                role: match p.role { Role::Creator(_) => "owner", Role::Admin(_) => "admin", Role::Banned(_) => "banned", Role::Left(_) => "left", _ => "member" },
+                presence: user_presence(&p.user),
+            });
+        }
+        Ok(out)
     }
 
     // ---- updates ---------------------------------------------------------------
@@ -507,6 +681,7 @@ pub fn membership_from_raw(update: &tl::enums::Update, self_id: i64) -> Option<T
                 source: EventSource::ParticipantUpdate,
             }))
         }
+        tl::enums::Update::UserStatus(u) => Some(TgEvent::Presence { user_id: u.user_id, presence: presence_of(&u.status) }),
         tl::enums::Update::Channel(u) => Some(TgEvent::ChatChanged {
             chat_id: PeerId::channel_unchecked(u.channel_id).bot_api_dialog_id_unchecked(),
         }),

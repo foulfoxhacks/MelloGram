@@ -53,6 +53,8 @@ pub enum UiEvent {
     /// A ban, removal, restriction or lost access. `alerts` are the texts
     /// plugins chose to raise (empty = record only).
     Membership { event: mellogram_core::relationships::MembershipEvent, alerts: Vec<String> },
+    /// A user's online status changed.
+    Presence { user_id: i64, presence: mellogram_telegram::Presence },
     /// Nothing for the UI (internal bookkeeping only).
     Quiet,
 }
@@ -257,6 +259,7 @@ impl AppState {
                 self.membership(event)
             }
             TgEvent::ChatChanged { .. } => UiEvent::Quiet,
+            TgEvent::Presence { user_id, presence } => UiEvent::Presence { user_id, presence },
         }
     }
 
