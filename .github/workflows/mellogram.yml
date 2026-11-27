@@ -13,7 +13,8 @@ permissions:
 
 concurrency:
   group: mellogram-${{ github.ref }}
-  cancel-in-progress: true
+  # Do not kill long native Android builds when another commit is pushed.
+  cancel-in-progress: false
 
 jobs:
   test:
@@ -165,29 +166,67 @@ jobs:
       - name: Build release Android App Bundle
         working-directory: app/src-tauri
         run: cargo tauri android build --aab --target aarch64 --target armv7
-      - name: Sign and collect Android packages
+      - name: Sign, validate and collect Android packages
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
         run: |
           set -euo pipefail
           out=app/src-tauri/gen/android/app/build/outputs
           mkdir -p dist
           bt="$ANDROID_SDK_ROOT/build-tools/34.0.0"
+
+          # Select a real Gradle-produced APK instead of assuming a filename.
+          find_apk() {
+            local profile="$1"
+            find "$out/apk" -type f -name '*.apk' -path "*/$profile/*" -print | sort | head -n 1
+          }
+
+          release_apk="$(find_apk release || true)"
+          debug_apk="$(find_apk debug || true)"
+
           if [ -n "${KEYSTORE_B64:-}" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > release.jks
-            unsigned=$(ls $out/apk/universal/release/*.apk | head -1)
-            "$bt/zipalign" -f -p 4 "$unsigned" aligned.apk
-            "$bt/apksigner" sign --ks release.jks --ks-pass env:KEYSTORE_PASSWORD --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASSWORD --out dist/MelloGram-android.apk aligned.apk
-            "$bt/apksigner" verify dist/MelloGram-android.apk
+            test -n "$release_apk" || { echo "No release APK was produced"; exit 1; }
+            printf '%s' "$KEYSTORE_B64" | base64 --decode > release.jks
+            "$bt/zipalign" -f -p 4 "$release_apk" aligned.apk
+            "$bt/apksigner" sign --ks release.jks \
+              --ks-pass env:KEYSTORE_PASSWORD \
+              --ks-key-alias "$KEY_ALIAS" \
+              --key-pass env:KEY_PASSWORD \
+              --out dist/MelloGram-android.apk aligned.apk
             rm -f release.jks aligned.apk
           else
-            echo "::notice::ANDROID_KEYSTORE_BASE64 is not set; publishing the debug-signed universal APK."
-            cp "$(ls $out/apk/universal/debug/*.apk | head -1)" dist/MelloGram-android.apk
+            test -n "$release_apk" || { echo "No release APK was produced"; exit 1; }
+            echo "::warning::No Android release keystore configured. Signing optimized release APK with a debug keystore for installability."
+            keytool -genkeypair -v -keystore test.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=MelloGram,O=FoulFoxHacks,C=US"
+            "$bt/zipalign" -f -p 4 "$release_apk" aligned.apk
+            "$bt/apksigner" sign --ks test.keystore \
+              --ks-pass pass:android \
+              --ks-key-alias androiddebugkey \
+              --key-pass pass:android \
+              --out dist/MelloGram-android.apk aligned.apk
+            rm -f test.keystore aligned.apk
+            if [ -n "$debug_apk" ]; then
+              cp "$debug_apk" dist/MelloGram-android-debug.apk
+            fi
           fi
-          cp "$(ls $out/bundle/universalRelease/*.aab | head -1)" dist/MelloGram-android-unsigned.aab
+
+          # Validate every deliverable APK before upload.
+          for apk in dist/*.apk; do
+            "$bt/zipalign" -c -v 4 "$apk"
+            "$bt/apksigner" verify --verbose --print-certs "$apk"
+            "$bt/aapt" dump badging "$apk" | grep -F "package: name='app.mellogram.desktop'"
+            unzip -t "$apk" >/dev/null
+          done
+
+          aab="$(find "$out/bundle" -type f -name '*.aab' -print | head -n 1)"
+          test -n "$aab" || { echo "No Android App Bundle was produced"; exit 1; }
+          cp "$aab" dist/MelloGram-android-unsigned.aab
+          echo "Validated Android APK artifacts:"
+          ls -lh dist/
       - uses: actions/upload-artifact@v4
         with:
           name: mellogram-android

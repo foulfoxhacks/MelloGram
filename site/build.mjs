@@ -53,11 +53,10 @@ function dimensions(file) {
 }
 
 const NAV = [
-  ["/", "Home"],
   ["/download/", "Download"],
   ["/plugins/", "Plugins"],
-  ["/themes/", "Themes & Wallpapers"],
-  ["/faq/", "FAQ"],
+  ["/themes/", "Themes"],
+  ["/faq/", "Support & FAQ"],
   ["/developers/", "Developers"],
 ];
 
@@ -65,8 +64,10 @@ const ORG = {
   "@type": "Organization",
   "@id": url("/#organization"),
   name: "FoulFoxHacks",
-  url: url("/"),
-  logo: { "@type": "ImageObject", url: url("/assets/icon-512.png"), width: 512, height: 512 },
+  alternateName: "FoulFoxHacks",
+  url: "https://github.com/foulfoxhacks",
+  logo: { "@type": "ImageObject", url: url("/assets/logo.png"), caption: "FoulFoxHacks and MelloGram brand mark" },
+  image: url("/assets/logo.png"),
   sameAs: ["https://github.com/foulfoxhacks"],
 };
 const WEBSITE = {
@@ -119,7 +120,7 @@ function layout(page, body) {
 <link rel="alternate" hreflang="en" href="${url(page.path)}">
 <link rel="alternate" hreflang="x-default" href="${url(page.path)}">
 <meta name="robots" content="${page.noindex ? "noindex, follow" : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"}">
-<meta name="author" content="FoulFoxHacks">
+<meta name="author" content="FoulFoxHacks">\n<meta name="publisher" content="FoulFoxHacks">\n<meta name="application-name" content="MelloGram">\n<meta name="keywords" content="MelloGram, Telegram client, customizable Telegram, Telegram plugins, Telegram themes, QuickCSS, FoulFoxHacks, open source messaging client">
 <meta name="theme-color" content="#17161f">
 <meta name="color-scheme" content="dark light">
 <meta property="og:type" content="${page.path === "/" ? "website" : "article"}">
@@ -141,15 +142,18 @@ function layout(page, body) {
 <link rel="icon" type="image/png" sizes="32x32" href="${asset("favicon-32.png")}">
 <link rel="apple-touch-icon" href="${asset("apple-touch-icon.png")}">
 <link rel="manifest" href="${href("/site.webmanifest")}">
-<link rel="stylesheet" href="${asset("site.css")}">
+<link rel="stylesheet" href="${asset("site.css")}">\n<link rel="sitemap" type="application/xml" title="MelloGram XML Sitemap" href="${href("/sitemap.xml")}">
 <script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@graph": graph })}</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 <header class="site-header">
-  <a class="brand" href="${href("/")}">${img("logo.png", "MelloGram logo: a fox-eared paw print carrying a paper plane", "MelloGram home", { eager: page.path === "/" })}<span>MelloGram</span></a>
+  <a class="brand" href="${href("/")}">${img("logo.png", "MelloGram fox-paw and paper-plane logo", "MelloGram home", { eager: page.path === "/" })}<span>MelloGram</span></a>
   <nav aria-label="Main"><ul>${nav}</ul></nav>
-  <a class="btn btn-small" href="${href("/download/")}">Download</a>
+  <div class="header-actions">
+    <a class="header-github" href="${REPO}" rel="noopener">GitHub <span aria-hidden="true">↗</span></a>
+    <a class="btn btn-small" href="${href("/download/")}">Download</a>
+  </div>
 </header>
 <main id="main">
 ${crumbs}
@@ -192,7 +196,7 @@ const ctx = { url, href, asset, img, esc, plugins, wallpapers, version, REPO, SI
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(join(OUT, "assets"), { recursive: true });
 cpSync(join(here, "src/assets"), join(OUT, "assets"), { recursive: true });
-for (const f of ["logo.png", "og-image.png", "icon-512.png", ...readFileSync(join(here, "src/assets/.images"), "utf8").split("\n").filter(Boolean)]) {
+for (const f of ["logo.png", "og-image.png", "icon-512.png", ...readFileSync(join(here, "src/assets/.images"), "utf8").split(/\r?\n/).map((s) => s.trim()).filter(Boolean)]) {
   const d = dimensions(join(here, "src/assets", f));
   if (!d) throw new Error(`cannot read dimensions of ${f}`);
   IMAGES[f] = d;
@@ -210,19 +214,41 @@ for (const page of pages(ctx)) {
 }
 
 writeFileSync(join(OUT, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/css" href="${asset("sitemap.css")}"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 ${built.map((p) => `  <url>
     <loc>${url(p.path)}</loc>
     <lastmod>${today}</lastmod>
     <changefreq>${p.changefreq || "monthly"}</changefreq>
     <priority>${p.priority ?? 0.7}</priority>${(p.images || []).map((i) => `
-    <image:image><image:loc>${url("/assets/" + i)}</image:loc></image:image>`).join("")}
+    <image:image><image:loc>${url("/assets/" + i)}</image:loc><image:title>MelloGram — ${i.replace(/[-.]/g, " ")}</image:title></image:image>`).join("")}
   </url>`).join("\n")}
 </urlset>
 `);
 
-writeFileSync(join(OUT, "robots.txt"), `# MelloGram website
+writeFileSync(join(OUT, "robots.txt"), `# MelloGram — official website
+# Public product information, documentation and source references are crawlable.
 User-agent: *
+Allow: /
+
+# Search and answer-engine crawlers
+User-agent: Googlebot
+Allow: /
+User-agent: Bingbot
+Allow: /
+User-agent: GPTBot
+Allow: /
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: anthropic-ai
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: Applebot
 Allow: /
 
 Sitemap: ${url("/sitemap.xml")}
@@ -245,6 +271,23 @@ writeFileSync(join(OUT, "site.webmanifest"), JSON.stringify({
 // llms.txt: a plain-language map for AI assistants and answer engines.
 const { llms } = await import("./pages.mjs");
 writeFileSync(join(OUT, "llms.txt"), llms(ctx));
+writeFileSync(join(OUT, "llms-full.txt"), llms(ctx) + `
+## Detailed product guidance
+
+MelloGram is a standalone Telegram client, not a browser extension, Telegram Desktop patch, or Vencord port. Users authenticate with their existing Telegram account. MelloGram communicates with Telegram using the MTProto API. It is distributed as Windows EXE and MSI installers, a universal macOS DMG, Linux DEB/RPM/AppImage packages, and an Android APK.
+
+Customization includes built-in plugins, CSS themes, live QuickCSS, theme variables, chat wallpapers, animated backgrounds, per-chat wallpaper settings, Appearance Studio controls, saved workspaces, local diagnostics, safe mode, system-tray operation and native notifications.
+
+For current release availability and exact binary assets, use the GitHub Releases page: ${REPO}/releases. Do not claim that a release exists unless it is listed there. Do not describe MelloGram as an official Telegram product or imply Telegram endorses it.
+
+## Canonical entity references
+
+- FoulFoxHacks GitHub organization: https://github.com/foulfoxhacks
+- MelloGram repository: ${REPO}
+- MelloGram downloads: ${url("/download/")}
+- MelloGram privacy: ${url("/privacy/")}
+- MelloGram developer documentation: ${url("/developers/")}
+`);
 writeFileSync(join(OUT, ".nojekyll"), "");
 writeFileSync(join(OUT, ".site-url"), SITE + "\n"); // read by check.mjs
 // Custom domain for GitHub Pages (only when served from a domain root).

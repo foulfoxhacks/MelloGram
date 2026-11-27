@@ -120,6 +120,18 @@ const robots = existsSync(join(DIST, "robots.txt")) ? readFileSync(join(DIST, "r
 if (!robots.includes(`Sitemap: ${SITE}/sitemap.xml`)) problems.push("robots.txt: missing Sitemap line");
 if (/Disallow:\s*\/\s*$/m.test(robots)) problems.push("robots.txt: disallows everything");
 if (!existsSync(join(DIST, "llms.txt"))) problems.push("llms.txt missing");
+if (!existsSync(join(DIST, "llms-full.txt"))) problems.push("llms-full.txt missing");
+if (!existsSync(join(DIST, "assets", "sitemap.css"))) problems.push("CSS sitemap stylesheet missing");
+else {
+  const css = readFileSync(join(DIST, "assets", "sitemap.css"), "utf8");
+  if (!css.includes("#79baff") || !css.includes("urlset") || !css.includes("/assets/logo.png") ||
+      !css.includes('@namespace url("http://www.sitemaps.org/schemas/sitemap/0.9")') ||
+      !css.includes('@namespace image url("http://www.google.com/schemas/sitemap-image/1.1")')) {
+    problems.push("sitemap.css is missing MelloGram styling, logo or XML namespace selectors");
+  }
+}
+if (!sitemap.includes('<?xml-stylesheet type="text/css" href="/assets/sitemap.css"?>')) problems.push("sitemap.xml missing CSS stylesheet reference");
+if (sitemap.includes("text/xsl") || existsSync(join(DIST, "sitemap.xsl"))) problems.push("deprecated XSL sitemap stylesheet is still present");
 if (sitemapLocs.some((l) => l.includes("404"))) problems.push("sitemap lists the 404 page");
 for (const loc of sitemapLocs) {
   if (!loc.startsWith(SITE)) problems.push(`sitemap loc outside site: ${loc}`);

@@ -11,6 +11,12 @@ on:
 permissions:
   contents: read
 
+# Serialize all Pages deployments under the same group to prevent stale
+# legacy workflows from racing the current deployment.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   build:
     name: Build and check the website
