@@ -62,7 +62,8 @@ mellogram/
 │   ├── mellogram-plugins    built-in plugins (Rust) + their UI halves (ui/*.js)
 │   ├── mellogram-telegram   Telegram backend on grammers (pure-Rust MTProto)
 │   ├── mellogram-e2e        end-to-end overlay state: identity, sessions, per-chat mode
-│   └── ametherian-truee2e   X3DH + Double Ratchet protocol for the overlay
+│   ├── ametherian-truee2e   X3DH + Double Ratchet protocol for the overlay
+│   └── ametherian-truee2e-wasm  WebAssembly bindings for the browser client (spike)
 ├── app/
 │   ├── src-tauri            desktop shell: commands, event pump, bundling
 │   └── ui                   HTML/CSS/JS front end (no build step)
@@ -70,6 +71,8 @@ mellogram/
 ├── services/
 │   ├── melloid-public       Cloudflare Worker, D1 profile API and public pages
 │   └── web-client           browser client skeleton: Worker, static shell, status API
+├── scripts/                 release tooling (installer builds, CI tagging, publishing)
+├── site/                    dependency-free static site + Cloudflare Worker edge
 └── docs/                    features, plugin API, theming, roadmap
 ```
 
@@ -162,3 +165,23 @@ on Windows, `~/.config/app.mellogram.desktop` on Linux): `settings.json`,
 GPL-3.0-or-later. MelloGram is an independent implementation; it contains no
 Vencord or Telegram Desktop code.
 "# MelloGram" 
+
+## Releasing packages
+
+`scripts/release.sh` builds installers and gets them onto GitHub Releases.
+
+```bash
+scripts/release.sh local linux        # .deb, .rpm, AppImage on this machine
+scripts/release.sh local windows      # .exe (Inno Setup) and .msi
+scripts/release.sh local macos        # universal .dmg
+scripts/release.sh local android      # .apk and .aab
+scripts/release.sh ci v0.2.0          # tag, push, wait for CI, download every package
+scripts/release.sh assets v0.2.0      # download packages for a tag that already ran
+scripts/release.sh publish v0.2.0     # create/update the release from dist/release-v0.2.0
+```
+
+`ci` pushes the tag, which triggers the workflow; its `release` job already
+attaches every platform artifact to the tag. `publish` is for re-uploads and
+manual releases. Add `--dry-run` to any command to see the exact commands, and
+`--repo owner/name` to target a fork. Local builds need the Tauri toolchain and,
+for Windows, Inno Setup 6.

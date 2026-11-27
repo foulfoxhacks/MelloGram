@@ -71,6 +71,8 @@ pub fn run() {
             e2e::e2e_group_disable,
             e2e::e2e_group_rotate,
             e2e::e2e_group_share,
+            e2e::e2e_group_request_keys,
+            e2e::e2e_group_sweep,
             commands::membership_log,
             commands::chat_info,
             commands::chat_members,

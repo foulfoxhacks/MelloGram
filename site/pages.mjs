@@ -1,3 +1,5 @@
+import { homeBody } from "./home.mjs";
+
 // MelloGram website content. Each page: path, title (≤60), description
 // (120–160), h1, body(ctx), optional jsonld(ctx). Copy is written answer-first:
 // the first sentence of each section answers the question its heading asks.
@@ -120,77 +122,7 @@ export function pages(c) {
       changefreq: "weekly",
       images: ["screenshot-chat.webp", "screenshot-plugins.webp", "screenshot-wallpapers.webp", "screenshot-appearance-studio.webp", "og-image.png"],
       jsonld: (c) => [softwareApp(c)],
-      body: () => `
-<section class="home-hero">
-  <div class="home-hero-copy">
-    <div class="home-hero-mark">
-      ${img("logo.png", "MelloGram fox-paw and paper-plane mascot logo", "MelloGram logo", { eager: true, cls: "cute-logo" })}
-    </div>
-    <p class="eyebrow">A customizable Telegram client by FoulFoxHacks · Open Source · Free</p>
-    <h1>MelloGram</h1>
-    <h2 class="hero-tagline">The customizable Telegram client mod</h2>
-    <p class="lead">MelloGram brings the client-mod experience to a standalone Telegram app. Built from scratch in Rust, it features ${c.plugins.length} built-in plugins, custom themes, live QuickCSS, animated wallpapers, and workspaces with zero telemetry.</p>
-    <div class="cta home-cta buttons">
-      <a class="btn main-btn" href="${href("/download/")}" data-download>Download MelloGram</a>
-      <a class="btn btn-ghost" href="${href("/plugins/")}">Browse Plugins</a>
-      <a class="btn btn-ghost" href="${c.REPO}" rel="noopener">GitHub ↗</a>
-    </div>
-    <ul class="home-platforms" aria-label="Supported platforms">
-      <li>Windows</li><li>macOS</li><li>Linux</li><li>Android</li>
-    </ul>
-  </div>
-  <figure class="home-hero-shot">
-    ${img("screenshot-chat.webp", "MelloGram desktop chat window with custom colours and a paw-print wallpaper", "MelloGram desktop preview", { eager: true })}
-    <figcaption>A familiar messenger with modern customization, themes, and native performance.</figcaption>
-  </figure>
-</section>
-
-<section class="home-features section" aria-labelledby="home-features-title">
-  <div class="home-section-heading">
-    <p class="eyebrow">Features</p>
-    <h2 id="home-features-title">Everything you need. Nothing to patch.</h2>
-    <p class="lead">MelloGram gives you complete control over how your messenger looks, behaves, and connects, all in a fast and lightweight native application.</p>
-  </div>
-  <ul class="home-feature-grid">
-    <li class="home-feature-card">
-      ${img("screenshot-plugins.webp", "MelloGram plugin manager with searchable extensions and permission labels", "Built-in plugin manager", { cls: "home-feature-image" })}
-      <div><h3>Plugins, ready to enable</h3><p>${c.plugins.length} built-in plugins for chat tools, message history, privacy, productivity, and link cleaning. Every plugin shows its permissions before you turn it on.</p><a href="${href("/plugins/")}">Browse all plugins <span aria-hidden="true">↗</span></a></div>
-    </li>
-    <li class="home-feature-card">
-      ${img("screenshot-appearance-studio.webp", "MelloGram Appearance Studio with live controls for the application interface", "Appearance Studio", { cls: "home-feature-image" })}
-      <div><h3>Make every detail yours</h3><p>Change bubbles, fonts, spacing, density, colours and animations with a live preview — no CSS knowledge required.</p><a href="${href("/themes/#appearance-studio")}">Explore Appearance Studio <span aria-hidden="true">↗</span></a></div>
-    </li>
-    <li class="home-feature-card">
-      ${img("screenshot-wallpapers.webp", "MelloGram wallpaper gallery with gradients, patterns and animated scenes", "Themes and wallpapers", { cls: "home-feature-image" })}
-      <div><h3>Themes, wallpapers & QuickCSS</h3><p>Install CSS themes, edit variables, write live styles and set custom image, gradient, patterned or animated chat backgrounds.</p><a href="${href("/themes/")}">Explore customization <span aria-hidden="true">↗</span></a></div>
-    </li>
-    <li class="home-feature-card">
-      ${img("screenshot-workspaces.webp", "MelloGram workspace selector showing saved client configurations", "Saved workspaces", { cls: "home-feature-image" })}
-      <div><h3>Workspaces for every mood</h3><p>Save complete setups for work, gaming or privacy, then switch plugins, themes, CSS and appearance settings together.</p><a href="${href("/faq/#how-do-i-back-up-or-share-my-mellogram-setup")}">Learn about workspaces <span aria-hidden="true">↗</span></a></div>
-    </li>
-    <li class="home-feature-card">
-      ${img("screenshot-diagnostics.webp", "MelloGram local diagnostics and testing centre", "Privacy and diagnostics", { cls: "home-feature-image" })}
-      <div><h3>Privacy and control</h3><p>Keep settings and diagnostics on your device, with app lock, privacy blur, safe mode and a built-in testing centre.</p><a href="${href("/privacy/")}">Read the privacy overview <span aria-hidden="true">↗</span></a></div>
-    </li>
-    <li class="home-feature-card">
-      ${img("screenshot-android.webp", "MelloGram running on an Android phone", "MelloGram for Android", { cls: "home-feature-image" })}
-      <div><h3>One experience, every device</h3><p>Use MelloGram on Windows, macOS, Linux and Android, with packages built from the public source repository.</p><a href="${href("/download/")}">Choose your platform <span aria-hidden="true">↗</span></a></div>
-    </li>
-  </ul>
-</section>
-
-<section class="home-bottom-cta" aria-labelledby="home-bottom-title">
-  <div>
-    <p class="eyebrow">Ready to customize?</p>
-    <h2 id="home-bottom-title">Start with MelloGram.</h2>
-    <p>Free, open source under GPL-3.0, and built for the way you use Telegram.</p>
-  </div>
-  <div class="cta">
-    <a class="btn main-btn" href="${href("/download/")}" data-download>Get MelloGram</a>
-    <a class="btn btn-ghost" href="${href("/faq/")}">Read the FAQ</a>
-  </div>
-</section>`,
-
+      body: () => homeBody(c),
     },
 
     {

@@ -94,6 +94,19 @@ do **not** hide anything from other members: anyone in the group can read the
 group. Channels are not covered — there is no member list to deliver keys to,
 so the lock says so rather than pretending.
 
+**Missing a message does not mean missing the key.** A member can press
+**Ask for missing keys** in the group dialog; the request travels inside that
+member's pairwise session, and the holder answers with their sender key only if
+the requester appears in the member list this device has seen. Requests from
+people who are not members get no answer.
+
+**Member lists are swept.** Telegram does not always deliver a departure, so
+MelloGram re-reads the member list of every encrypted group shortly after
+sign-in and every 30 minutes after that. Any member who disappeared forces a
+rotation, exactly like a membership event. A sweep that hits the 200-member
+paging limit is recorded but not compared, so a large group cannot trigger a
+false rotation just because the page was cut short.
+
 ## What MelloGram stores
 
 - Your identity, the ratchet sessions and a bounded cache of decrypted
