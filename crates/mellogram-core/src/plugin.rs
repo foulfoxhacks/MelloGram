@@ -411,6 +411,12 @@ pub trait Plugin: Send + Sync + 'static {
         false
     }
 
+    /// A membership change (ban, removal, restriction, lost access…). Return
+    /// text to alert the user with, or `None` to stay quiet.
+    fn on_membership(&self, _ctx: &PluginContext, _event: &crate::relationships::MembershipEvent) -> Option<String> {
+        None
+    }
+
     /// Return `false` to stop the client from broadcasting "typing…".
     fn allow_typing(&self, _ctx: &PluginContext, _chat_id: i64) -> bool {
         true

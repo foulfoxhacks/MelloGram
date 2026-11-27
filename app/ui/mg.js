@@ -19,6 +19,8 @@ function h(tag, props = {}, ...children) {
     if (v == null || v === false) continue;
     if (k === "class") el.className = v;
     else if (k === "text") el.textContent = v;
+    // CSSOM, not the style attribute: Tauri's CSP blocks inline style attributes.
+    else if (k === "style") el.style.cssText = v;
     else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
     else if (k in el && typeof v !== "string") el[k] = v;
     else el.setAttribute(k, v === true ? "" : v);
@@ -118,6 +120,13 @@ function createPluginApi(id, settings, app) {
       set: (value) => Bridge.invoke("plugin_storage_set", { id, value }),
     },
     clipboard: { write: (text) => navigator.clipboard.writeText(text) },
+    /** Subscribe to backend events of one type (e.g. "membership"); auto-removed on disable. */
+    onEvent(type, fn) {
+      let off = null;
+      let dead = false;
+      Bridge.listen("mg://event", (ev) => { if (!dead && ev.type === type) fn(ev); }).then((u) => { off = u; if (dead) u?.(); });
+      return track(() => { dead = true; off?.(); });
+    },
     download(name, text, mime = "text/plain") {
       const url = URL.createObjectURL(new Blob([text], { type: mime }));
       h("a", { href: url, download: name }).click();

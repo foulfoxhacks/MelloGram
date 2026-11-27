@@ -7,7 +7,8 @@ license.workspace = true
 
 [dependencies]
 mellogram-core.workspace = true
-grammers-client = "0.12"
+grammers-client = { version = "0.12", features = ["proxy"] }
+grammers-mtproto = "0.12"
 grammers-session = "0.12"
 serde.workspace = true
 thiserror.workspace = true

@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::Timelike as _;
 use mellogram_core::background::notification_for;
+use mellogram_core::relationships::{lost_chats, MembershipEvent, MembershipKind};
 use mellogram_core::IncomingMessage;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_notification::NotificationExt as _;
@@ -19,8 +20,59 @@ use crate::state::AppState;
 #[derive(Default)]
 pub struct BackgroundState {
     pub chat_titles: Mutex<HashMap<i64, String>>,
+    /// Sender names seen in messages, for naming people in alerts.
+    pub user_names: Mutex<HashMap<i64, String>>,
     /// Notifications shown since the window was last focused.
     pub unseen: AtomicU32,
+    /// Last complete chat list, for lost-access detection.
+    known_chats: Mutex<Option<Vec<(i64, String)>>>,
+    /// Recent membership events, newest last (capped).
+    membership_log: Mutex<std::collections::VecDeque<MembershipEvent>>,
+    /// (chat, user, kind) → when first seen, to drop duplicate reports.
+    seen: Mutex<HashMap<(i64, i64, MembershipKind), std::time::Instant>>,
+}
+
+const LOG_CAP: usize = 500;
+
+impl BackgroundState {
+    /// Records the chat list; returns chats that vanished since the last
+    /// complete list. Incomplete lists never report anything.
+    pub fn update_known_chats(&self, chats: &[mellogram_telegram::ChatSummary], complete: bool) -> Vec<(i64, String)> {
+        let now: Vec<(i64, String)> = chats.iter().map(|c| (c.id, c.title.clone())).collect();
+        {
+            let mut titles = self.chat_titles.lock().unwrap();
+            for (id, t) in &now {
+                titles.insert(*id, t.clone());
+            }
+        }
+        if !complete {
+            return Vec::new();
+        }
+        let mut known = self.known_chats.lock().unwrap();
+        let lost = known.as_deref().map(|before| lost_chats(before, &now, true)).unwrap_or_default();
+        *known = Some(now);
+        lost
+    }
+
+    /// `false` if the same change was already reported in the last 2 minutes.
+    pub fn first_sighting(&self, e: &MembershipEvent) -> bool {
+        let mut seen = self.seen.lock().unwrap();
+        let now = std::time::Instant::now();
+        seen.retain(|_, t| now.duration_since(*t).as_secs() < 120);
+        seen.insert((e.chat_id, e.user_id, e.kind), now).is_none()
+    }
+
+    pub fn log(&self, e: MembershipEvent) {
+        let mut log = self.membership_log.lock().unwrap();
+        log.push_back(e);
+        while log.len() > LOG_CAP {
+            log.pop_front();
+        }
+    }
+
+    pub fn log_snapshot(&self) -> Vec<MembershipEvent> {
+        self.membership_log.lock().unwrap().iter().rev().cloned().collect()
+    }
 }
 
 fn main_window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
@@ -54,6 +106,16 @@ pub fn notify_message(state: &AppState, msg: &IncomingMessage) {
     }
     let n = state.background.unseen.fetch_add(1, Ordering::Relaxed) + 1;
     update_tray_tooltip(&state.app, n);
+}
+
+/// A native notification with fixed text (respects Do Not Disturb).
+pub fn notify_text(state: &AppState, title: &str, body: &str) {
+    if state.store.lock().unwrap().settings.notifications.dnd {
+        return;
+    }
+    if let Err(e) = state.app.notification().builder().title(title).body(body).show() {
+        tracing::debug!("notification failed: {e}");
+    }
 }
 
 /// Clears the unseen counter when the user comes back.

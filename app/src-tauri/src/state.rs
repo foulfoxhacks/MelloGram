@@ -50,6 +50,13 @@ pub enum UiEvent {
     Deleted { chat_id: Option<i64>, ids: Vec<i32>, keep: bool },
     Disconnected { reason: String },
     LoggedIn,
+    /// A ban, removal, restriction or lost access. `alerts` are the texts
+    /// plugins chose to raise (empty = record only).
+    Membership { event: mellogram_core::relationships::MembershipEvent, alerts: Vec<String> },
+    /// A user's online status changed.
+    Presence { user_id: i64, presence: mellogram_telegram::Presence },
+    /// Nothing for the UI (internal bookkeeping only).
+    Quiet,
 }
 
 /// Session counters for the Diagnostics page.
@@ -89,6 +96,7 @@ pub struct AppState {
     pub themes: ThemeManager,
     pub cache: Mutex<MessageCache>,
     pub background: crate::background::BackgroundState,
+    pub media: crate::media::MediaState,
     pub tg: AsyncMutex<Option<Arc<Telegram>>>,
 }
 
@@ -135,6 +143,7 @@ impl AppState {
             themes,
             cache: Mutex::new(MessageCache::default()),
             background: Default::default(),
+            media: Default::default(),
             tg: AsyncMutex::new(None),
         })
     }
@@ -176,7 +185,16 @@ impl AppState {
     }
 
     pub async fn connect(self: &Arc<Self>, api_id: i32, api_hash: String) -> Result<(), String> {
-        let tg = Telegram::connect(TelegramConfig { api_id, api_hash, session_path: self.session_path() })
+        let net = self.store.lock().unwrap().settings.network.clone();
+        let proxy_url = net.proxy_url.filter(|u| mellogram_core::settings::validate_proxy_url(u).is_ok());
+        let tg = Telegram::connect(TelegramConfig {
+            api_id,
+            api_hash,
+            session_path: self.session_path(),
+            obfuscated: net.obfuscated_transport,
+            proxy_url,
+            app_version: env!("CARGO_PKG_VERSION").into(),
+        })
             .await
             .map_err(|e| e.to_string())?;
         *self.tg.lock().await = Some(Arc::clone(&tg));
@@ -207,7 +225,13 @@ impl AppState {
                     TgEvent::Disconnected { .. } => Counters::bump(&state.counters.disconnects),
                     _ => {}
                 }
+                let changed = matches!(event, TgEvent::ChatChanged { .. });
                 let ui = state.process_event(event);
+                if changed {
+                    // A channel changed state: re-read the chat list and look for lost access.
+                    let s = Arc::clone(&state);
+                    tauri::async_runtime::spawn(async move { s.check_lost_access().await });
+                }
                 if let UiEvent::NewMessage(m) = &ui {
                     crate::background::notify_message(&state, m);
                 }
@@ -221,6 +245,9 @@ impl AppState {
         let plugins = self.plugins.lock().unwrap();
         match event {
             TgEvent::NewMessage(mut m) => {
+                if let (Some(id), Some(name)) = (m.sender_id, m.sender_name.clone()) {
+                    self.background.user_names.lock().unwrap().insert(id, name);
+                }
                 plugins.on_message(&mut m);
                 self.cache.lock().unwrap().insert(&m);
                 UiEvent::NewMessage(m)
@@ -238,6 +265,66 @@ impl AppState {
                 UiEvent::Deleted { chat_id, ids, keep }
             }
             TgEvent::Disconnected { reason } => UiEvent::Disconnected { reason },
+            TgEvent::Membership(event) => {
+                drop(plugins);
+                self.membership(event)
+            }
+            TgEvent::ChatChanged { .. } => UiEvent::Quiet,
+            TgEvent::Presence { user_id, presence } => UiEvent::Presence { user_id, presence },
+        }
+    }
+
+    /// Enriches, de-duplicates, logs and alerts a membership event.
+    pub fn membership(&self, mut event: mellogram_core::relationships::MembershipEvent) -> UiEvent {
+        let bg = &self.background;
+        if event.chat_title.is_none() {
+            event.chat_title = bg.chat_titles.lock().unwrap().get(&event.chat_id).cloned();
+        }
+        {
+            let names = bg.user_names.lock().unwrap();
+            if event.user_name.is_none() {
+                event.user_name = names.get(&event.user_id).cloned();
+            }
+            if event.actor_name.is_none() {
+                event.actor_name = event.actor_id.and_then(|a| names.get(&a).cloned());
+            }
+        }
+        if !bg.first_sighting(&event) {
+            return UiEvent::Quiet; // same change reported twice (update + service message)
+        }
+        bg.log(event.clone());
+        let alerts: Vec<String> = self.plugins.lock().unwrap().on_membership(&event).into_iter().map(|(_, t)| t).collect();
+        for text in &alerts {
+            crate::background::notify_text(self, "MelloGram · Bond Watch", text);
+        }
+        UiEvent::Membership { event, alerts }
+    }
+
+    /// Re-reads the full chat list and reports chats that disappeared.
+    pub async fn check_lost_access(self: &Arc<Self>) {
+        let Ok(tg) = self.telegram().await else { return };
+        // Debounce bursts of channel updates.
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        const LIMIT: usize = 2000;
+        let Ok(chats) = tg.dialogs(LIMIT).await else { return };
+        let complete = chats.len() < LIMIT;
+        let lost = self.background.update_known_chats(&chats, complete);
+        for (chat_id, title) in lost {
+            let event = mellogram_core::relationships::MembershipEvent {
+                chat_id,
+                chat_title: Some(title),
+                user_id: 0,
+                user_name: None,
+                actor_id: None,
+                actor_name: None,
+                kind: mellogram_core::relationships::MembershipKind::AccessLost,
+                until: None,
+                is_self: true,
+                date: chrono::Utc::now().timestamp(),
+                source: mellogram_core::relationships::EventSource::ChatList,
+            };
+            let ui = self.membership(event);
+            let _ = self.app.emit("mg://event", ui);
         }
     }
 

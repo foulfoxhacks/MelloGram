@@ -29,6 +29,7 @@
       if (state.current?.id !== chat.id) await openChat(chat);
     },
     chats: () => state.chats,
+    addMessage: (m) => upsert(m),
     openChat: (c) => openChat(c),
   };
   window.MelloGram.App = App;
@@ -265,7 +266,7 @@
     h("div", { class: "mg-sender", text: m.display_name || m.sender_name || "" }),
     m.reply_to ? h("div", { class: "mg-reply-preview", text: reply ? (reply.text || "Media").slice(0, 90) : "Reply", onclick: () => jumpTo(m.reply_to) }) : null,
     m.edit_history?.length ? h("div", { class: "mg-edit-history" }, ...m.edit_history.map((t) => h("div", { text: t }))) : null,
-    m.has_media ? h("div", { class: "mg-media", text: "📎 Media (open in another client for now)" }) : null,
+    m.__album ? window.MelloGram.Media.album(m.__album) : (m.media || m.has_media) && window.MelloGram.Media ? window.MelloGram.Media.render(m) : null,
     h("div", { class: "mg-text" }, renderText(m.text)),
     h("div", { class: "mg-meta" },
       ...m.badges.map((b) => h("span", { class: "mg-badge", title: b.tooltip || b.plugin, text: b.label })),
@@ -286,9 +287,19 @@
     const sorted = [...map.values()].sort((a, b) => a.id - b.id);
     const nodes = [];
     let lastDay = "";
-    for (const m of sorted) {
+    for (let i = 0; i < sorted.length; i++) {
+      let m = sorted[i];
       const day = new Date(m.date * 1000).toDateString();
       if (day !== lastDay) { nodes.push(h("div", { class: "mg-day", text: new Date(m.date * 1000).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" }) })); lastDay = day; }
+      // Albums: consecutive messages sharing a grouped_id render as one bubble.
+      if (m.grouped_id) {
+        const group = [m];
+        while (i + 1 < sorted.length && sorted[i + 1].grouped_id === m.grouped_id) group.push(sorted[++i]);
+        if (group.length > 1) {
+          const caption = group.find((g) => g.text) || group[group.length - 1];
+          m = { ...caption, __album: group, media: null, has_media: false };
+        }
+      }
       nodes.push(messageEl(m, map));
     }
     box.replaceChildren(...nodes);
