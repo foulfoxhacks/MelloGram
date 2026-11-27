@@ -1,4 +1,8 @@
-/* MelloGram XML sitemap presentation — plain CSS, no XSLT. */
+/* MelloGram XML sitemap presentation — CSS styling, no XSLT. */
+/* The XML sitemap elements are in the Sitemap protocol namespace. */
+@namespace url("http://www.sitemaps.org/schemas/sitemap/0.9");
+@namespace image url("http://www.google.com/schemas/sitemap-image/1.1");
+
 :root {
   color-scheme: dark;
   background: #10101a;
@@ -9,6 +13,7 @@ urlset {
   display: block;
   box-sizing: border-box;
   max-width: 980px;
+  min-height: 100vh;
   margin: 0 auto;
   padding: 54px 24px 80px;
   background:
@@ -18,11 +23,11 @@ urlset {
 urlset::before {
   content: "MelloGram  /  XML Sitemap";
   display: block;
-  margin: 0 0 8px;
-  color: #c9c0ff;
   min-height: 48px;
+  margin: 0 0 8px;
   padding-left: 58px;
   background: url("/assets/logo.png") no-repeat left center / 44px 44px;
+  color: #c9c0ff;
   font-size: clamp(2rem, 5vw, 3.3rem);
   font-weight: 850;
   letter-spacing: -.055em;
@@ -64,10 +69,19 @@ lastmod, changefreq, priority {
 lastmod::before { content: "Updated: "; color: #77748f; }
 changefreq::before { content: "Frequency: "; color: #77748f; }
 priority::before { content: "Priority: "; color: #77748f; }
-image\\:image, image\\:loc, image\\:title { display: block; }
-image\\:image { margin-top: 8px; color: #85829f; font-size: .8rem; }
-image\\:loc::before { content: "Image: "; color: #77748f; }
-@media(max-width:600px) {
+image|image {
+  display: block;
+  margin-top: 10px;
+  color: #85829f;
+  font-size: .8rem;
+}
+image|loc {
+  display: block;
+  overflow-wrap: anywhere;
+}
+image|loc::before { content: "Image: "; color: #77748f; }
+image|title { display: block; color: #aaa8c3; }
+@media (max-width: 600px) {
   urlset { padding: 34px 14px 55px; }
   url { padding: 14px; }
   lastmod, changefreq, priority { display: block; margin-top: 5px; }
