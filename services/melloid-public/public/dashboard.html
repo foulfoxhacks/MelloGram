@@ -24,10 +24,11 @@
     </section>
     <section class="panel">
       <h1>Verified account connections</h1>
-      <p class="lead">Connect accounts through their official authorization pages. MelloID requests GitHub profile access and Discord identity only; access tokens are used for the verification request and are not stored.</p>
+      <p class="lead">Connect accounts through their official authorization pages. MelloID requests GitHub profile access, Discord identity, and a Steam OpenID assertion. Provider tokens are not stored.</p>
       <div class="actions">
         <a id="connect-github" class="button" href="/auth/connections/github/start">Connect GitHub</a>
         <a id="connect-discord" class="button" href="/auth/connections/discord/start">Connect Discord</a>
+        <a id="connect-steam" class="button" href="/auth/connections/steam/start">Connect Steam</a>
       </div>
       <div id="connections-list" class="connection-list" aria-live="polite">
         <p class="muted">Loading linked accounts…</p>

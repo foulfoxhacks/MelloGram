@@ -107,21 +107,22 @@ export function validateAndSanitizeProfile(input) {
 }
 
 export function projectVerifiedConnection(record) {
-  if (!record || !["github", "discord"].includes(record.provider)
+  if (!record || !["github", "discord", "steam"].includes(record.provider)
       || typeof record.provider_user_id !== "string"
       || typeof record.username !== "string"
       || typeof record.verified_at !== "string"
       || !record.profile_url || !webUrl(record.profile_url)
       || !record.visible) return null;
   const isGithub = record.provider === "github";
+  const isSteam = record.provider === "steam";
   return {
     id: `oauth-${record.provider}`,
-    provider: isGithub ? "GitHub" : "Discord",
-    kind: isGithub ? "development" : "social",
+    provider: isGithub ? "GitHub" : isSteam ? "Steam" : "Discord",
+    kind: isGithub ? "development" : isSteam ? "gaming" : "social",
     display_name: record.display_name || record.username,
     profile_url: record.profile_url,
     avatar_url: record.avatar_url || null,
-    verification_issuer: `${record.provider}-oauth`,
+    verification_issuer: record.provider === "steam" ? "steam-openid" : `${record.provider}-oauth`,
     verified_at: record.verified_at,
     visible: true,
   };

@@ -30,7 +30,7 @@ async function loadConnections() {
     const result = await request("/api/v1/me/connections");
     list.replaceChildren();
     const connections = result.connections || [];
-    for (const provider of ["github", "discord"]) {
+    for (const provider of ["github", "discord", "steam"]) {
       const record = connections.find((item) => item.provider === provider);
       const connectButton = byId(`connect-${provider}`);
       if (connectButton) connectButton.hidden = Boolean(record);
@@ -38,7 +38,7 @@ async function loadConnections() {
       card.className = "connection-card";
       const meta = document.createElement("div");
       const title = document.createElement("strong");
-      title.textContent = provider === "github" ? "GitHub" : "Discord";
+      title.textContent = provider === "github" ? "GitHub" : provider === "steam" ? "Steam" : "Discord";
       const detail = document.createElement("p");
       detail.className = "muted";
       detail.textContent = record

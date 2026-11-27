@@ -60,3 +60,77 @@ export function normalizeProviderIdentity(provider, user) {
 
   throw new Error("Unsupported external account provider.");
 }
+
+/** Steam authenticates browser account links with OpenID 2.0, not OAuth. */
+export function normalizeSteamIdentity(steamId, summary = null) {
+  if (typeof steamId !== "string" || !/^\d{17}$/.test(steamId)) {
+    throw new Error("Steam returned an invalid SteamID64.");
+  }
+  const persona = isRecord(summary) && typeof summary.personaname === "string"
+    ? summary.personaname.trim() : "";
+  let profileUrl = `https://steamcommunity.com/profiles/${steamId}`;
+  let avatarUrl = null;
+  if (isRecord(summary)) {
+    if (typeof summary.profileurl === "string") {
+      try {
+        const candidate = new URL(summary.profileurl);
+        if (candidate.protocol === "https:" && candidate.hostname === "steamcommunity.com") {
+          profileUrl = candidate.toString();
+        }
+      } catch {}
+    }
+    if (typeof summary.avatarfull === "string") {
+      try {
+        const candidate = new URL(summary.avatarfull);
+        if (candidate.protocol === "https:"
+            && (candidate.hostname.endsWith(".steamstatic.com") || candidate.hostname === "steamcdn-a.akamaihd.net")) {
+          avatarUrl = candidate.toString();
+        }
+      } catch {}
+    }
+  }
+  return {
+    provider_user_id: steamId,
+    username: steamId,
+    display_name: [...(persona || `Steam user ${steamId}`)].slice(0, 80).join(""),
+    profile_url: profileUrl,
+    avatar_url: avatarUrl,
+  };
+}
+
+function steamNonceIsRecent(value, nowSeconds) {
+  if (typeof value !== "string" || value.length < 20) return false;
+  const timestamp = Date.parse(value.slice(0, 20));
+  return Number.isFinite(timestamp)
+    && timestamp <= (nowSeconds + 60) * 1000
+    && timestamp >= (nowSeconds - 600) * 1000;
+}
+
+/** Validate Steam's OpenID response envelope before checking its signature server-to-server. */
+export function validateSteamOpenIdResponse(params, expectedReturnTo, nowSeconds = Math.floor(Date.now() / 1000)) {
+  if (!params || typeof params.get !== "function") return null;
+  const claimedId = params.get("openid.claimed_id") || "";
+  const identity = params.get("openid.identity") || "";
+  const match = claimedId.match(/^https?:\/\/steamcommunity\.com\/openid\/id\/(\d{17})$/);
+  const endpoint = params.get("openid.op_endpoint") || "";
+  let endpointUrl;
+  try { endpointUrl = new URL(endpoint); } catch { return null; }
+  const signedFields = new Set((params.get("openid.signed") || "").split(","));
+  const requiredSignedFields = ["op_endpoint", "claimed_id", "identity", "return_to", "response_nonce"];
+  const signed = requiredSignedFields.every((field) => signedFields.has(field));
+  const responseNonce = params.get("openid.response_nonce") || "";
+  if (params.get("openid.ns") !== "http://specs.openid.net/auth/2.0"
+      || params.get("openid.mode") !== "id_res"
+      || endpointUrl.protocol !== "https:"
+      || endpointUrl.hostname !== "steamcommunity.com"
+      || !["/openid/login", "/openid/"].includes(endpointUrl.pathname)
+      || params.get("openid.return_to") !== expectedReturnTo
+      || !match
+      || identity !== claimedId
+      || !signed
+      || !(params.get("openid.sig") || "")
+      || !steamNonceIsRecent(responseNonce, nowSeconds)) {
+    return null;
+  }
+  return { steamId: match[1], responseNonce, opEndpoint: endpointUrl.toString() };
+}

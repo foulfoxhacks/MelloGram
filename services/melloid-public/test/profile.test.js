@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { projectVerifiedConnection, publicProfileProjection, validateAndSanitizeProfile } from "../src/profile.js";
-import { normalizeProviderIdentity } from "../src/connections.js";
+import { normalizeProviderIdentity, normalizeSteamIdentity, validateSteamOpenIdResponse } from "../src/connections.js";
 
 function sample() {
   return {
@@ -118,4 +118,85 @@ test("Discord identity normalization derives the profile URL from the stable acc
   assert.equal(identity.display_name, "Mello Fox");
   assert.equal(identity.avatar_url, "https://cdn.discordapp.com/avatars/123456789012345678/a_123abc.png?size=128");
   assert.throws(() => normalizeProviderIdentity("discord", { id: "bad", username: "mello" }));
+});
+
+test("Steam OpenID identity normalization accepts a SteamID64 and only Steam profile assets", () => {
+  const identity = normalizeSteamIdentity("76561198000000000", {
+    personaname: "Sammy",
+    profileurl: "https://steamcommunity.com/profiles/76561198000000000",
+    avatarfull: "https://avatars.steamstatic.com/avatar.jpg"
+  });
+  assert.equal(identity.provider_user_id, "76561198000000000");
+  assert.equal(identity.display_name, "Sammy");
+  assert.equal(identity.profile_url, "https://steamcommunity.com/profiles/76561198000000000");
+  assert.equal(identity.avatar_url, "https://avatars.steamstatic.com/avatar.jpg");
+  assert.throws(() => normalizeSteamIdentity("not-a-steamid"));
+  const unsafe = normalizeSteamIdentity("76561198000000000", {
+    profileurl: "https://evil.example/profile",
+    avatarfull: "https://evil.example/avatar.png"
+  });
+  assert.equal(unsafe.profile_url, "https://steamcommunity.com/profiles/76561198000000000");
+  assert.equal(unsafe.avatar_url, null);
+});
+
+test("Steam OpenID callback validation binds the exact return URL and signed SteamID64", () => {
+  const now = 1_795_744_000;
+  const nonce = new Date(now * 1000).toISOString().replace(".000", "") + "unique";
+  const returnTo = "https://profiles.example.com/auth/connections/steam/callback?state=one-time-state";
+  const params = new URLSearchParams({
+    "openid.ns": "http://specs.openid.net/auth/2.0",
+    "openid.mode": "id_res",
+    "openid.op_endpoint": "https://steamcommunity.com/openid/login",
+    "openid.claimed_id": "https://steamcommunity.com/openid/id/76561198000000000",
+    "openid.identity": "https://steamcommunity.com/openid/id/76561198000000000",
+    "openid.return_to": returnTo,
+    "openid.response_nonce": nonce,
+    "openid.assoc_handle": "steam-handle",
+    "openid.signed": "op_endpoint,claimed_id,identity,return_to,response_nonce",
+    "openid.sig": "signed-assertion"
+  });
+  assert.deepEqual(validateSteamOpenIdResponse(params, returnTo, now), {
+    steamId: "76561198000000000",
+    responseNonce: nonce,
+    opEndpoint: "https://steamcommunity.com/openid/login"
+  });
+  assert.equal(validateSteamOpenIdResponse(params, returnTo + "&other=1", now), null);
+  const stale = new URLSearchParams(params);
+  stale.set("openid.response_nonce", "2020-01-01T00:00:00Zold");
+  assert.equal(validateSteamOpenIdResponse(stale, returnTo, now), null);
+  const unsigned = new URLSearchParams(params);
+  unsigned.set("openid.signed", "claimed_id,identity,return_to,response_nonce");
+  assert.equal(validateSteamOpenIdResponse(unsigned, returnTo, now), null);
+});
+
+test("Steam verified account projection is marked with the OpenID issuer", () => {
+  const connection = projectVerifiedConnection({
+    provider: "steam",
+    provider_user_id: "76561198000000000",
+    username: "76561198000000000",
+    display_name: "Sammy",
+    profile_url: "https://steamcommunity.com/profiles/76561198000000000",
+    avatar_url: null,
+    verified_at: "2026-11-27T00:00:00Z",
+    visible: 1
+  });
+  assert.equal(connection.provider, "Steam");
+  assert.equal(connection.kind, "gaming");
+  assert.equal(connection.verification_issuer, "steam-openid");
+});
+
+test("Steam verified connection projection uses its OpenID issuer and gaming category", () => {
+  const connection = projectVerifiedConnection({
+    provider: "steam",
+    provider_user_id: "76561198000000000",
+    username: "76561198000000000",
+    display_name: "Sammy",
+    profile_url: "https://steamcommunity.com/profiles/76561198000000000",
+    avatar_url: null,
+    verified_at: "2026-11-27T00:00:00Z",
+    visible: 1
+  });
+  assert.equal(connection.provider, "Steam");
+  assert.equal(connection.kind, "gaming");
+  assert.equal(connection.verification_issuer, "steam-openid");
 });
