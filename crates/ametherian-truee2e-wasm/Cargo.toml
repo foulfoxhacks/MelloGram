@@ -1,0 +1,17 @@
+[package]
+name = "ametherian-truee2e-wasm"
+description = "WebAssembly bindings for the MelloGram overlay protocol (spike)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ametherian-truee2e = { path = "../ametherian-truee2e", features = ["wasm"] }
+wasm-bindgen = "0.2"
+base64 = "0.23"
+serde_json = { workspace = true }

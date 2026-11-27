@@ -78,10 +78,14 @@ pub fn e2e_group_state(state: S<'_>, chat_id: i64) -> GroupView {
     state.e2e.group_state(chat_id)
 }
 
-/// Turns group encryption on and creates our sender key.
+/// Turns group encryption on and creates our sender key. The member list is
+/// read straight away so a key request can be answered without waiting for the
+/// next sweep.
 #[tauri::command]
-pub fn e2e_group_enable(state: S<'_>, chat_id: i64) -> R<GroupView> {
-    state.e2e.group_enable(chat_id)
+pub async fn e2e_group_enable(state: S<'_>, chat_id: i64) -> R<GroupView> {
+    let view = state.e2e.group_enable(chat_id)?;
+    let _ = state.sweep_group_keys().await;
+    Ok(view)
 }
 
 #[tauri::command]
@@ -139,4 +143,63 @@ pub async fn e2e_group_share(state: S<'_>, chat_id: i64) -> R<ShareReport> {
         sent,
         skipped,
     })
+}
+
+/// Asks every reachable member who has not sent us their key yet for it.
+#[tauri::command]
+pub async fn e2e_group_request_keys(state: S<'_>, chat_id: i64) -> R<ShareReport> {
+    let tg = state.telegram().await?;
+    let me = tg.ensure_self_id().await.map_err(|e| e.to_string())?;
+    state.e2e.set_self_id(me);
+    let members = tg
+        .chat_members(chat_id, 200)
+        .await
+        .map_err(|e| e.to_string())?;
+    let request = state.e2e.request_group_key(chat_id)?;
+    let have: std::collections::HashSet<i64> = state
+        .e2e
+        .group_state(chat_id)
+        .senders
+        .iter()
+        .map(|sender| sender.sender_id)
+        .collect();
+    let mut sent = Vec::new();
+    let mut skipped = Vec::new();
+    for member in members.iter() {
+        if member.id == me || member.id <= 0 || have.contains(&member.id) {
+            continue;
+        }
+        if !state.e2e.has_pairwise(member.id) {
+            skipped.push((member.id, "no one-to-one overlay session yet".to_string()));
+            continue;
+        }
+        let armored = match state.e2e.encrypt_for_peer(member.id, &request) {
+            Ok(armored) => armored,
+            Err(e) => {
+                skipped.push((member.id, e));
+                continue;
+            }
+        };
+        let message = mellogram_core::OutgoingMessage {
+            chat_id: member.id,
+            text: armored,
+            link_preview: false,
+            ..Default::default()
+        };
+        match tg.send(&message).await {
+            Ok(_) => sent.push(member.id),
+            Err(e) => skipped.push((member.id, e.to_string())),
+        }
+    }
+    Ok(ShareReport {
+        group: state.e2e.group_state(chat_id),
+        sent,
+        skipped,
+    })
+}
+
+/// Re-reads group member lists now; returns how many groups now need a new key.
+#[tauri::command]
+pub async fn e2e_group_sweep(state: S<'_>) -> R<usize> {
+    state.sweep_group_keys().await
 }

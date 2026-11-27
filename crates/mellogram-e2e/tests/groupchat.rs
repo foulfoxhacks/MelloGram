@@ -162,3 +162,75 @@ fn group_messages_reject_tampering_and_persist() {
     let store = std::fs::read(dir.join("e2e/store.bin")).unwrap();
     assert!(!store.windows(7).any(|w| w == b"payload"));
 }
+
+#[test]
+fn sweep_notices_members_who_left_without_an_event() {
+    const GROUP: i64 = -1002223334445;
+    let alice = device("sweep", 1);
+    alice.identity_bundle().unwrap();
+    alice.group_enable(GROUP).unwrap();
+
+    // First observation only records, it cannot know what came before.
+    let first = alice.group_note_members(GROUP, &[1, 2, 3], true);
+    assert!(first.removed.is_empty() && first.added.is_empty());
+    assert!(!first.rotation_needed);
+    assert_eq!(alice.group_state(GROUP).members, 3);
+
+    // Bob is gone in the second observation: the key must rotate.
+    let second = alice.group_note_members(GROUP, &[1, 3], true);
+    assert_eq!(second.removed, vec![2]);
+    assert!(second.rotation_needed);
+    assert!(alice.group_state(GROUP).rotation_needed);
+    assert!(alice.group_encrypt(GROUP, "x").unwrap_err().contains("rotate"));
+
+    // After rotating, a new member is recorded without forcing another rotation.
+    let rotated = alice.group_rotate(GROUP).unwrap();
+    assert!(!rotated.rotation_needed);
+    let third = alice.group_note_members(GROUP, &[1, 3, 4], true);
+    assert_eq!(third.added, vec![4]);
+    assert!(!third.rotation_needed);
+    assert!(alice.group_encrypt(GROUP, "ok").is_ok());
+}
+
+#[test]
+fn a_member_can_ask_for_the_group_key() {
+    const GROUP: i64 = -1007778889990;
+    let alice = device("ask-a", 1);
+    let bob = device("ask-b", 2);
+    let carol = device("ask-c", 3);
+    let bob_key = bob.identity_bundle().unwrap();
+    let alice_key = alice.identity_bundle().unwrap();
+    carol.identity_bundle().unwrap();
+    alice.import_peer(2, &bob_key).unwrap();
+    alice.set_chat(2, true).unwrap();
+    bob.import_peer(1, &alice_key).unwrap();
+    bob.set_chat(1, true).unwrap();
+    alice.group_enable(GROUP).unwrap();
+    // Alice knows the member list, which is what lets her answer key requests.
+    alice.group_note_members(GROUP, &[1, 2, 3], true);
+
+    // Bob asks Alice, inside their pairwise session.
+    let request = bob.request_group_key(GROUP).unwrap();
+    assert!(request.starts_with("mg-e2e-groupkeyreq:v1:"));
+    let armored = bob.encrypt_for_peer(1, &request).unwrap();
+    let mut incoming = msg(2, 80, 2, armored, false);
+    assert_eq!(alice.apply_incoming(&mut incoming), None);
+    assert_eq!(incoming.text, "🔑 Asked for a group encryption key");
+
+    // Alice answers from the queue, and Bob installs the key.
+    let replies = alice.take_replies();
+    assert_eq!(replies.len(), 1);
+    assert_eq!(replies[0].peer_id, 2);
+    let reply = alice.encrypt_for_peer(2, &replies[0].text).unwrap();
+    let mut key = msg(1, 81, 1, reply, false);
+    assert_eq!(bob.apply_incoming(&mut key), None);
+    assert_eq!(bob.group_state(GROUP).senders.len(), 1);
+    let mut group_message = msg(GROUP, 82, 1, alice.group_encrypt(GROUP, "for bob").unwrap(), false);
+    assert_eq!(bob.apply_incoming(&mut group_message), None);
+    assert_eq!(group_message.text, "for bob");
+
+    // Carol holds no key, so asking produces no reply.
+    let mut carol_request = msg(3, 83, 3, carol.request_group_key(GROUP).unwrap(), false);
+    carol.apply_incoming(&mut carol_request);
+    assert_eq!(alice.take_replies().len(), 0);
+}

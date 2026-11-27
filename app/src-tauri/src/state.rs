@@ -14,10 +14,12 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{mpsc, Mutex as AsyncMutex};
 
-use mellogram_e2e::E2eState;
+use mellogram_e2e::{E2eState, GroupDistribution};
 
 /// Recent messages, so edits can be compared with what was on screen.
 const MESSAGE_CACHE: usize = 20_000;
+/// How many members one sweep reads. Hitting this means the list is partial.
+const SWEEP_MEMBER_LIMIT: usize = 200;
 
 #[derive(Default)]
 pub struct MessageCache {
@@ -222,6 +224,82 @@ impl AppState {
             .ok_or_else(|| "Telegram is not configured yet — add your API ID and hash in Settings → Telegram.".into())
     }
 
+    /// Sends queued group key replies through their pairwise sessions.
+    pub async fn deliver_group_replies(
+        &self,
+        replies: Vec<GroupDistribution>,
+    ) -> Result<(), String> {
+        let tg = self.telegram().await?;
+        for reply in replies {
+            let armored = match self.e2e.encrypt_for_peer(reply.peer_id, &reply.text) {
+                Ok(armored) => armored,
+                Err(e) => {
+                    tracing::warn!("could not encrypt a group key reply for {}: {e}", reply.peer_id);
+                    continue;
+                }
+            };
+            let message = mellogram_core::OutgoingMessage {
+                chat_id: reply.peer_id,
+                text: armored,
+                link_preview: false,
+                ..Default::default()
+            };
+            if let Err(e) = tg.send(&message).await {
+                tracing::warn!("could not send a group key reply to {}: {e}", reply.peer_id);
+            }
+        }
+        Ok(())
+    }
+
+    /// Re-reads the member list of every encrypted group. A removal that never
+    /// arrived as an event still forces a rotation this way.
+    pub async fn sweep_group_keys(&self) -> Result<usize, String> {
+        let groups = self.e2e.encrypted_groups();
+        if groups.is_empty() {
+            return Ok(0);
+        }
+        let tg = self.telegram().await?;
+        let me = tg.ensure_self_id().await.map_err(|e| e.to_string())?;
+        self.e2e.set_self_id(me);
+        let mut flagged = 0;
+        for chat_id in groups {
+            match tg.chat_members(chat_id, SWEEP_MEMBER_LIMIT).await {
+                Ok(members) => {
+                    let ids: Vec<i64> = members
+                        .iter()
+                        .map(|m| m.id)
+                        .filter(|id| *id != me)
+                        .collect();
+                    // A list that hit the paging limit proves nothing about who
+                    // left, so it is recorded but not compared.
+                    let complete = members.len() < SWEEP_MEMBER_LIMIT;
+                    if self.e2e.group_note_members(chat_id, &ids, complete).rotation_needed {
+                        flagged += 1;
+                    }
+                }
+                Err(e) => {
+                    tracing::debug!("group key sweep could not read members of {chat_id}: {e}")
+                }
+            }
+        }
+        Ok(flagged)
+    }
+
+    /// Starts the periodic key sweep. Runs a little after sign-in, then every
+    /// half hour while the app is open.
+    pub fn start_key_sweep(self: &Arc<Self>) {
+        let state = Arc::clone(self);
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(90)).await;
+            loop {
+                if let Err(e) = state.sweep_group_keys().await {
+                    tracing::debug!("group key sweep skipped: {e}");
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(30 * 60)).await;
+            }
+        });
+    }
+
     /// Pipes Telegram updates through the plugin hooks to the UI.
     pub async fn start_updates(self: &Arc<Self>) -> Result<(), String> {
         let tg = self.telegram().await?;
@@ -237,6 +315,17 @@ impl AppState {
                 }
                 let changed = matches!(event, TgEvent::ChatChanged { .. });
                 let ui = state.process_event(event);
+                // A decrypted message may have been a group key request; answer
+                // it over the same pairwise session it arrived on.
+                let replies = state.e2e.take_replies();
+                if !replies.is_empty() {
+                    let s = Arc::clone(&state);
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(e) = s.deliver_group_replies(replies).await {
+                            tracing::warn!("group key replies were not delivered: {e}");
+                        }
+                    });
+                }
                 if changed {
                     // A channel changed state: re-read the chat list and look for lost access.
                     let s = Arc::clone(&state);
@@ -248,6 +337,7 @@ impl AppState {
                 let _ = state.app.emit("mg://event", ui);
             }
         });
+        self.start_key_sweep();
         Ok(())
     }
 

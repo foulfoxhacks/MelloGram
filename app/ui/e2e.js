@@ -128,7 +128,7 @@
       }),
       !state.enabled
         ? h("p", { class: "mg-hint", text: "Members who have not exchanged one-to-one overlay keys with you will see ciphertext until they do." })
-        : h("p", { class: "mg-hint", text: `${senders.length} member key${senders.length === 1 ? "" : "s"} on this device · ${group.pairwise_peers} contact${group.pairwise_peers === 1 ? "" : "s"} can receive keys.` }),
+        : h("p", { class: "mg-hint", text: `${senders.length} member key${senders.length === 1 ? "" : "s"} on this device · ${group.members || 0} member${group.members === 1 ? "" : "s"} seen · ${group.pairwise_peers} contact${group.pairwise_peers === 1 ? "" : "s"} can receive keys.` }),
       senders.length
         ? h("div", { class: "mg-raw" }, senders.map((sender) =>
             h("div", { class: "mg-hint", text: `User ${sender.sender_id} · key ${sender.key}${sender.verified ? " · verified" : ""}` })))
@@ -147,6 +147,7 @@
               },
             })
           : h("button", { class: "mg-btn mg-primary", text: "Share my key", onclick: () => shareKeys(chat, close) }),
+        state.enabled ? h("button", { class: "mg-btn", text: "Ask for missing keys", onclick: () => requestKeys(chat) }) : null,
         state.enabled ? h("button", {
           class: "mg-btn", text: "Rotate key",
           onclick: async () => {
@@ -192,6 +193,20 @@
           ? `Key sent to ${report.sent.length} member${report.sent.length === 1 ? "" : "s"}${skipped ? `; ${skipped} could not be reached` : ""}.`
           : "No member could be reached: exchange one-to-one overlay keys with them first.",
         skipped ? "warning" : "success",
+      );
+    } catch (e) { UI.toast(String(e), "error"); }
+  }
+
+  /// Asks members we have no key from (but can reach) to send theirs.
+  async function requestKeys(chat) {
+    try {
+      const report = await invoke("e2e_group_request_keys", { chatId: chat.id });
+      await paint(chat.id);
+      UI.toast(
+        report.sent.length
+          ? `Asked ${report.sent.length} member${report.sent.length === 1 ? "" : "s"} for their key.`
+          : "Nobody to ask: every reachable member's key is here, or none of them have one-to-one encryption with you.",
+        report.sent.length ? "success" : "info",
       );
     } catch (e) { UI.toast(String(e), "error"); }
   }
@@ -336,6 +351,21 @@
             window.MelloGram.Settings.show("e2e");
           },
         }) : null,
+        h("button", {
+          class: "mg-btn", text: "Check group membership",
+          onclick: async () => {
+            try {
+              const flagged = await invoke("e2e_group_sweep");
+              UI.toast(
+                flagged
+                  ? `${flagged} group${flagged === 1 ? "" : "s"} lost a member: rotate the key before sending.`
+                  : "No group membership changes found.",
+                flagged ? "warning" : "success",
+              );
+              window.MelloGram.Settings.show("e2e");
+            } catch (e) { UI.toast(String(e), "error"); }
+          },
+        }),
         h("button", {
           class: "mg-btn", text: `Forget decrypted messages (${status.decrypted_messages})`,
           onclick: async () => {

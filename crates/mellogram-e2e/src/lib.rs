@@ -14,7 +14,7 @@
 //!
 //! Threat model and limitations: `docs/E2E.md`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -51,6 +51,8 @@ const PADDED_MAX: usize = 1020;
 const PLAINTEXT_VAULT_MAX: usize = 5000;
 /// Envelope for a sender key delivered inside a pairwise encrypted message.
 const DISTRIBUTION_PREFIX: &str = "mg-e2e-groupkey:v1:";
+/// Envelope asking a member for the sender key of one group.
+const REQUEST_PREFIX: &str = "mg-e2e-groupkeyreq:v1:";
 
 #[derive(Clone, Default)]
 struct Peer {
@@ -75,6 +77,9 @@ struct GroupChat {
     /// sender user id -> their chain.
     senders: BTreeMap<i64, GroupPeer>,
     rotation_needed: bool,
+    /// Last member list seen by a sweep, used to notice departures Telegram
+    /// did not send an event for.
+    members: BTreeSet<i64>,
 }
 
 struct E2eStore {
@@ -88,6 +93,8 @@ struct E2eStore {
     plaintext: BTreeMap<(i64, i32), String>,
     /// Group id -> sender keys.
     groups: BTreeMap<i64, GroupChat>,
+    /// Key envelopes waiting to be sent back (drained by the app).
+    replies: Vec<GroupDistribution>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -114,6 +121,8 @@ struct PersistedGroup {
     senders: BTreeMap<i64, PersistedGroupPeer>,
     #[serde(default)]
     rotation_needed: bool,
+    #[serde(default)]
+    members: Vec<i64>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -166,6 +175,17 @@ pub struct GroupView {
     pub senders: Vec<GroupSenderView>,
     /// Contacts we can hand keys to (they have a pairwise overlay session).
     pub pairwise_peers: usize,
+    /// Members seen by the last hydration or sweep.
+    pub members: usize,
+}
+
+/// What a member-list observation changed.
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct GroupMembers {
+    pub added: Vec<i64>,
+    pub removed: Vec<i64>,
+    /// The key must be rotated before anything else is sent.
+    pub rotation_needed: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Default)]
@@ -274,6 +294,7 @@ impl E2eStore {
             chats: BTreeMap::new(),
             plaintext: BTreeMap::new(),
             groups: BTreeMap::new(),
+            replies: Vec::new(),
         };
         if let Err(e) = store.load() {
             tracing::warn!("encrypted overlay state could not be loaded: {e}");
@@ -347,6 +368,7 @@ impl E2eStore {
                 own,
                 senders: BTreeMap::new(),
                 rotation_needed: record.rotation_needed,
+                members: record.members.into_iter().collect(),
             };
             for (sender_id, peer) in record.senders {
                 let Some(receiver) = peer
@@ -436,6 +458,7 @@ impl E2eStore {
                     own: group.own.as_ref().map(SenderKey::to_armored),
                     senders,
                     rotation_needed: group.rotation_needed,
+                    members: group.members.iter().copied().collect(),
                 },
             );
         }
@@ -520,6 +543,7 @@ impl E2eStore {
                 })
                 .unwrap_or_default(),
             pairwise_peers: self.peers.values().filter(|p| p.session.is_some()).count(),
+            members: group.map(|g| g.members.len()).unwrap_or(0),
         }
     }
 
@@ -899,6 +923,9 @@ impl E2eState {
         let peer_id = message.chat_id;
         match self.decrypt_incoming(message.chat_id, peer_id, message.id, &message.text) {
             Ok((text, verified)) => {
+                if text.trim_start().starts_with(REQUEST_PREFIX) {
+                    return self.handle_group_request_message(message, peer_id, &text);
+                }
                 if text.trim_start().starts_with(DISTRIBUTION_PREFIX) {
                     // Key envelopes are rendered as a note, not as text.
                     return self.handle_distribution(message, peer_id, &text);
@@ -943,6 +970,29 @@ impl E2eState {
             Err(reason) => {
                 message.add_class("mg-e2e-locked");
                 group_badge(message, false);
+                Some(reason)
+            }
+        }
+    }
+
+    /// A pairwise message may ask for a group key; answer it when we hold one
+    /// and render the request as a note.
+    fn handle_group_request_message(
+        &self,
+        message: &mut IncomingMessage,
+        peer_id: i64,
+        text: &str,
+    ) -> Option<String> {
+        let friendly = "🔑 Asked for a group encryption key".to_string();
+        match self.handle_group_request(peer_id, text) {
+            Ok(_) => {
+                self.remember_sent(message.chat_id, message.id, &friendly);
+                message.text = friendly;
+                None
+            }
+            Err(reason) => {
+                message.text = "🔑 A group key request could not be read".into();
+                message.add_class("mg-e2e-locked");
                 Some(reason)
             }
         }
@@ -1066,6 +1116,112 @@ impl E2eState {
         if let Err(e) = store.persist() {
             tracing::warn!("could not record the group key rotation: {e}");
         }
+    }
+
+    /// Groups the overlay is switched on for.
+    pub fn encrypted_groups(&self) -> Vec<i64> {
+        self.lock()
+            .chats
+            .iter()
+            .filter(|(id, on)| **on && **id < 0)
+            .map(|(id, _)| *id)
+            .collect()
+    }
+
+    /// Records the member list observed for a group. A member who disappeared
+    /// since the last observation still holds a copy of our sender key, so any
+    /// departure forces a rotation.
+    ///
+    /// `complete` must be false when the caller hit its own paging limit: a
+    /// truncated list is not evidence that anyone left, and treating it as such
+    /// would rotate on every sweep in a large group.
+    pub fn group_note_members(&self, chat_id: i64, members: &[i64], complete: bool) -> GroupMembers {
+        let mut store = self.lock();
+        let Some(group) = store.groups.get_mut(&chat_id) else {
+            return GroupMembers::default();
+        };
+        let observed: BTreeSet<i64> = members.iter().copied().filter(|id| *id > 0).collect();
+        let mut note = GroupMembers::default();
+        if complete && !group.members.is_empty() {
+            note.removed = group.members.difference(&observed).copied().collect();
+            note.added = observed.difference(&group.members).copied().collect();
+        }
+        let changed = group.members != observed || !note.removed.is_empty();
+        group.members = observed;
+        if !note.removed.is_empty() && group.own.is_some() {
+            group.rotation_needed = true;
+            note.rotation_needed = true;
+        }
+        if changed {
+            if let Err(e) = store.persist() {
+                tracing::warn!("could not record the group member list: {e}");
+            }
+        }
+        note
+    }
+
+    /// Text asking a member for their sender key for one group. The caller
+    /// encrypts it with [`Self::encrypt_for_peer`].
+    pub fn request_group_key(&self, chat_id: i64) -> Result<String, String> {
+        if chat_id >= 0 {
+            return Err("Group keys only exist for groups and supergroups.".into());
+        }
+        let payload = serde_json::json!({ "group": chat_id });
+        let mut text = String::from(REQUEST_PREFIX);
+        text.push_str(&STANDARD.encode(payload.to_string()));
+        Ok(text)
+    }
+
+    /// Answers a key request from `from_peer` when we hold that group's key,
+    /// and queues the reply for the app to send back.
+    pub fn handle_group_request(
+        &self,
+        from_peer: i64,
+        text: &str,
+    ) -> Result<Option<GroupInstall>, String> {
+        let Some(body) = text.trim().strip_prefix(REQUEST_PREFIX) else {
+            return Ok(None);
+        };
+        let json = STANDARD
+            .decode(body)
+            .map_err(|_| "the key request is malformed".to_string())?;
+        let value: serde_json::Value = serde_json::from_slice(&json)
+            .map_err(|_| "the key request is malformed".to_string())?;
+        let group_id = value
+            .get("group")
+            .and_then(|v| v.as_i64())
+            .ok_or_else(|| "the key request has no group id".to_string())?;
+        if group_id >= 0 {
+            return Err("the key request names a chat that is not a group".into());
+        }
+        let mut store = self.lock();
+        let Some(group) = store.groups.get(&group_id) else {
+            return Ok(None);
+        };
+        // Only answer members we have actually seen in this group: a key request
+        // is just a chat id, and anyone who guesses it must not get the key.
+        if !group.members.contains(&from_peer) {
+            return Ok(None);
+        }
+        let Some(key) = group.own.as_ref() else {
+            return Ok(None);
+        };
+        let fingerprint = key_fingerprint(&key.id());
+        let reply = GroupDistribution {
+            peer_id: from_peer,
+            text: distribution_text(group_id, key),
+        };
+        store.replies.push(reply);
+        Ok(Some(GroupInstall {
+            group_id,
+            sender_id: from_peer,
+            key: fingerprint,
+        }))
+    }
+
+    /// Takes the queued key replies; the app encrypts and sends each one.
+    pub fn take_replies(&self) -> Vec<GroupDistribution> {
+        std::mem::take(&mut self.lock().replies)
     }
 
     /// Key envelopes for the members we can reach: those with a pairwise

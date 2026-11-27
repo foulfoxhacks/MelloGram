@@ -1,0 +1,12 @@
+name = "mellogram-site"
+main = "worker.mjs"
+compatibility_date = "2026-11-27"
+
+# `node site/build.mjs` writes this directory; the Worker runs first so the
+# security headers and the HTML 404 apply to every response.
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+run_worker_first = true
+html_handling = "auto-trailing-slash"
+not_found_handling = "none"

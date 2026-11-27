@@ -301,3 +301,40 @@ jobs:
       - name: Test routing, headers and capability claims
         working-directory: services/web-client
         run: node --test test/*.test.js
+
+  site:
+    name: Website build and Worker tests
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build the site
+        run: node site/build.mjs
+      - name: Check SEO, links, headings and images
+        run: node site/check.mjs
+      - name: Validate site and Worker JavaScript
+        run: |
+          node --check site/home.mjs
+          node --check site/pages.mjs
+          node --check site/worker.mjs
+          node --check site/serve.mjs
+      - name: Test the site Worker
+        run: node --test site/test/*.test.mjs
+
+  wasm-overlay:
+    name: WASM overlay build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Test the bindings natively
+        run: cargo test -p ametherian-truee2e-wasm
+      - name: Build for the browser
+        run: cargo build -p ametherian-truee2e-wasm --release --target wasm32-unknown-unknown
+      - name: Check the artifact exists
+        run: test -s target/wasm32-unknown-unknown/release/ametherian_truee2e_wasm.wasm

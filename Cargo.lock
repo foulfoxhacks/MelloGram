@@ -73,6 +73,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ametherian-truee2e-wasm"
+version = "0.1.0"
+dependencies = [
+ "ametherian-truee2e",
+ "base64 0.23.1",
+ "serde_json",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "android_system_properties"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1638,9 +1648,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "300e883d756b2e4ec94e02791f39b04b522276138852cfc41d9fb7e904106099"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "r-efi 6.0.0",
  "rand_core",
+ "wasm-bindgen",
 ]
 
 [[package]]
