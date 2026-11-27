@@ -31,6 +31,7 @@ jobs:
           node --check app/ui/studio.js
           node --check app/ui/wallpapers.js
           node --check app/ui/mg.js
+          node --check app/ui/e2e.js
           node --check app/ui/info.js
           node --check app/ui/media.js
           node --check docs/examples/mellorpc-node-example.js

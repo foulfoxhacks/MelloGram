@@ -14,6 +14,8 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{mpsc, Mutex as AsyncMutex};
 
+use mellogram_e2e::E2eState;
+
 /// Recent messages, so edits can be compared with what was on screen.
 const MESSAGE_CACHE: usize = 20_000;
 
@@ -98,6 +100,8 @@ pub struct AppState {
     pub background: crate::background::BackgroundState,
     pub media: crate::media::MediaState,
     pub tg: AsyncMutex<Option<Arc<Telegram>>>,
+    /// End-to-end privacy overlay: identity, sessions and per-chat mode.
+    pub e2e: E2eState,
 }
 
 impl AppState {
@@ -105,6 +109,7 @@ impl AppState {
         let store = SettingsStore::open(&dir)?;
         let melloid = MelloIdStore::open(&dir)?;
         let themes = ThemeManager::new(dir.join("themes"))?;
+        let e2e = E2eState::open(&dir);
         // Crash / safe-mode bookkeeping.
         let running = dir.join("running.lock");
         let unclean_shutdown = running.exists();
@@ -145,6 +150,7 @@ impl AppState {
             background: Default::default(),
             media: Default::default(),
             tg: AsyncMutex::new(None),
+            e2e,
         })
     }
 
@@ -199,6 +205,10 @@ impl AppState {
             .map_err(|e| e.to_string())?;
         *self.tg.lock().await = Some(Arc::clone(&tg));
         if tg.client().is_authorized().await.unwrap_or(false) {
+            // The overlay binds messages to our own user id.
+            if let Ok(mellogram_telegram::LoginState::Ready { me }) = tg.login_state().await {
+                self.e2e.set_self_id(me.id);
+            }
             self.start_updates().await?;
         }
         Ok(())
@@ -248,6 +258,8 @@ impl AppState {
                 if let (Some(id), Some(name)) = (m.sender_id, m.sender_name.clone()) {
                     self.background.user_names.lock().unwrap().insert(id, name);
                 }
+                // Overlay messages are decrypted before plugins and the UI see them.
+                let _ = self.e2e.apply_incoming(&mut m);
                 plugins.on_message(&mut m);
                 self.cache.lock().unwrap().insert(&m);
                 UiEvent::NewMessage(m)
@@ -255,6 +267,7 @@ impl AppState {
             TgEvent::Edited(mut m) => {
                 let mut cache = self.cache.lock().unwrap();
                 let previous = cache.get(m.chat_id, m.id).cloned();
+                let _ = self.e2e.apply_incoming(&mut m);
                 plugins.on_message(&mut m);
                 plugins.on_edit(previous.as_ref(), &mut m);
                 cache.map.insert((m.chat_id, m.id), m.clone());
@@ -338,6 +351,7 @@ impl AppState {
                 m.edit_history = cached.edit_history.clone();
                 m.badges = cached.badges.clone();
             }
+            let _ = self.e2e.apply_incoming(m);
             plugins.on_message(m);
             cache.insert(m);
         }
@@ -388,6 +402,7 @@ impl AppState {
         self.plugins.lock().unwrap().shutdown();
         self.store.lock().unwrap().settings.save_active_workspace();
         let _ = self.save();
+        self.e2e.flush();
         let _ = std::fs::remove_file(self.dir.join("running.lock"));
     }
 }

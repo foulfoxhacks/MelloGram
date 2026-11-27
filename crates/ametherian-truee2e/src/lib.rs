@@ -59,6 +59,7 @@
     )
 )]
 
+mod at_rest;
 mod crypto;
 mod error;
 mod keys;
@@ -68,6 +69,7 @@ mod safety;
 mod session;
 mod wire;
 
+pub use at_rest::{open as open_at_rest, seal as seal_at_rest, DeviceKey, SEALED_FORMAT_VERSION};
 pub use error::{Error, Result};
 pub use keys::{IdentityKeyPair, IdentityPublic, PublicBundle, BUNDLE_ARMOR_PREFIX};
 pub use padding::{pad, padded_len, unpad, PAD_BUCKETS};

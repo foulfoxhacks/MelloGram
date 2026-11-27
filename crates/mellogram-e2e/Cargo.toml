@@ -1,0 +1,16 @@
+[package]
+name = "mellogram-e2e"
+description = "In-app end-to-end privacy overlay state for MelloGram (identity, sessions, per-chat mode)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ametherian-truee2e = { path = "../ametherian-truee2e" }
+mellogram-core.workspace = true
+base64 = "0.22"
+serde.workspace = true
+serde_json.workspace = true
+sha2 = "0.10"
+tracing.workspace = true

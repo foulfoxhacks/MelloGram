@@ -315,6 +315,15 @@ impl Telegram {
         Ok(Me { id: me.id().bare_id_unchecked(), name: me.full_name(), username: me.username().map(str::to_owned) })
     }
 
+    /// Our own user id, fetched once and cached. `0` only if we never logged in.
+    pub async fn ensure_self_id(&self) -> Result<i64> {
+        let id = self.self_id.load(std::sync::atomic::Ordering::Relaxed);
+        if id != 0 {
+            return Ok(id);
+        }
+        Ok(self.me().await?.id)
+    }
+
     // ---- chats & messages ----------------------------------------------------
 
     async fn peer_ref(&self, chat_id: i64) -> Result<PeerRef> {

@@ -182,6 +182,7 @@
     $("app").classList.add("mg-show-chat");
     $("chat-title").textContent = chat.title;
     $("chat-sub").textContent = [chat.username && `@${chat.username}`, chat.kind].filter(Boolean).join(" · ");
+    window.MelloGram.E2E?.sync(chat);
     renderChats();
     if (!state.messages.has(chat.id)) {
       state.messages.set(chat.id, new Map());

@@ -47,3 +47,42 @@ If a contact's safety number ever changes, MelloGram warns you. That can
 happen because they reinstalled the app or changed devices, but it can also
 mean someone is intercepting the chat. Verify again before sending anything
 sensitive.
+
+## Turning it on in MelloGram
+
+1. **Settings → End-to-End Overlay → Create my key**, then **Copy my key** and
+   send it to the other person through a channel you trust.
+2. Open the one-to-one chat and click the **lock button** in the composer,
+   paste their key and confirm. Your next message starts the encrypted
+   session; on their device it is decrypted automatically, and their client
+   pins your key from that first message.
+3. Compare the 60-digit safety number (lock button) over a call or in person
+   and press **Check digits**. Verified contacts show a closed lock; everyone
+   else shows an open one.
+
+The lock button shows the state at a glance: grey = off, amber = on but
+waiting for the other person's key, green = on with an open session.
+
+## What MelloGram stores
+
+- Your identity, the ratchet sessions and a bounded cache of decrypted
+  messages live in `e2e/store.bin` in the config directory, sealed with
+  XChaCha20-Poly1305 under a per-install device key (`e2e/device.key`). Both
+  files are created owner-only. The device key sits beside the store, so this
+  keeps overlay state out of backups, sync folders and bug reports — it is not
+  protection against someone who already has your account.
+- The decrypted cache exists so history renders again after a restart without
+  rewinding the ratchet. **Forget decrypted messages** clears it.
+- Deleting `e2e/` means a new identity: contacts must verify the new safety
+  number. MelloGram warns when a stored contact key changes and never
+  silently replaces a pinned one; the new key has to be imported explicitly.
+
+## Limits in this build
+
+- One-to-one text only. Group and channel overlays are separate work.
+- Encrypted messages are limited to about 2600 bytes of UTF-8, because the
+  armored text has to fit Telegram's 4096-character message limit.
+- Attachments and edits are refused while the overlay is on: files are not
+  covered yet, and an edit would no longer match the ciphertext stored by
+  Telegram.
+- Messages sent before the overlay was enabled stay in plain text.
