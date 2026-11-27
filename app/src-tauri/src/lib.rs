@@ -33,6 +33,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
+            commands::get_melloid_profile,
+            commands::save_melloid_profile,
             commands::get_settings,
             commands::set_general,
             commands::set_notifications,
