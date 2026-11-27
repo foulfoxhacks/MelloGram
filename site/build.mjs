@@ -196,7 +196,7 @@ const ctx = { url, href, asset, img, esc, plugins, wallpapers, version, REPO, SI
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(join(OUT, "assets"), { recursive: true });
 cpSync(join(here, "src/assets"), join(OUT, "assets"), { recursive: true });
-for (const f of ["logo.png", "og-image.png", "icon-512.png", ...readFileSync(join(here, "src/assets/.images"), "utf8").split("\n").filter(Boolean)]) {
+for (const f of ["logo.png", "og-image.png", "icon-512.png", ...readFileSync(join(here, "src/assets/.images"), "utf8").split(/\r?\n/).map((s) => s.trim()).filter(Boolean)]) {
   const d = dimensions(join(here, "src/assets", f));
   if (!d) throw new Error(`cannot read dimensions of ${f}`);
   IMAGES[f] = d;

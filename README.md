@@ -121,8 +121,13 @@ cd app/src-tauri && cargo tauri build --target x86_64-pc-windows-gnu --bundles n
 Android (needs the Android SDK + NDK and the Android Rust targets):
 
 ```bash
-cd app/src-tauri && cargo tauri android init && cargo tauri android build --apk
+# Debug build (automatically signed with debug keystore, installable on any device):
+cd app/src-tauri && cargo tauri android init && cargo tauri android build --apk --debug
+
+# Release build (outputs unsigned APK; must be signed with apksigner or release keystore to install):
+cargo tauri android build --apk
 ```
+> **Note:** Android requires all installed packages to be signed. If you install an unsigned release APK without signing it, Android will report "There was a problem parsing the package" (invalid package error). Always use `--debug` for direct local testing, or sign the release APK with `apksigner sign --ks release.jks your-app.apk`.
 
 Tests:
 

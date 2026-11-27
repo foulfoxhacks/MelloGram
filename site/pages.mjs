@@ -124,15 +124,16 @@ export function pages(c) {
 <section class="home-hero">
   <div class="home-hero-copy">
     <div class="home-hero-mark">
-      ${img("logo.png", "MelloGram fox-paw and paper-plane logo", "MelloGram logo", { eager: true })}
+      ${img("logo.png", "MelloGram fox-paw and paper-plane mascot logo", "MelloGram logo", { eager: true, cls: "cute-logo" })}
     </div>
-    <p class="eyebrow">Made by FoulFoxHacks · Open source · Free</p>
-    <h1>Your Telegram.<br><span class="gradient-text">Your style.</span></h1>
-    <p class="lead">MelloGram brings the client-mod experience to a standalone Telegram app. Explore ${c.plugins.length} built-in plugins, powerful themes, live QuickCSS, custom wallpapers and workspaces — all in one place.</p>
-    <div class="cta home-cta">
-      <a class="btn" href="${href("/download/")}" data-download>Download MelloGram</a>
-      <a class="btn btn-ghost" href="${href("/plugins/")}">Explore plugins</a>
-      <a class="text-link" href="${c.REPO}" rel="noopener">View source on GitHub ↗</a>
+    <p class="eyebrow">A customizable Telegram client by FoulFoxHacks · Open Source · Free</p>
+    <h1>MelloGram</h1>
+    <h2 class="hero-tagline">The customizable Telegram client mod</h2>
+    <p class="lead">MelloGram brings the client-mod experience to a standalone Telegram app. Built from scratch in Rust, it features ${c.plugins.length} built-in plugins, custom themes, live QuickCSS, animated wallpapers, and workspaces with zero telemetry.</p>
+    <div class="cta home-cta buttons">
+      <a class="btn main-btn" href="${href("/download/")}" data-download>Download MelloGram</a>
+      <a class="btn btn-ghost" href="${href("/plugins/")}">Browse Plugins</a>
+      <a class="btn btn-ghost" href="${c.REPO}" rel="noopener">GitHub ↗</a>
     </div>
     <ul class="home-platforms" aria-label="Supported platforms">
       <li>Windows</li><li>macOS</li><li>Linux</li><li>Android</li>
@@ -140,20 +141,20 @@ export function pages(c) {
   </div>
   <figure class="home-hero-shot">
     ${img("screenshot-chat.webp", "MelloGram desktop chat window with custom colours and a paw-print wallpaper", "MelloGram desktop preview", { eager: true })}
-    <figcaption>One Telegram client. A whole lot more personality.</figcaption>
+    <figcaption>A familiar messenger with modern customization, themes, and native performance.</figcaption>
   </figure>
 </section>
 
 <section class="home-features section" aria-labelledby="home-features-title">
   <div class="home-section-heading">
-    <p class="eyebrow">Why MelloGram?</p>
+    <p class="eyebrow">Features</p>
     <h2 id="home-features-title">Everything you need. Nothing to patch.</h2>
-    <p class="lead">A familiar messenger, with the freedom to shape how it looks, feels and works.</p>
+    <p class="lead">MelloGram gives you complete control over how your messenger looks, behaves, and connects, all in a fast and lightweight native application.</p>
   </div>
   <ul class="home-feature-grid">
     <li class="home-feature-card">
       ${img("screenshot-plugins.webp", "MelloGram plugin manager with searchable extensions and permission labels", "Built-in plugin manager", { cls: "home-feature-image" })}
-      <div><h3>Plugins, ready to enable</h3><p>${c.plugins.length} built-in plugins for chat tools, privacy, productivity and quality-of-life improvements. Every plugin shows its permissions before you turn it on.</p><a href="${href("/plugins/")}">Browse all plugins <span aria-hidden="true">↗</span></a></div>
+      <div><h3>Plugins, ready to enable</h3><p>${c.plugins.length} built-in plugins for chat tools, message history, privacy, productivity, and link cleaning. Every plugin shows its permissions before you turn it on.</p><a href="${href("/plugins/")}">Browse all plugins <span aria-hidden="true">↗</span></a></div>
     </li>
     <li class="home-feature-card">
       ${img("screenshot-appearance-studio.webp", "MelloGram Appearance Studio with live controls for the application interface", "Appearance Studio", { cls: "home-feature-image" })}
@@ -180,12 +181,12 @@ export function pages(c) {
 
 <section class="home-bottom-cta" aria-labelledby="home-bottom-title">
   <div>
-    <p class="eyebrow">Ready to make it yours?</p>
+    <p class="eyebrow">Ready to customize?</p>
     <h2 id="home-bottom-title">Start with MelloGram.</h2>
-    <p>Free, open source and built for the way you use Telegram.</p>
+    <p>Free, open source under GPL-3.0, and built for the way you use Telegram.</p>
   </div>
   <div class="cta">
-    <a class="btn" href="${href("/download/")}" data-download>Get MelloGram</a>
+    <a class="btn main-btn" href="${href("/download/")}" data-download>Get MelloGram</a>
     <a class="btn btn-ghost" href="${href("/faq/")}">Read the FAQ</a>
   </div>
 </section>`,

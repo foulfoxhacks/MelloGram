@@ -199,9 +199,19 @@ jobs:
               --out dist/MelloGram-android.apk aligned.apk
             rm -f release.jks aligned.apk
           else
-            test -n "$debug_apk" || { echo "No debug APK was produced"; exit 1; }
-            echo "::warning::No Android release keystore configured. Publishing a clearly labelled debug-signed APK; it cannot update an install signed with a different key."
-            cp "$debug_apk" dist/MelloGram-android-debug.apk
+            test -n "$release_apk" || { echo "No release APK was produced"; exit 1; }
+            echo "::warning::No Android release keystore configured. Signing optimized release APK with a debug keystore for installability."
+            keytool -genkeypair -v -keystore test.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=MelloGram,O=FoulFoxHacks,C=US"
+            "$bt/zipalign" -f -p 4 "$release_apk" aligned.apk
+            "$bt/apksigner" sign --ks test.keystore \
+              --ks-pass pass:android \
+              --ks-key-alias androiddebugkey \
+              --key-pass pass:android \
+              --out dist/MelloGram-android.apk aligned.apk
+            rm -f test.keystore aligned.apk
+            if [ -n "$debug_apk" ]; then
+              cp "$debug_apk" dist/MelloGram-android-debug.apk
+            fi
           fi
 
           # Validate every deliverable APK before upload.
