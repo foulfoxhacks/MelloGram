@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use chrono::Timelike as _;
 use mellogram_core::background::notification_for;
 use mellogram_core::IncomingMessage;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 use tauri_plugin_notification::NotificationExt as _;
 
 use crate::state::AppState;
@@ -30,6 +30,7 @@ fn main_window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
 pub fn show_main(app: &AppHandle) {
     if let Some(w) = main_window(app) {
         let _ = w.show();
+        #[cfg(desktop)]
         let _ = w.unminimize();
         let _ = w.set_focus();
     }
@@ -111,6 +112,7 @@ pub fn setup(app: &AppHandle, state: &Arc<AppState>) -> tauri::Result<()> {
 #[cfg(desktop)]
 fn build_tray(app: &AppHandle, state: &Arc<AppState>) -> tauri::Result<()> {
     use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
+    use tauri::Emitter as _;
     use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 
     let dnd_on = state.store.lock().unwrap().settings.notifications.dnd;

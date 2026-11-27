@@ -118,3 +118,7 @@ thead th { background: var(--bg-2); }
   .footer-grid { grid-template-columns: 1fr; }
   .plugin-list { grid-template-columns: 1fr; }
 }
+.cards-2 { grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); }
+.dl-list { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 12px; }
+.dl-list li { display: flex; flex-direction: column; gap: 4px; }
+.dl-list .btn { align-self: flex-start; }

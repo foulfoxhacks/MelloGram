@@ -13,7 +13,7 @@ const PERMISSION = {
 
 const faqs = (c) => [
   ["What is MelloGram?",
-    `MelloGram is a free, open-source Telegram client for Windows, Linux and Android that you can customize like a Vencord-modded Discord: it ships ${c.plugins.length} built-in plugins, a theme engine with QuickCSS, a wallpaper engine, workspaces and an Appearance Studio, all in a fast Rust application.`],
+    `MelloGram is a free, open-source Telegram client for Windows, macOS, Linux and Android that you can customize like a Vencord-modded Discord: it ships ${c.plugins.length} built-in plugins, a theme engine with QuickCSS, a wallpaper engine, workspaces and an Appearance Studio, all in a fast Rust application.`],
   ["Is MelloGram free?",
     "Yes. MelloGram is completely free and open source under the GPL-3.0-or-later licence. There are no ads, no subscriptions and no paid features."],
   ["Is it safe to use MelloGram with my Telegram account?",
@@ -25,7 +25,7 @@ const faqs = (c) => [
   ["Is MelloGram a Vencord port?",
     "No. MelloGram is inspired by the Vencord user experience — a plugin manager, themes and QuickCSS — but it is a standalone Telegram client written from scratch in Rust. It does not inject into another app and contains no Vencord code."],
   ["Which platforms does MelloGram support?",
-    "MelloGram has installers for Windows (NSIS .exe and .msi) and Linux (.deb, .rpm and AppImage), plus an Android APK. macOS builds come from the same code."],
+    "MelloGram runs on Windows 10 and 11 (setup .exe or .msi), macOS 11 or newer on Apple Silicon and Intel (.dmg), Linux (.deb, .rpm or AppImage) and Android 7.0 or newer (.apk)."],
   ["How do I install plugins in MelloGram?",
     "Open Settings → Plugins (Ctrl+,) and switch a plugin on. Every plugin is built in, shows the permissions it uses, and has its own settings panel. Plugins that crash are isolated and paused automatically."],
   ["Can I use custom themes and CSS?",
@@ -57,12 +57,12 @@ function softwareApp(c) {
     description: "A free, open-source, customizable Telegram client with plugins, themes, wallpapers and workspaces.",
     applicationCategory: "CommunicationApplication",
     applicationSubCategory: "Messaging client",
-    operatingSystem: "Windows 10, Windows 11, Linux, Android, macOS",
+    operatingSystem: "Windows 10, Windows 11, macOS 11+, Linux, Android 7+",
     softwareVersion: c.version,
     license: "https://www.gnu.org/licenses/gpl-3.0.html",
     isAccessibleForFree: true,
     offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-    downloadUrl: `${c.REPO}/releases/latest`,
+    downloadUrl: [c.downloads.windows[0][1], c.downloads.macos[0][1], c.downloads.linux[0][1], c.downloads.android[0][1]],
     installUrl: c.url("/download/"),
     softwareHelp: { "@type": "CreativeWork", url: c.url("/faq/") },
     codeRepository: c.REPO,
@@ -108,7 +108,7 @@ export function pages(c) {
     {
       path: "/",
       title: "MelloGram — The Customizable Telegram Client",
-      description: "MelloGram is a free, open-source Telegram client for Windows, Linux and Android with plugins, themes, QuickCSS, wallpapers and workspaces.",
+      description: "MelloGram is a free, open-source Telegram client for Windows, macOS, Linux and Android with plugins, themes, QuickCSS, wallpapers and workspaces.",
       h1: "MelloGram, the customizable Telegram client",
       priority: 1.0,
       changefreq: "weekly",
@@ -119,7 +119,7 @@ export function pages(c) {
   <div class="hero-text">
     <p class="eyebrow">Free · Open source · Built in Rust</p>
     <h1>MelloGram, the customizable Telegram client</h1>
-    <p class="lead">MelloGram is a free, open-source Telegram client that you can make your own: ${c.plugins.length} built-in plugins, CSS themes and QuickCSS, animated and per-chat wallpapers, and workspaces — on Windows, Linux and Android.</p>
+    <p class="lead">MelloGram is a free, open-source Telegram client that you can make your own: ${c.plugins.length} built-in plugins, CSS themes and QuickCSS, animated and per-chat wallpapers, and workspaces — on Windows, macOS, Linux and Android.</p>
     <div class="cta">
       <a class="btn" href="${href("/download/")}" data-download>Download MelloGram</a>
       <a class="btn btn-ghost" href="${c.REPO}" rel="noopener">View source on GitHub</a>
@@ -204,31 +204,32 @@ export function pages(c) {
     {
       path: "/download/",
       crumb: "Download",
-      title: "Download MelloGram for Windows, Linux & Android",
-      description: "Download MelloGram, the free customizable Telegram client: Windows installer and MSI, Linux .deb, .rpm and AppImage, and Android APK.",
+      title: "Download MelloGram: Windows, macOS, Linux, Android",
+      description: "Download MelloGram, the free customizable Telegram client, for Windows (.exe, .msi), macOS (.dmg), Linux (.deb, .rpm, AppImage) and Android.",
       h1: "Download MelloGram",
       priority: 0.9,
       changefreq: "weekly",
       jsonld: (c) => [softwareApp(c)],
       body: () => `
 <header class="page-head"><h1>Download MelloGram</h1>
-<p class="lead">MelloGram ${esc(c.version)} is free and available for Windows, Linux and Android. Every download comes from the official GitHub releases page and is built automatically from the public source code.</p></header>
+<p class="lead">MelloGram ${esc(c.version)} is free for Windows, macOS, Linux and Android. Pick your platform below; every file is built automatically from the public source code and published on GitHub.</p></header>
 
 <section class="section" aria-labelledby="platforms">
   <h2 id="platforms">Choose your platform</h2>
-  <ul class="cards cards-3">
-    <li class="card" id="windows"><h3>Windows</h3><p>Windows 10 and 11, 64-bit. The <strong>.exe</strong> installer adds a Start-menu entry and uninstaller and installs Microsoft WebView2 if needed. The <strong>.msi</strong> suits managed deployments.</p><a class="btn" href="${c.REPO}/releases/latest" rel="noopener" data-os="windows">Download for Windows</a></li>
-    <li class="card" id="linux"><h3>Linux</h3><p>Choose <strong>.deb</strong> for Debian and Ubuntu, <strong>.rpm</strong> for Fedora and openSUSE, or the portable <strong>AppImage</strong> for any distribution.</p><a class="btn" href="${c.REPO}/releases/latest" rel="noopener" data-os="linux">Download for Linux</a></li>
-    <li class="card" id="android"><h3>Android</h3><p>Android 7.0 or newer. Download the <strong>APK</strong> and allow installs from your browser when Android asks.</p><a class="btn" href="${c.REPO}/releases/latest" rel="noopener" data-os="android">Download for Android</a></li>
+  <ul class="cards cards-2">
+    ${[["windows", "Windows", "Windows 10 and 11, 64-bit."], ["macos", "macOS", "macOS 11 Big Sur or newer, Apple Silicon and Intel."], ["linux", "Linux", "64-bit distributions with WebKitGTK 4.1."], ["android", "Android", "Android 7.0 or newer."]].map(([id, name, req]) => `
+    <li class="card" id="${id}"><h3>MelloGram for ${name}</h3><p>${req}</p>
+      <ul class="dl-list">${c.downloads[id].map(([label, link, note]) => `<li><a class="btn${label === c.downloads[id][0][0] ? "" : " btn-ghost"}" href="${link}" rel="noopener" data-os="${id}">Download ${esc(label)}</a><span class="muted small">${esc(note)}</span></li>`).join("")}</ul>
+    </li>`).join("")}
   </ul>
-  <p class="muted">macOS builds are produced from the same code; check the releases page for a .dmg.</p>
+  <p class="muted">All files come from the <a href="${c.REPO}/releases/latest" rel="noopener">latest GitHub release</a>, built automatically from the public source code. Older versions and checksums are on the <a href="${c.REPO}/releases" rel="noopener">releases page</a>.</p>
 </section>
 
 <section class="section" aria-labelledby="install">
   <h2 id="install">How to install MelloGram</h2>
   <ol class="steps">
     <li><strong>Download</strong> the file for your platform from the latest release.</li>
-    <li><strong>Install it.</strong> On Windows, run the installer; if SmartScreen warns about a new app, choose <em>More info → Run anyway</em>. On Linux, open the .deb or .rpm with your software centre, or make the AppImage executable and run it.</li>
+    <li><strong>Install it.</strong> On Windows, run <em>MelloGram-Setup-x64.exe</em> and follow the setup wizard; if SmartScreen warns about a new app, choose <em>More info → Run anyway</em>. On macOS, open the .dmg and drag MelloGram to Applications; the first time, right-click the app and choose <em>Open</em>. On Linux, open the .deb or .rpm with your software centre, or make the AppImage executable and run it. On Android, open the APK and allow installs from your browser.</li>
     <li><strong>Sign in with Telegram:</strong> enter your phone number, the code Telegram sends to your other devices, and your two-step password if you have one.</li>
     <li><strong>Make it yours:</strong> press Ctrl+, to open Settings, then explore Plugins, Themes, Wallpapers and the Appearance Studio.</li>
   </ol>
@@ -240,7 +241,8 @@ export function pages(c) {
     <caption>Minimum requirements for MelloGram ${esc(c.version)}</caption>
     <thead><tr><th scope="col">Platform</th><th scope="col">Requirement</th></tr></thead>
     <tbody>
-      <tr><th scope="row">Windows</th><td>Windows 10 or 11, 64-bit, WebView2 (installed automatically)</td></tr>
+      <tr><th scope="row">Windows</th><td>Windows 10 (1809) or 11, 64-bit; WebView2 is installed automatically if missing</td></tr>
+      <tr><th scope="row">macOS</th><td>macOS 11 Big Sur or newer, Apple Silicon or Intel</td></tr>
       <tr><th scope="row">Linux</th><td>64-bit distribution with WebKitGTK 4.1 and GTK 3</td></tr>
       <tr><th scope="row">Android</th><td>Android 7.0 (API 24) or newer</td></tr>
       <tr><th scope="row">All</th><td>An existing Telegram account and under 100 MB of free disk space</td></tr>
@@ -401,6 +403,7 @@ ${faqList.map(([q, a]) => `<section class="section faq-item" id="${slug(q)}" ari
 <tr><th scope="row">melloid-core</th><td>MelloID profiles, badges and widgets</td></tr>
 <tr><th scope="row">mellorpc-core</th><td>MelloRPC rich-presence protocol</td></tr>
 <tr><th scope="row">app/src-tauri</th><td>Desktop and Android application shell</td></tr>
+<tr><th scope="row">installer/windows</th><td>Branded Inno Setup installer</td></tr>
 <tr><th scope="row">services/melloid-public</th><td>Public profile and verified-connection service</td></tr>
 </tbody></table></div></section>
 <section class="section" aria-labelledby="plugin-api"><h2 id="plugin-api">Plugin API</h2>
@@ -418,7 +421,7 @@ ${faqList.map(([q, a]) => `<section class="section faq-item" id="${slug(q)}" ari
 <p>MelloGram's local testing centre checks storage, settings integrity, themes, plugin health and performance, and Telegram connectivity, and exports support bundles with secrets redacted. Safe mode starts the client with plugins, themes and custom CSS turned off.</p></div>
 <figure>${img("screenshot-diagnostics.webp", "MelloGram diagnostics dashboard with uptime, ping, message counters and test results", "MelloGram diagnostics")}</figure></section>
 <section class="section" aria-labelledby="contribute"><h2 id="contribute">How to contribute</h2>
-<ol class="steps"><li>Clone <a href="${c.REPO}" rel="noopener">foulfoxhacks/MelloGram</a> and install Rust and the Tauri prerequisites.</li><li>Run <code>cargo test --workspace --exclude mellogram</code> to check the core, plugins and services.</li><li>Run <code>cargo tauri dev</code> from <code>app/src-tauri</code> to start the app.</li><li>Open a pull request; CI builds Windows, Linux, macOS and Android packages.</li></ol></section>`,
+<ol class="steps"><li>Clone <a href="${c.REPO}" rel="noopener">foulfoxhacks/MelloGram</a> and install Rust and the Tauri prerequisites.</li><li>Run <code>cargo test --workspace --exclude mellogram</code> to check the core, plugins and services.</li><li>Run <code>cargo tauri dev</code> from <code>app/src-tauri</code> to start the app.</li><li>Open a pull request; CI builds the Windows installer, macOS universal .dmg, Linux packages and Android APK.</li></ol></section>`,
     },
 
     {
@@ -436,12 +439,14 @@ ${faqList.map(([q, a]) => `<section class="section faq-item" id="${slug(q)}" ari
 export function llms(c) {
   return `# MelloGram
 
-> MelloGram is a free, open-source (GPL-3.0-or-later) customizable Telegram client for Windows, Linux and Android, built in Rust by FoulFoxHacks. It offers a Vencord-style plugin manager with ${c.plugins.length} built-in plugins, CSS themes and live QuickCSS, a wallpaper engine, an Appearance Studio, workspaces, background/tray operation with native notifications, an app lock and local diagnostics. It is an unofficial client, not affiliated with Telegram, and uses Telegram's official MTProto API.
+> MelloGram is a free, open-source (GPL-3.0-or-later) customizable Telegram client for Windows, macOS, Linux and Android, built in Rust by FoulFoxHacks. It offers a Vencord-style plugin manager with ${c.plugins.length} built-in plugins, CSS themes and live QuickCSS, a wallpaper engine, an Appearance Studio, workspaces, background/tray operation with native notifications, an app lock and local diagnostics. It is an unofficial client, not affiliated with Telegram, and uses Telegram's official MTProto API.
 
 Key facts:
 - Current version: ${c.version}
 - Price: free, no ads, no telemetry
-- Platforms: Windows 10/11 (.exe, .msi), Linux (.deb, .rpm, AppImage), Android 7+ (APK); macOS builds from the same code
+- Platforms: Windows 10/11 (setup .exe, .msi), macOS 11+ universal (.dmg), Linux (.deb, .rpm, AppImage), Android 7+ (.apk)
+- Direct downloads: ${c.downloads.windows[0][1]} · ${c.downloads.macos[0][1]} · ${c.downloads.linux[0][1]} · ${c.downloads.android[0][1]}
+- Website: ${c.url("/")}
 - Source code: ${c.REPO}
 - Not a Vencord port: inspired by its user experience, written from scratch, contains no Vencord code, does not inject into other apps
 - Sign-in: normal Telegram account; login codes and 2FA passwords go only to Telegram

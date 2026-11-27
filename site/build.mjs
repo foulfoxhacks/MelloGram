@@ -6,7 +6,7 @@
 // must have alt text, a title and explicit dimensions (enforced here and again
 // by check.mjs). Output goes to site/dist.
 //
-// SITE_URL sets the public origin + base path (default: GitHub Pages).
+// SITE_URL sets the public origin + base path (default: https://mellogram.foulfoxhacks.dev).
 
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import { pages } from "./pages.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const SITE = (process.env.SITE_URL || "https://foulfoxhacks.github.io/MelloGram").replace(/\/+$/, "");
+const SITE = (process.env.SITE_URL || "https://mellogram.foulfoxhacks.dev").replace(/\/+$/, "");
 const BASE = new URL(SITE + "/").pathname; // e.g. "/MelloGram/"
 const OUT = join(here, "dist");
 const REPO = "https://github.com/foulfoxhacks/MelloGram";
@@ -130,7 +130,7 @@ function layout(page, body) {
 <meta property="og:image" content="${url("/assets/og-image.png")}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="MelloGram, the customizable Telegram client, showing a chat with a paw-print wallpaper">
+<meta property="og:image:alt" content="MelloGram logo and app window: the customizable Telegram client for Windows, macOS, Linux and Android">
 <meta property="og:locale" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(page.ogTitle || title)}">
@@ -147,7 +147,7 @@ function layout(page, body) {
 <body>
 <a class="skip" href="#main">Skip to content</a>
 <header class="site-header">
-  <a class="brand" href="${href("/")}">${img("logo.png", "MelloGram logo: a speech bubble with an M", "MelloGram home", { eager: page.path === "/" })}<span>MelloGram</span></a>
+  <a class="brand" href="${href("/")}">${img("logo.png", "MelloGram logo: a fox-eared paw print carrying a paper plane", "MelloGram home", { eager: page.path === "/" })}<span>MelloGram</span></a>
   <nav aria-label="Main"><ul>${nav}</ul></nav>
   <a class="btn btn-small" href="${href("/download/")}">Download</a>
 </header>
@@ -177,7 +177,15 @@ ${body}
 `;
 }
 
-const ctx = { url, href, asset, img, esc, plugins, wallpapers, version, REPO, SITE, today };
+// Stable release asset names published by CI (.github/workflows/mellogram.yml).
+const DL = (file) => `${REPO}/releases/latest/download/${file}`;
+const downloads = {
+  windows: [["Installer (.exe)", DL("MelloGram-Setup-x64.exe"), "Recommended. Branded setup wizard; installs for you or for everyone, adds Start-menu and desktop shortcuts, and installs WebView2 only if needed."], ["MSI package", DL("MelloGram-windows-x64.msi"), "For managed and scripted deployments."]],
+  macos: [["Disk image (.dmg)", DL("MelloGram-macos-universal.dmg"), "Universal build for Apple Silicon and Intel Macs. Open it and drag MelloGram to Applications."]],
+  linux: [["Debian / Ubuntu (.deb)", DL("MelloGram-linux-amd64.deb"), "Install with your software centre or sudo apt install ./MelloGram-linux-amd64.deb."], ["Fedora / openSUSE (.rpm)", DL("MelloGram-linux-x86_64.rpm"), "Install with sudo dnf install ./MelloGram-linux-x86_64.rpm."], ["AppImage", DL("MelloGram-linux-x86_64.AppImage"), "Portable for any distribution: chmod +x, then run it."]],
+  android: [["Android app (.apk)", DL("MelloGram-android.apk"), "Allow installs from your browser when Android asks."]],
+};
+const ctx = { url, href, asset, img, esc, plugins, wallpapers, version, REPO, SITE, today, downloads };
 
 // ---- build ------------------------------------------------------------------
 
@@ -238,6 +246,9 @@ writeFileSync(join(OUT, "site.webmanifest"), JSON.stringify({
 const { llms } = await import("./pages.mjs");
 writeFileSync(join(OUT, "llms.txt"), llms(ctx));
 writeFileSync(join(OUT, ".nojekyll"), "");
+writeFileSync(join(OUT, ".site-url"), SITE + "\n"); // read by check.mjs
+// Custom domain for GitHub Pages (only when served from a domain root).
+if (BASE === "/") writeFileSync(join(OUT, "CNAME"), new URL(SITE).host + "\n");
 
 const size = built.reduce((n, p) => n + statSync(join(OUT, p.path === "/" ? "index.html" : join(p.path.replace(/^\/|\/$/g, ""), "index.html"))).size, 0);
 console.log(`built ${built.length} pages (${(size / 1024).toFixed(1)} KB HTML) for ${SITE}`);

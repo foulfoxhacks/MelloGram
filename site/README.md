@@ -16,7 +16,5 @@ node site/check.mjs   # SEO/AEO/GEO checks; exits 1 on any problem
 - `update-data.sh` — regenerates `src/data/*.json` from the real plugin
   manifests and wallpaper presets (run after adding plugins).
 
-`SITE_URL` sets the public address (default
-`https://foulfoxhacks.github.io/MelloGram`). In GitHub, set the repository
-variable `SITE_URL` for a custom domain, and enable **Settings → Pages →
-Source: GitHub Actions** once.
+`SITE_URL` sets the public address (default `https://mellogram.foulfoxhacks.dev`).
+The build writes a `CNAME` file for root domains.

@@ -8,7 +8,8 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DIST = join(here, "dist");
-const SITE = (process.env.SITE_URL || "https://foulfoxhacks.github.io/MelloGram").replace(/\/+$/, "");
+// Use exactly the URL the build used, so build and check can never disagree.
+const SITE = readFileSync(join(DIST, ".site-url"), "utf8").trim().replace(/\/+$/, "");
 const BASE = new URL(SITE + "/").pathname;
 const problems = [];
 const report = [];

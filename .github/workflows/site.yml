@@ -16,9 +16,8 @@ jobs:
     name: Build and check the website
     runs-on: ubuntu-latest
     env:
-      # Set the repository variable SITE_URL to your custom domain when you
-      # have one (e.g. https://mellogram.example); defaults to GitHub Pages.
-      SITE_URL: ${{ vars.SITE_URL || 'https://foulfoxhacks.github.io/MelloGram' }}
+      # Public address of the site; override with the repository variable SITE_URL.
+      SITE_URL: ${{ vars.SITE_URL || 'https://mellogram.foulfoxhacks.dev' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
