@@ -2331,6 +2331,7 @@ dependencies = [
  "mellogram-core",
  "mellogram-plugins",
  "mellogram-telegram",
+ "melloid-core",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -2340,6 +2341,16 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "ureq",
+]
+
+[[package]]
+name = "melloid-core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
