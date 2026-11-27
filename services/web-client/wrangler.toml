@@ -1,6 +1,15 @@
 name = "mellogram-web-client"
 main = "src/worker.js"
 compatibility_date = "2026-11-27"
+workers_dev = false
+
+# One Worker answers both hostnames: the shell on wc., the API on wc-api.
+# Custom domains get Cloudflare-managed certificates; the Worker itself
+# redirects plain HTTP and sends HSTS.
+routes = [
+  { pattern = "wc.mellogram.foulfoxhacks.dev", custom_domain = true },
+  { pattern = "wc-api.mellogram.foulfoxhacks.dev", custom_domain = true },
+]
 
 # The Worker runs before the assets so /api/* is never shadowed by a file.
 [assets]
@@ -10,3 +19,4 @@ run_worker_first = true
 
 [vars]
 PUBLIC_BASE_URL = "https://wc.mellogram.foulfoxhacks.dev"
+API_BASE_URL = "https://wc-api.mellogram.foulfoxhacks.dev"
