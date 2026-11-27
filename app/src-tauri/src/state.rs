@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use mellogram_core::{IncomingMessage, PluginManager, SettingsStore, ThemeManager, Toast};
+use melloid_core::MelloIdStore;
 use mellogram_telegram::{Telegram, TelegramConfig, TgEvent};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
@@ -79,6 +80,8 @@ pub struct AppState {
     pub lock_failures: Mutex<(u32, Option<Instant>)>,
     pub dir: PathBuf,
     pub store: Mutex<SettingsStore>,
+    /// Local MelloID profile cache; remote publication is handled by a future service.
+    pub melloid: Mutex<MelloIdStore>,
     pub plugins: Mutex<PluginManager>,
     pub themes: ThemeManager,
     pub cache: Mutex<MessageCache>,
@@ -88,6 +91,7 @@ pub struct AppState {
 impl AppState {
     pub fn open(app: AppHandle, dir: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
         let store = SettingsStore::open(&dir)?;
+        let melloid = MelloIdStore::open(&dir)?;
         let themes = ThemeManager::new(dir.join("themes"))?;
         // Crash / safe-mode bookkeeping.
         let running = dir.join("running.lock");
@@ -121,6 +125,7 @@ impl AppState {
             lock_failures: Mutex::new((0, None)),
             dir,
             store: Mutex::new(store),
+            melloid: Mutex::new(melloid),
             plugins: Mutex::new(plugins),
             themes,
             cache: Mutex::new(MessageCache::default()),
