@@ -20,6 +20,9 @@ urlset::before {
   display: block;
   margin: 0 0 8px;
   color: #c9c0ff;
+  min-height: 48px;
+  padding-left: 58px;
+  background: url("/assets/logo.png") no-repeat left center / 44px 44px;
   font-size: clamp(2rem, 5vw, 3.3rem);
   font-weight: 850;
   letter-spacing: -.055em;
