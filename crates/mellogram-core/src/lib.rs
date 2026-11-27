@@ -13,6 +13,7 @@ pub mod background;
 pub mod manager;
 pub mod model;
 pub mod plugin;
+pub mod relationships;
 pub mod settings;
 pub mod theme;
 pub mod wallpaper;

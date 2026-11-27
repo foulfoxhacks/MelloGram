@@ -435,6 +435,17 @@ impl PluginManager {
         keep
     }
 
+    /// Alerts plugins raise for a membership event, as `(plugin id, text)`.
+    pub fn on_membership(&self, event: &crate::relationships::MembershipEvent) -> Vec<(String, String)> {
+        let mut out = Vec::new();
+        self.each(|p, ctx| {
+            if let Some(text) = p.on_membership(ctx, event) {
+                out.push((ctx.plugin_id().to_owned(), text));
+            }
+        });
+        out
+    }
+
     pub fn allow_typing(&self, chat_id: i64) -> bool {
         let mut allow = true;
         self.each(|p, ctx| allow &= p.allow_typing(ctx, chat_id));

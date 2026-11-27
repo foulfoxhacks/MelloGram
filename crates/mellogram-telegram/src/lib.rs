@@ -84,6 +84,10 @@ pub enum TgEvent {
     NewMessage(IncomingMessage),
     Edited(IncomingMessage),
     Deleted { chat_id: Option<i64>, ids: Vec<i32> },
+    /// A ban, removal, restriction, join or admin change.
+    Membership(mellogram_core::relationships::MembershipEvent),
+    /// A channel/supergroup's state changed (often: you were banned or removed).
+    ChatChanged { chat_id: i64 },
     Disconnected { reason: String },
 }
 
@@ -105,6 +109,8 @@ pub struct Telegram {
     api_hash: String,
     pending: Mutex<Pending>,
     updates: Mutex<Option<mpsc::Receiver<grammers_client::session::updates::UpdatesLike>>>,
+    /// Your own user id once known (0 until then).
+    self_id: std::sync::atomic::AtomicI64,
 }
 
 impl Telegram {
@@ -122,6 +128,7 @@ impl Telegram {
             api_hash: config.api_hash,
             pending: Mutex::new(Pending::None),
             updates: Mutex::new(Some(updates)),
+            self_id: std::sync::atomic::AtomicI64::new(0),
         }))
     }
 
@@ -198,6 +205,7 @@ impl Telegram {
 
     async fn me(&self) -> Result<Me> {
         let me = self.client.get_me().await?;
+        self.self_id.store(me.id().bare_id_unchecked(), std::sync::atomic::Ordering::Relaxed);
         Ok(Me { id: me.id().bare_id_unchecked(), name: me.full_name(), username: me.username().map(str::to_owned) })
     }
 
@@ -339,10 +347,27 @@ impl Telegram {
             .stream_updates(updates, UpdatesConfiguration { catch_up: true, ..Default::default() })
             .await
             .map_err(|e| TgError::Session(e.to_string()))?;
+        if self.self_id.load(std::sync::atomic::Ordering::Relaxed) == 0 {
+            let _ = self.me().await;
+        }
+        let me = Arc::clone(self);
         tokio::spawn(async move {
             loop {
                 let event = match stream.next().await {
-                    Ok(Update::NewMessage(m)) => TgEvent::NewMessage(convert(&m)),
+                    Ok(Update::NewMessage(m)) => {
+                        let self_id = me.self_id.load(std::sync::atomic::Ordering::Relaxed);
+                        if let Some(ev) = membership_from_service(&m, self_id) {
+                            let _ = tx.send(TgEvent::Membership(ev));
+                        }
+                        TgEvent::NewMessage(convert(&m))
+                    }
+                    Ok(Update::Raw(raw)) => {
+                        let self_id = me.self_id.load(std::sync::atomic::Ordering::Relaxed);
+                        match membership_from_raw(&raw.raw, self_id) {
+                            Some(ev) => ev,
+                            None => continue,
+                        }
+                    }
                     Ok(Update::MessageEdited(m)) => TgEvent::Edited(convert(&m)),
                     Ok(Update::MessageDeleted(d)) => TgEvent::Deleted {
                         chat_id: d.channel_id().map(|c| PeerId::channel_unchecked(c).bot_api_dialog_id_unchecked()),
@@ -403,5 +428,173 @@ pub fn convert(m: &grammers_client::message::Message) -> IncomingMessage {
         deleted: false,
         classes: Vec::new(),
         highlight: None,
+    }
+}
+
+// ---- membership detection ------------------------------------------------------
+
+use mellogram_core::relationships::{classify, EventSource, MembershipEvent, MembershipKind, ParticipantState};
+
+fn banned_state(b: &tl::types::ChannelParticipantBanned) -> ParticipantState {
+    let tl::enums::ChatBannedRights::Rights(r) = &b.banned_rights;
+    ParticipantState::Banned { view_messages: r.view_messages, until: i64::from(r.until_date) }
+}
+
+fn channel_state(p: Option<&tl::enums::ChannelParticipant>) -> ParticipantState {
+    use tl::enums::ChannelParticipant as C;
+    match p {
+        None => ParticipantState::Absent,
+        Some(C::Participant(_) | C::ParticipantSelf(_)) => ParticipantState::Member,
+        Some(C::Creator(_)) => ParticipantState::Creator,
+        Some(C::Admin(_)) => ParticipantState::Admin,
+        Some(C::Banned(b)) => banned_state(b),
+        Some(C::Left(_)) => ParticipantState::Left,
+    }
+}
+
+fn chat_state(p: Option<&tl::enums::ChatParticipant>) -> ParticipantState {
+    use tl::enums::ChatParticipant as C;
+    match p {
+        None => ParticipantState::Absent,
+        Some(C::Participant(_)) => ParticipantState::Member,
+        Some(C::Creator(_)) => ParticipantState::Creator,
+        Some(C::Admin(_)) => ParticipantState::Admin,
+    }
+}
+
+fn until_of(state: ParticipantState) -> Option<i64> {
+    match state {
+        // Telegram uses 0 (or a far-future date) for "forever".
+        ParticipantState::Banned { until, .. } if until > 0 && until < 32_503_680_000 => Some(until),
+        _ => None,
+    }
+}
+
+/// Participant-change and channel-state updates → events.
+pub fn membership_from_raw(update: &tl::enums::Update, self_id: i64) -> Option<TgEvent> {
+    match update {
+        tl::enums::Update::ChannelParticipant(u) => {
+            let (prev, new) = (channel_state(u.prev_participant.as_ref()), channel_state(u.new_participant.as_ref()));
+            let kind = classify(prev, new, u.actor_id == u.user_id)?;
+            Some(TgEvent::Membership(MembershipEvent {
+                chat_id: PeerId::channel_unchecked(u.channel_id).bot_api_dialog_id_unchecked(),
+                chat_title: None,
+                user_id: u.user_id,
+                user_name: None,
+                actor_id: (u.actor_id != 0).then_some(u.actor_id),
+                actor_name: None,
+                kind,
+                until: until_of(new),
+                is_self: self_id != 0 && u.user_id == self_id,
+                date: i64::from(u.date),
+                source: EventSource::ParticipantUpdate,
+            }))
+        }
+        tl::enums::Update::ChatParticipant(u) => {
+            let (prev, new) = (chat_state(u.prev_participant.as_ref()), chat_state(u.new_participant.as_ref()));
+            let kind = classify(prev, new, u.actor_id == u.user_id)?;
+            Some(TgEvent::Membership(MembershipEvent {
+                chat_id: PeerId::chat_unchecked(u.chat_id).bot_api_dialog_id_unchecked(),
+                chat_title: None,
+                user_id: u.user_id,
+                user_name: None,
+                actor_id: (u.actor_id != 0).then_some(u.actor_id),
+                actor_name: None,
+                kind,
+                until: None,
+                is_self: self_id != 0 && u.user_id == self_id,
+                date: i64::from(u.date),
+                source: EventSource::ParticipantUpdate,
+            }))
+        }
+        tl::enums::Update::Channel(u) => Some(TgEvent::ChatChanged {
+            chat_id: PeerId::channel_unchecked(u.channel_id).bot_api_dialog_id_unchecked(),
+        }),
+        _ => None,
+    }
+}
+
+/// "X removed Y" / "Y left" service messages (basic groups and supergroups).
+pub fn membership_from_service(m: &grammers_client::message::Message, self_id: i64) -> Option<MembershipEvent> {
+    let tl::enums::MessageAction::ChatDeleteUser(a) = m.action()? else { return None };
+    let actor = m.sender_id().map(|s| s.bare_id_unchecked());
+    let kind = if actor == Some(a.user_id) { MembershipKind::Left } else { MembershipKind::Removed };
+    Some(MembershipEvent {
+        chat_id: m.peer_id().bot_api_dialog_id_unchecked(),
+        chat_title: None,
+        user_id: a.user_id,
+        user_name: None,
+        actor_id: actor,
+        actor_name: m.sender().and_then(|s| s.name()).map(str::to_owned),
+        kind,
+        until: None,
+        is_self: self_id != 0 && a.user_id == self_id,
+        date: m.date().as_second(),
+        source: EventSource::ServiceMessage,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rights(view_messages: bool, until_date: i32) -> tl::enums::ChatBannedRights {
+        tl::enums::ChatBannedRights::Rights(tl::types::ChatBannedRights {
+            view_messages, send_messages: true, send_media: false, send_stickers: false, send_gifs: false, send_games: false,
+            send_inline: false, embed_links: false, send_polls: false, change_info: false, invite_users: false, pin_messages: false,
+            manage_topics: false, send_photos: false, send_videos: false, send_roundvideos: false, send_audios: false,
+            send_voices: false, send_docs: false, send_plain: false, edit_rank: false, send_reactions: false,
+            manage_linked_peers: false, until_date,
+        })
+    }
+
+    fn banned(view: bool, until: i32) -> tl::enums::ChannelParticipant {
+        tl::enums::ChannelParticipant::Banned(tl::types::ChannelParticipantBanned {
+            left: true,
+            peer: tl::enums::Peer::User(tl::types::PeerUser { user_id: 42 }),
+            kicked_by: 7,
+            date: 0,
+            banned_rights: rights(view, until),
+            rank: None,
+        })
+    }
+
+    fn update(prev: Option<tl::enums::ChannelParticipant>, new: Option<tl::enums::ChannelParticipant>, user: i64, actor: i64) -> tl::enums::Update {
+        tl::enums::Update::ChannelParticipant(tl::types::UpdateChannelParticipant {
+            via_chatlist: false, channel_id: 1234, date: 1_700_000_000, actor_id: actor, user_id: user,
+            prev_participant: prev, new_participant: new, invite: None, qts: 1,
+        })
+    }
+
+    fn member() -> tl::enums::ChannelParticipant {
+        tl::enums::ChannelParticipant::Participant(tl::types::ChannelParticipant { user_id: 42, date: 0, subscription_until_date: None, rank: None })
+    }
+
+    #[test]
+    fn detects_self_ban_with_expiry() {
+        let ev = membership_from_raw(&update(Some(member()), Some(banned(true, 1_800_000_000)), 42, 7), 42).unwrap();
+        let TgEvent::Membership(ev) = ev else { panic!() };
+        assert_eq!(ev.kind, MembershipKind::Banned);
+        assert!(ev.is_self);
+        assert_eq!(ev.chat_id, -1_000_000_001_234);
+        assert_eq!(ev.until, Some(1_800_000_000));
+        assert_eq!(ev.actor_id, Some(7));
+    }
+
+    #[test]
+    fn restriction_kick_and_unban() {
+        let TgEvent::Membership(ev) = membership_from_raw(&update(Some(member()), Some(banned(false, 0)), 42, 7), 1).unwrap() else { panic!() };
+        assert_eq!((ev.kind, ev.is_self, ev.until), (MembershipKind::Restricted, false, None));
+        let TgEvent::Membership(ev) = membership_from_raw(&update(Some(member()), None, 42, 7), 1).unwrap() else { panic!() };
+        assert_eq!(ev.kind, MembershipKind::Removed);
+        let TgEvent::Membership(ev) = membership_from_raw(&update(Some(banned(true, 0)), None, 42, 7), 1).unwrap() else { panic!() };
+        assert_eq!(ev.kind, MembershipKind::Unbanned);
+        assert!(membership_from_raw(&update(Some(member()), Some(member()), 42, 42), 1).is_none());
+    }
+
+    #[test]
+    fn channel_change_is_reported() {
+        let u = tl::enums::Update::Channel(tl::types::UpdateChannel { channel_id: 99 });
+        assert!(matches!(membership_from_raw(&u, 1), Some(TgEvent::ChatChanged { chat_id: -1_000_000_000_099 })));
     }
 }
