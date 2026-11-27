@@ -286,7 +286,7 @@ For current release availability and exact binary assets, use the GitHub Release
 - MelloGram privacy: ${url("/privacy/")}
 - MelloGram developer documentation: ${url("/developers/")}
 `);
-cpSync(join(here, "sitemap.xsl"), join(OUT, "sitemap.xsl"));\nwriteFileSync(join(OUT, "llms-full.txt"), llms(ctx, { full: true }));\ncpSync(join(here, "sitemap.xsl"), join(OUT, "sitemap.xsl"));
+cpSync(join(here, "sitemap.xsl"), join(OUT, "sitemap.xsl"));
 writeFileSync(join(OUT, ".nojekyll"), "");
 writeFileSync(join(OUT, ".site-url"), SITE + "\n"); // read by check.mjs
 // Custom domain for GitHub Pages (only when served from a domain root).
