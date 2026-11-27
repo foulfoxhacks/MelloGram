@@ -244,3 +244,32 @@ thead th { background: var(--bg-2); }
   .home-feature-card { transition: none; }
   .home-feature-card:hover { transform: none; }
 }
+
+/* MelloGram identity refresh: deep violet, electric blue, product-first layout. */
+:root{--bg:#10101a;--bg-2:#171727;--surface:#1b1b2d;--text:#f4f2ff;--muted:#aaa8c3;--accent:#9a86ff;--accent-2:#79baff;--border:#2c2b45;color-scheme:dark}
+body{background:radial-gradient(ellipse 70% 42% at 50% -14%,rgba(111,91,235,.18),transparent 70%),var(--bg)}
+a{color:#a99aff}a:hover{color:#8dcaff}
+.site-header{min-height:72px;background:rgba(16,16,26,.84);border-color:rgba(164,151,255,.13);backdrop-filter:blur(18px)}
+.brand img{width:38px;height:38px;filter:drop-shadow(0 0 12px rgba(145,119,255,.25))}
+.btn{border-radius:11px;transition:transform .18s ease}.btn:hover{transform:translateY(-2px)}
+.home-hero{min-height:0;display:flex;flex-direction:column;align-items:center;text-align:center;padding:clamp(76px,9vw,116px) 0 65px;position:relative;isolation:isolate}
+.home-hero:before{content:"";position:absolute;z-index:-1;top:-180px;left:50%;transform:translateX(-50%);width:min(1000px,110vw);height:600px;background:radial-gradient(ellipse,rgba(111,91,235,.24),rgba(73,112,214,.08) 45%,transparent 72%);pointer-events:none}
+.home-hero-copy{max-width:900px}.home-hero .eyebrow{display:inline-block;border:1px solid rgba(157,139,255,.25);border-radius:999px;padding:7px 14px;color:#c5bcff;background:rgba(125,105,239,.08);font-size:.7rem;letter-spacing:.1em;margin-bottom:24px}
+.home-hero h1{color:#f4f2ff;background:none;font-size:clamp(3.5rem,8.8vw,7.2rem);line-height:.99;letter-spacing:-.075em;margin:0 0 25px;font-weight:850}
+.gradient-text{background:linear-gradient(100deg,#b4a4ff,#8d91ff 48%,#80c9ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.home-hero .lead{max-width:660px;margin:0 auto;color:#b7b4d0;font-size:clamp(1.02rem,1.7vw,1.2rem);line-height:1.75}.home-cta{justify-content:center;margin:29px 0 13px}.home-meta{color:#85829f;font-size:.78rem}
+.btn:not(.btn-ghost){background:linear-gradient(110deg,#8068f5,#5b8ef0);box-shadow:0 9px 30px rgba(104,91,235,.28);color:white}.btn-ghost{background:rgba(255,255,255,.025);border-color:rgba(178,169,255,.24);color:#e4e0fa}
+.home-hero-shot{width:min(100%,1020px);margin:15px auto 0;padding:9px;border:1px solid rgba(164,149,255,.32);border-radius:19px;background:linear-gradient(145deg,rgba(157,137,255,.13),rgba(84,127,230,.07) 55%,rgba(255,255,255,.025));box-shadow:0 34px 100px rgba(0,0,0,.5),0 0 90px rgba(109,91,239,.12)}
+.home-hero-shot:before{content:"MelloGram  ·  YOUR SPACE, YOUR STYLE";display:block;text-align:left;padding:0 10px 10px;color:#9c94ca;font:600 .65rem/1.5 ui-monospace,monospace;letter-spacing:.09em}
+.home-hero-shot img,.home-showcase-shot img{width:100%;height:auto;border:1px solid rgba(255,255,255,.08);border-radius:11px;box-shadow:0 12px 35px rgba(0,0,0,.32)}
+.home-section-heading{text-align:center;max-width:760px;margin:0 auto 38px}.home-section-heading h2{color:#f4f2ff;font-size:clamp(2rem,4.8vw,3.5rem);letter-spacing:-.055em}.home-section-heading .lead{margin:0 auto;color:#aaa6c1}
+.section{border-top:1px solid rgba(160,148,255,.13);padding:76px 0}.home-features{padding-top:78px}.home-feature-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.home-feature-card{background:linear-gradient(145deg,rgba(255,255,255,.04),rgba(255,255,255,.012));border:1px solid rgba(160,148,255,.16);border-radius:16px;overflow:hidden;transition:transform .2s,border-color .2s,box-shadow .2s}.home-feature-card:hover{transform:translateY(-4px);border-color:rgba(160,148,255,.45);box-shadow:0 20px 50px rgba(0,0,0,.28)}
+.home-feature-image{aspect-ratio:16/10;object-fit:cover;object-position:top center;border:0;border-bottom:1px solid rgba(160,148,255,.15);border-radius:0;box-shadow:none}.home-feature-card>div{padding:22px;gap:10px}.home-feature-card h3{color:#eeeaff;font-size:1.05rem}.home-feature-card p{color:#a5a2bf;font-size:.91rem;line-height:1.7}.home-feature-card a{color:#b5a9ff}
+.home-showcase{gap:55px}.home-showcase-copy h2{color:#f4f2ff;font-size:clamp(2rem,4vw,3.2rem);letter-spacing:-.05em}.home-showcase-copy p{color:#a5a2bf}.home-showcase-shot img{padding:8px;border:1px solid rgba(160,148,255,.24);background:rgba(140,119,255,.07)}
+.home-faq{max-width:900px;margin-inline:auto}.faq{border-color:rgba(160,148,255,.15);background:rgba(255,255,255,.018);border-radius:12px}.faq summary h3{color:#e3dff7;font-size:.95rem}.faq p{color:#aaa6c1;line-height:1.75}
+.home-download{text-align:center;border:1px solid rgba(160,148,255,.2);border-radius:22px;margin:55px 0 70px;padding:clamp(45px,7vw,80px) 20px;background:linear-gradient(135deg,rgba(107,86,230,.15),rgba(67,128,225,.09) 60%,rgba(255,255,255,.025))}.home-download h2{color:#f4f2ff;font-size:clamp(2.5rem,6vw,4.6rem);letter-spacing:-.06em}.home-download>p:not(.eyebrow){color:#aaa6c1}
+.site-footer{background:#0d0d16;border-color:rgba(160,148,255,.13)}.footer-brand{color:#f0edff;font-size:1.2rem}.site-footer p{color:#9793ad}.site-footer a{color:#aaa0ff}
+@media(max-width:900px){.home-feature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.home-showcase{grid-template-columns:1fr;gap:28px}}
+@media(max-width:600px){.home-hero{padding-top:55px;gap:26px}.home-hero h1{font-size:clamp(3rem,15vw,5rem)}.home-feature-grid{grid-template-columns:1fr}.home-feature-card{max-width:520px;width:100%;margin-inline:auto}.home-hero-shot img,.home-showcase-shot img{border-radius:11px}.section{padding:55px 0}}
+@media(prefers-reduced-motion:reduce){.home-feature-card,.btn{transition:none}.home-feature-card:hover,.btn:hover{transform:none}}
