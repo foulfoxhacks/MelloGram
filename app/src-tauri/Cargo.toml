@@ -20,6 +20,7 @@ tauri-build = { version = "2", features = [] }
 mellogram-core.workspace = true
 mellogram-plugins.workspace = true
 mellogram-telegram.workspace = true
+melloid-core.workspace = true
 tauri = { version = "2", features = [] }
 serde.workspace = true
 serde_json.workspace = true
