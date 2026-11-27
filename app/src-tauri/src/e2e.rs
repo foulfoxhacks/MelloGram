@@ -78,10 +78,14 @@ pub fn e2e_group_state(state: S<'_>, chat_id: i64) -> GroupView {
     state.e2e.group_state(chat_id)
 }
 
-/// Turns group encryption on and creates our sender key.
+/// Turns group encryption on and creates our sender key. The member list is
+/// read straight away so a key request can be answered without waiting for the
+/// next sweep.
 #[tauri::command]
-pub fn e2e_group_enable(state: S<'_>, chat_id: i64) -> R<GroupView> {
-    state.e2e.group_enable(chat_id)
+pub async fn e2e_group_enable(state: S<'_>, chat_id: i64) -> R<GroupView> {
+    let view = state.e2e.group_enable(chat_id)?;
+    let _ = state.sweep_group_keys().await;
+    Ok(view)
 }
 
 #[tauri::command]
