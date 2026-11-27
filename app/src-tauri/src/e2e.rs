@@ -71,7 +71,14 @@ pub struct ShareReport {
     pub sent: Vec<i64>,
     /// Members we could not reach, with the reason.
     pub skipped: Vec<(i64, String)>,
+    /// True when the group has more members than one share pass covers. The
+    /// rest were not contacted; they will get the key on the next pass.
+    pub truncated: bool,
 }
+
+/// One share or ask pass covers this many members. Bigger groups are handled
+/// over several passes rather than in one burst of direct messages.
+const SHARE_MEMBER_CAP: usize = 500;
 
 #[tauri::command]
 pub fn e2e_group_state(state: S<'_>, chat_id: i64) -> GroupView {
@@ -107,8 +114,8 @@ pub async fn e2e_group_share(state: S<'_>, chat_id: i64) -> R<ShareReport> {
     let tg = state.telegram().await?;
     let me = tg.ensure_self_id().await.map_err(|e| e.to_string())?;
     state.e2e.set_self_id(me);
-    let members = tg
-        .chat_members(chat_id, 200)
+    let (members, complete) = tg
+        .chat_members_all(chat_id, SHARE_MEMBER_CAP)
         .await
         .map_err(|e| e.to_string())?;
     let ids: Vec<i64> = members
@@ -142,6 +149,7 @@ pub async fn e2e_group_share(state: S<'_>, chat_id: i64) -> R<ShareReport> {
         group: state.e2e.group_state(chat_id),
         sent,
         skipped,
+        truncated: !complete,
     })
 }
 
@@ -151,8 +159,8 @@ pub async fn e2e_group_request_keys(state: S<'_>, chat_id: i64) -> R<ShareReport
     let tg = state.telegram().await?;
     let me = tg.ensure_self_id().await.map_err(|e| e.to_string())?;
     state.e2e.set_self_id(me);
-    let members = tg
-        .chat_members(chat_id, 200)
+    let (members, complete) = tg
+        .chat_members_all(chat_id, SHARE_MEMBER_CAP)
         .await
         .map_err(|e| e.to_string())?;
     let request = state.e2e.request_group_key(chat_id)?;
@@ -195,6 +203,7 @@ pub async fn e2e_group_request_keys(state: S<'_>, chat_id: i64) -> R<ShareReport
         group: state.e2e.group_state(chat_id),
         sent,
         skipped,
+        truncated: !complete,
     })
 }
 

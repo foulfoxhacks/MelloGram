@@ -185,6 +185,7 @@ cmd_assets() {
   say "Downloading artifacts from run $run_id"
   gh run download "$run_id" --repo "$REPO" --dir "$dest"
   list_assets "$dest"
+  say "Check a download with: cd $dest && sha256sum -c SHA256SUMS"
 }
 
 # ---- publishing ------------------------------------------------------------
@@ -193,10 +194,21 @@ cmd_publish() {
   local version="$1"
   local dest
   dest="$(stage_dir "$version")"
+  if [ "$DRY_RUN" = 1 ]; then
+    say "Would create or update the $version release from $dest (installers + SHA256SUMS)"
+    printf '    gh release create %s <installer files> --repo %s --title "MelloGram %s" --generate-notes\n' "$version" "$REPO" "$version"
+    return
+  fi
   [ -d "$dest" ] || die "no staged packages in $dest — run 'ci $version' or 'assets $version' first"
   local files=()
   while IFS= read -r file; do files+=("$file"); done < <(find "$dest" -type f \( -name '*.exe' -o -name '*.msi' -o -name '*.dmg' -o -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.apk' -o -name '*.aab' \) | sort)
   [ "${#files[@]}" -gt 0 ] || die "no installer files found in $dest"
+  if [ "$DRY_RUN" = 1 ]; then
+    printf '    (write %s/SHA256SUMS over %s file(s))\n' "$dest" "${#files[@]}"
+  else
+    write_checksums "$dest" "${files[@]}"
+    files+=("$dest/SHA256SUMS")
+  fi
   need gh
   if gh release view "$version" --repo "$REPO" >/dev/null 2>&1; then
     say "Uploading ${#files[@]} file(s) to the existing $version release"
@@ -205,6 +217,24 @@ cmd_publish() {
     say "Creating the $version release with ${#files[@]} file(s)"
     run gh release create "$version" "${files[@]}" --repo "$REPO" --title "MelloGram $version" --generate-notes
   fi
+}
+
+# A release is only useful if it can be checked: one checksum file next to the
+# installers, covering exactly the files being published.
+write_checksums() {
+  local dest="$1"
+  shift
+  local out="$dest/SHA256SUMS" file name
+  : > "$out"
+  for file in "$@"; do
+    name="$(basename "$file")"
+    if command -v sha256sum >/dev/null 2>&1; then
+      ( cd "$dest" && sha256sum "$name" ) >> "$out"
+    else
+      ( cd "$dest" && shasum -a 256 "$name" ) >> "$out"
+    fi
+  done
+  say "Wrote $out"
 }
 
 list_assets() {

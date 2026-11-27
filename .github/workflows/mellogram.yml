@@ -58,6 +58,17 @@ jobs:
           - os: macos-latest
             platform: macos
     runs-on: ${{ matrix.os }}
+    env:
+      # Optional signing material; unset secrets are empty, so every signing
+      # step below skips itself instead of failing the build.
+      WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+      WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - uses: actions/checkout@v4
       - name: Linux system dependencies
@@ -109,6 +120,23 @@ jobs:
           Copy-Item installer/windows/Output/MelloGram-Setup-x64.exe dist/MelloGram-Setup-x64.exe
           Copy-Item (Get-ChildItem target/release/bundle/msi/*.msi | Select-Object -First 1).FullName dist/MelloGram-windows-x64.msi
 
+      - name: Sign the Windows installers (optional)
+        if: runner.os == 'Windows' && env.WINDOWS_CERT_PFX_BASE64 != ''
+        shell: pwsh
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP "mellogram.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERT_PFX_BASE64))
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $signtool) { throw "signtool.exe not found" }
+          foreach ($f in @("dist\MelloGram-Setup-x64.exe", "dist\MelloGram-windows-x64.msi")) {
+            & $signtool.FullName sign /fd SHA256 /f $pfx /p $env:WINDOWS_CERT_PASSWORD `
+              /tr http://timestamp.digicert.com /td SHA256 $f
+            if ($LASTEXITCODE -ne 0) { throw "signing $f failed" }
+          }
+          Remove-Item $pfx
+          Write-Host "Authenticode signatures applied"
+
       # ---- macOS: universal .dmg (Apple Silicon + Intel) ------------------------
       - name: Build macOS universal app and DMG
         if: runner.os == 'macOS'
@@ -119,6 +147,17 @@ jobs:
         run: |
           mkdir -p dist
           cp target/universal-apple-darwin/release/bundle/dmg/*.dmg dist/MelloGram-macos-universal.dmg
+
+      - name: Write SHA256SUMS
+        shell: bash
+        run: |
+          cd dist
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum * > "SHA256SUMS-${{ matrix.platform }}"
+          else
+            shasum -a 256 * > "SHA256SUMS-${{ matrix.platform }}"
+          fi
+          cat "SHA256SUMS-${{ matrix.platform }}"
 
       - name: Upload ${{ matrix.platform }} packages
         uses: actions/upload-artifact@v4
@@ -237,10 +276,46 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  smoke-linux:
+    name: Launch the Linux package
+    needs: desktop
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: mellogram-linux
+          path: pkg
+      - name: Install a virtual display and the WebKitGTK runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb dbus-x11 libfuse2 libgtk-3-0 libwebkit2gtk-4.1-0 libayatana-appindicator3-1
+      # Packaging proves a file exists, not that it starts. Exit code 124 is the
+      # timeout killing an app that is still running, which is what a healthy
+      # launch looks like in a headless session.
+      - name: Start the AppImage and prove it stays up
+        run: |
+          chmod +x pkg/*.AppImage
+          set +e
+          timeout 40 dbus-run-session -- xvfb-run -a env \
+            APPIMAGE_EXTRACT_AND_RUN=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 GDK_BACKEND=x11 \
+            ./pkg/*.AppImage > app.log 2>&1
+          code=$?
+          set -e
+          echo "exit=$code"
+          tail -n 40 app.log
+          if [ "$code" -ne 124 ]; then
+            echo "::error::the AppImage exited on its own (code $code)"
+            exit 1
+          fi
+          if grep -qi "panicked at" app.log; then
+            echo "::error::the app panicked during startup"
+            exit 1
+          fi
+
   release:
     name: Publish tagged release assets
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [desktop, android]
+    needs: [desktop, android, smoke-linux]
     runs-on: ubuntu-22.04
     steps:
       - name: Download all platform artifacts
@@ -248,6 +323,14 @@ jobs:
         with:
           path: release-assets
           merge-multiple: true
+      # One checksum file covering every published file, generated from the
+      # exact bytes being uploaded.
+      - name: Write the release checksum file
+        run: |
+          cd release-assets
+          rm -f SHA256SUMS-*
+          sha256sum MelloGram-* > SHA256SUMS
+          cat SHA256SUMS
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -262,6 +345,7 @@ jobs:
             release-assets/MelloGram-linux-x86_64.AppImage
             release-assets/MelloGram-android.apk
             release-assets/MelloGram-android-unsigned.aab
+            release-assets/SHA256SUMS
 
   melloid-public-service:
     name: MelloID public service tests

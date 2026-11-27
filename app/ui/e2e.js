@@ -188,9 +188,10 @@
       if (close) close();
       await paint(chat.id);
       const skipped = report.skipped.length;
+      const rest = report.truncated ? " This group is larger than one pass covers; the rest get the key on the next one." : "";
       UI.toast(
         report.sent.length
-          ? `Key sent to ${report.sent.length} member${report.sent.length === 1 ? "" : "s"}${skipped ? `; ${skipped} could not be reached` : ""}.`
+          ? `Key sent to ${report.sent.length} member${report.sent.length === 1 ? "" : "s"}${skipped ? `; ${skipped} could not be reached` : ""}.${rest}`
           : "No member could be reached: exchange one-to-one overlay keys with them first.",
         skipped ? "warning" : "success",
       );
@@ -202,9 +203,10 @@
     try {
       const report = await invoke("e2e_group_request_keys", { chatId: chat.id });
       await paint(chat.id);
+      const rest = report.truncated ? " This group is larger than one pass covers; ask again for the rest." : "";
       UI.toast(
         report.sent.length
-          ? `Asked ${report.sent.length} member${report.sent.length === 1 ? "" : "s"} for their key.`
+          ? `Asked ${report.sent.length} member${report.sent.length === 1 ? "" : "s"} for their key.${rest}`
           : "Nobody to ask: every reachable member's key is here, or none of them have one-to-one encryption with you.",
         report.sent.length ? "success" : "info",
       );

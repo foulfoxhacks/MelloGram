@@ -103,9 +103,15 @@ people who are not members get no answer.
 **Member lists are swept.** Telegram does not always deliver a departure, so
 MelloGram re-reads the member list of every encrypted group shortly after
 sign-in and every 30 minutes after that. Any member who disappeared forces a
-rotation, exactly like a membership event. A sweep that hits the 200-member
-paging limit is recorded but not compared, so a large group cannot trigger a
-false rotation just because the page was cut short.
+rotation, exactly like a membership event. The sweep follows the participant
+pager up to 5,000 members and only compares a read that reached the end; a read
+cut short is recorded but not compared, so a large group cannot trigger a false
+rotation because the page ended early.
+
+**Sharing is capped per pass.** Sharing a key and asking for missing ones each
+contact up to 500 members and report `truncated` when the group is bigger, so a
+very large group is handled over several passes instead of one burst of direct
+messages.
 
 ## What MelloGram stores
 
