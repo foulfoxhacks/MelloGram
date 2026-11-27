@@ -60,6 +60,7 @@ function setSecurityHeaders(response) {
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("X-Frame-Options", "DENY");
   headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  headers.set("Strict-Transport-Security", "max-age=63072000");
   if (headers.get("Content-Type")?.includes("text/html")) {
     headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
   }
@@ -565,6 +566,16 @@ export default {
     try {
       const url = new URL(request.url);
       const path = url.pathname;
+      // HTTPS only (local development excepted): redirect reads, refuse writes.
+      if (url.protocol === "http:" && !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) {
+        if (request.method !== "GET" && request.method !== "HEAD") return setSecurityHeaders(json({ error: "HTTPS is required." }, 403));
+        url.protocol = "https:";
+        return setSecurityHeaders(new Response(null, { status: 308, headers: { Location: url.toString() } }));
+      }
+      // Sign-in needs the Telegram login client; say so instead of failing with a 500.
+      if (path.startsWith("/auth/telegram/") && (!env.TELEGRAM_CLIENT_ID || !env.TELEGRAM_CLIENT_SECRET)) {
+        return setSecurityHeaders(json({ error: "Telegram sign-in is not configured on this MelloID server yet." }, 503));
+      }
       if (path === "/auth/telegram/start" && request.method === "GET") return setSecurityHeaders(await startTelegramLogin(request, env));
       if (path === "/auth/telegram/callback" && request.method === "GET") return setSecurityHeaders(await finishTelegramLogin(request, env));
       const connectionStart = path.match(/^\/auth\/connections\/(github|discord|steam)\/start$/);

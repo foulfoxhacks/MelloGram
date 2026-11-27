@@ -200,3 +200,15 @@ test("Steam verified connection projection uses its OpenID issuer and gaming cat
   assert.equal(connection.kind, "gaming");
   assert.equal(connection.verification_issuer, "steam-openid");
 });
+
+test("worker: HTTPS redirect, HSTS and unconfigured sign-in", async () => {
+  const { default: worker } = await import("../src/worker.js");
+  const env = { PUBLIC_BASE_URL: "https://id.example.com", ASSETS: { fetch: async () => new Response("<!doctype html>", { headers: { "Content-Type": "text/html" } }) }, DB: null };
+  const redirect = await worker.fetch(new Request("http://id.example.com/@/someone"), env);
+  assert.equal(redirect.status, 308);
+  assert.equal(redirect.headers.get("location"), "https://id.example.com/@/someone");
+  const login = await worker.fetch(new Request("https://id.example.com/auth/telegram/start"), env);
+  assert.equal(login.status, 503);
+  const page = await worker.fetch(new Request("https://id.example.com/"), env);
+  assert.match(page.headers.get("strict-transport-security"), /max-age=/);
+});
