@@ -191,7 +191,7 @@ where
         tracing::debug!("Discord IPC client did not begin with a handshake");
         return;
     }
-    let handshake: DiscordHandshake = match serde_json::from_slice(&packet.payload) {
+    let handshake: DiscordHandshake = match serde_json::from_slice::<DiscordHandshake>(&packet.payload) {
         Ok(handshake) if handshake.v == 1
             && !handshake.client_id.trim().is_empty()
             && handshake.client_id.len() <= 80 => handshake,
