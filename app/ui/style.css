@@ -365,3 +365,72 @@ input:focus, textarea:focus, select:focus { border-color: var(--mg-accent); }
   button, .mg-icon-btn { min-height: 34px; }
   #composer { font-size: 16px; } /* avoid iOS zoom on focus */
 }
+
+
+/* ---- MelloID profile studio ------------------------------------------------ */
+.mg-melloid-overlay { z-index: 60; padding: 20px; }
+.mg-melloid-editor {
+  width: min(1180px, 96vw); height: min(860px, 94vh);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.melloid-editor-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 18px; border-bottom: 1px solid var(--mg-border); background: var(--mg-bg-2);
+}
+.melloid-editor-header strong { display: block; font-size: 1.1rem; }
+.melloid-editor-header small { display: block; color: var(--mg-muted); margin-top: 2px; }
+.melloid-editor-header .mg-toolbar { margin: 0; align-items: center; }
+.melloid-editor-layout {
+  flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(320px, .95fr);
+}
+.melloid-editor-scroll { overflow-y: auto; padding: 18px; border-right: 1px solid var(--mg-border); }
+.melloid-editor-scroll h2 { margin: 0; font-size: 1.05rem; }
+.melloid-section-title { margin: 18px 0 10px; }
+.melloid-section-title:first-child { margin-top: 0; }
+.melloid-section-title p { margin: 3px 0 0; font-size: .86rem; }
+.melloid-field { margin: 10px 0; }
+.melloid-field > span { font-weight: 600; }
+.melloid-field input[type=color] { width: 54px; height: 34px; padding: 2px; }
+.melloid-presence-toggle { justify-content: space-between; border-top: 1px solid var(--mg-border); border-bottom: 1px solid var(--mg-border); padding: 10px 0; }
+.melloid-presence-toggle span { display: flex; flex-direction: column; }
+.melloid-editor-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.melloid-list-card { background: var(--mg-surface); border: 1px solid var(--mg-border); border-radius: var(--mg-radius); padding: 10px; display: grid; gap: 8px; }
+.melloid-row-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.melloid-row-head b { font-size: .9rem; }
+.melloid-list-card textarea { resize: vertical; min-height: 90px; }
+.melloid-inline-check { display: flex; align-items: center; gap: 7px; color: var(--mg-muted); font-size: .86rem; }
+.melloid-inline-check input { width: auto; }
+.melloid-preview { overflow-y: auto; padding: 18px; background: color-mix(in srgb, var(--mg-bg) 75%, var(--mg-accent) 5%); }
+.melloid-preview-card { overflow: hidden; border: 1px solid var(--mg-border); border-radius: 16px; background: var(--mg-bg-2); }
+.melloid-preview-banner { height: 128px; background: linear-gradient(125deg, var(--melloid-accent), color-mix(in srgb, var(--melloid-accent) 20%, #17161f)); display: grid; place-items: center; color: white; font: 800 1.35rem var(--mg-mono); letter-spacing: .16em; }
+.melloid-preview-banner img { width: 100%; height: 100%; object-fit: cover; }
+.melloid-preview-identity { padding: 0 18px 12px; position: relative; }
+.melloid-preview-avatar { width: 82px; height: 82px; margin-top: -38px; border-radius: 24px; object-fit: cover; border: 4px solid var(--mg-bg-2); background: var(--mg-surface); }
+.melloid-preview-initials { display: grid; place-items: center; color: white; background: var(--melloid-accent); font-size: 1.5rem; font-weight: 700; }
+.melloid-preview-name h2 { margin: 6px 0 0; }
+.melloid-preview-slug { color: var(--mg-muted); font: .85rem var(--mg-mono); }
+.melloid-preview-name p { margin: 6px 0 0; color: var(--mg-muted); }
+.melloid-preview-content { padding: 0 18px 18px; }
+.melloid-preview-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 14px; }
+.melloid-preview-section { padding: 12px 0; border-top: 1px solid var(--mg-border); }
+.melloid-preview-section h3 { margin: 0 0 7px; font-size: .92rem; color: var(--melloid-accent); }
+.melloid-preview-section p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--mg-muted); }
+.melloid-preview-connections { display: flex; flex-direction: column; gap: 7px; }
+.melloid-preview-connection { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 8px; border-radius: 8px; background: var(--mg-surface); }
+.melloid-preview-connection span { color: var(--mg-muted); font-size: .86rem; }
+.melloid-preview-connection a { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: .8rem; }
+.melloid-preview-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.melloid-badge-pill { border: 1px solid color-mix(in srgb, var(--melloid-accent) 45%, var(--mg-border)); color: var(--melloid-accent); padding: 4px 8px; border-radius: 20px; font-size: .8rem; }
+.melloid-preview-disclaimer { color: var(--mg-muted); font-size: .8rem; margin: 10px 2px; }
+@media (max-width: 820px) {
+  .mg-melloid-overlay { padding: 6px; }
+  .mg-melloid-editor { width: 100%; height: 96vh; }
+  .melloid-editor-header { align-items: flex-start; flex-direction: column; }
+  .melloid-editor-header .mg-toolbar { width: 100%; flex-wrap: wrap; }
+  .melloid-editor-layout { grid-template-columns: 1fr; grid-template-rows: minmax(420px, 1fr) minmax(280px, .8fr); overflow: auto; }
+  .melloid-editor-scroll { border-right: 0; border-bottom: 1px solid var(--mg-border); }
+}
+@media (max-width: 480px) {
+  .melloid-editor-header .mg-toolbar .mg-btn { padding: 5px 8px; font-size: .85rem; }
+  .melloid-preview { padding: 10px; }
+}
