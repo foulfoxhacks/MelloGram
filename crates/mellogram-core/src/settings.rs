@@ -32,6 +32,51 @@ pub struct Settings {
     pub rpc: RpcSettings,
     pub wallpapers: crate::wallpaper::WallpaperSettings,
     pub media: MediaSettings,
+    pub network: NetworkSettings,
+}
+
+/// How MelloGram connects to Telegram.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct NetworkSettings {
+    /// MTProto obfuscated transport: traffic is indistinguishable from random
+    /// bytes, which defeats protocol fingerprinting / DPI blocking.
+    pub obfuscated_transport: bool,
+    /// Optional SOCKS5 proxy, e.g. `socks5h://127.0.0.1:9050` (Tor).
+    pub proxy_url: Option<String>,
+}
+
+impl Default for NetworkSettings {
+    fn default() -> Self {
+        Self { obfuscated_transport: true, proxy_url: None }
+    }
+}
+
+/// Accepts only socks5:// or socks5h:// URLs with a host and port.
+pub fn validate_proxy_url(url: &str) -> std::result::Result<(), String> {
+    let url = url.trim();
+    let rest = url.strip_prefix("socks5h://").or_else(|| url.strip_prefix("socks5://")).ok_or("only socks5:// or socks5h:// proxies are supported")?;
+    let hostport = rest.rsplit('@').next().unwrap_or(rest).trim_end_matches('/');
+    let (host, port) = hostport.rsplit_once(':').ok_or("add a port, e.g. socks5h://127.0.0.1:9050")?;
+    if host.is_empty() || port.parse::<u16>().map_or(true, |p| p == 0) || hostport.contains(['/', ' ', '?', '#']) {
+        return Err("invalid proxy host or port".into());
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod network_tests {
+    use super::validate_proxy_url as v;
+    #[test]
+    fn proxy_urls() {
+        assert!(v("socks5h://127.0.0.1:9050").is_ok());
+        assert!(v("socks5://user:pw@proxy.example:1080").is_ok());
+        assert!(v("http://proxy:8080").is_err());
+        assert!(v("socks5://host").is_err());
+        assert!(v("socks5://:1080").is_err());
+        assert!(v("socks5://host:0").is_err());
+        assert!(v("socks5://host:1080/path").is_err());
+    }
 }
 
 /// How media is fetched and shown.
@@ -86,6 +131,7 @@ impl Default for Settings {
             rpc: RpcSettings::default(),
             wallpapers: Default::default(),
             media: MediaSettings::default(),
+            network: NetworkSettings::default(),
         }
     }
 }

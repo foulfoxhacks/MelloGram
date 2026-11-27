@@ -47,6 +47,35 @@ pub struct TelegramConfig {
     pub api_id: i32,
     pub api_hash: String,
     pub session_path: PathBuf,
+    /// MTProto obfuscated transport (anti-fingerprinting).
+    pub obfuscated: bool,
+    /// Optional SOCKS5 proxy URL (already validated).
+    pub proxy_url: Option<String>,
+    /// Shown in Telegram's active-sessions list, e.g. "0.1.0".
+    pub app_version: String,
+}
+
+/// How this device introduces itself to Telegram: MelloGram, the real OS,
+/// no hardware identifiers.
+fn connection_params(config: &TelegramConfig) -> grammers_client::sender::ConnectionParams {
+    let os = match std::env::consts::OS { "windows" => "Windows", "macos" => "macOS", "linux" => "Linux", "android" => "Android", "ios" => "iOS", other => other };
+    let obfuscated = config.obfuscated;
+    grammers_client::sender::ConnectionParams {
+        device_model: format!("MelloGram on {os}"),
+        system_version: format!("{os} {}", std::env::consts::ARCH),
+        app_version: format!("{} MelloGram", config.app_version),
+        system_lang_code: "en".into(),
+        lang_code: "en".into(),
+        proxy_url: config.proxy_url.clone(),
+        transport: Box::new(move || -> Box<dyn grammers_mtproto::transport::Transport + Send> {
+            if obfuscated {
+                Box::new(grammers_mtproto::transport::Obfuscated::new(grammers_mtproto::transport::Intermediate::new()))
+            } else {
+                Box::new(grammers_mtproto::transport::Full::new())
+            }
+        }),
+        ..Default::default()
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -197,7 +226,7 @@ impl Telegram {
             tokio::fs::create_dir_all(dir).await?;
         }
         let session = Arc::new(SqliteSession::open(&config.session_path).await.map_err(session_err)?);
-        let SenderPool { runner, updates, handle } = SenderPool::new(Arc::clone(&session), config.api_id);
+        let SenderPool { runner, updates, handle } = SenderPool::with_configuration(Arc::clone(&session), config.api_id, connection_params(&config));
         tokio::spawn(runner.run());
         Ok(Arc::new(Self {
             client: Client::new(handle),
