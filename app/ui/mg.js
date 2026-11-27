@@ -118,6 +118,13 @@ function createPluginApi(id, settings, app) {
       set: (value) => Bridge.invoke("plugin_storage_set", { id, value }),
     },
     clipboard: { write: (text) => navigator.clipboard.writeText(text) },
+    /** Subscribe to backend events of one type (e.g. "membership"); auto-removed on disable. */
+    onEvent(type, fn) {
+      let off = null;
+      let dead = false;
+      Bridge.listen("mg://event", (ev) => { if (!dead && ev.type === type) fn(ev); }).then((u) => { off = u; if (dead) u?.(); });
+      return track(() => { dead = true; off?.(); });
+    },
     download(name, text, mime = "text/plain") {
       const url = URL.createObjectURL(new Blob([text], { type: mime }));
       h("a", { href: url, download: name }).click();

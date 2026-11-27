@@ -185,11 +185,25 @@ pub async fn logout(state: S<'_>) -> R<()> {
 #[tauri::command]
 pub async fn list_chats(state: S<'_>, limit: Option<usize>) -> R<Vec<ChatSummary>> {
     let chats = state.telegram().await?.dialogs(limit.unwrap_or(200)).await.map_err(err)?;
-    {
-        let mut titles = state.background.chat_titles.lock().unwrap();
-        for c in &chats {
-            titles.insert(c.id, c.title.clone());
-        }
+    let limit = limit.unwrap_or(200);
+    let complete = chats.len() < limit;
+    let lost = state.background.update_known_chats(&chats, complete);
+    for (chat_id, title) in lost {
+        let event = mellogram_core::relationships::MembershipEvent {
+            chat_id,
+            chat_title: Some(title),
+            user_id: 0,
+            user_name: None,
+            actor_id: None,
+            actor_name: None,
+            kind: mellogram_core::relationships::MembershipKind::AccessLost,
+            until: None,
+            is_self: true,
+            date: chrono::Utc::now().timestamp(),
+            source: mellogram_core::relationships::EventSource::ChatList,
+        };
+        let ui = state.membership(event);
+        let _ = state.app.emit("mg://event", ui);
     }
     Ok(chats)
 }
@@ -477,4 +491,10 @@ pub fn import_backup(state: S<'_>, json: String) -> R<usize> {
     }
     state.reload_plugins();
     Ok(themes.len())
+}
+
+/// Bond Watch: recent bans, removals, restrictions and lost access (newest first).
+#[tauri::command]
+pub fn membership_log(state: S<'_>) -> Vec<mellogram_core::relationships::MembershipEvent> {
+    state.background.log_snapshot()
 }

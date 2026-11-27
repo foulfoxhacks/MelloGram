@@ -55,6 +55,7 @@ pub fn run() {
             wallpapers::import_wallpaper_image,
             wallpapers::delete_wallpaper_image,
             commands::app_info,
+            commands::membership_log,
             commands::get_melloid_profile,
             commands::save_melloid_profile,
             commands::get_settings,
