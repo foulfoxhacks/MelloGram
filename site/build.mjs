@@ -212,7 +212,7 @@ for (const page of pages(ctx)) {
 }
 
 writeFileSync(join(OUT, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>
-<?xml-stylesheet type="text/xsl" href="${href("/sitemap.xsl")}"?>
+<?xml-stylesheet type="text/css" href="${asset("sitemap.css")}"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 ${built.map((p) => `  <url>
     <loc>${url(p.path)}</loc>
@@ -286,7 +286,6 @@ For current release availability and exact binary assets, use the GitHub Release
 - MelloGram privacy: ${url("/privacy/")}
 - MelloGram developer documentation: ${url("/developers/")}
 `);
-cpSync(join(here, "sitemap.xsl"), join(OUT, "sitemap.xsl"));
 writeFileSync(join(OUT, ".nojekyll"), "");
 writeFileSync(join(OUT, ".site-url"), SITE + "\n"); // read by check.mjs
 // Custom domain for GitHub Pages (only when served from a domain root).
