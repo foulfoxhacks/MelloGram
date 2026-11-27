@@ -3,6 +3,7 @@
 //! Each plugin is an independent implementation of a feature idea popularised
 //! by Discord client mods such as Vencord, adapted to Telegram. No Vencord
 //! code is used; `PluginManifest::inspired_by` records the idea it adapts.
+#![forbid(unsafe_code)]
 
 use std::sync::Arc;
 

@@ -13,6 +13,7 @@
 //! session.
 //!
 //! Threat model and limitations: `docs/E2E.md`.
+#![forbid(unsafe_code)]
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::ErrorKind;

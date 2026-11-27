@@ -1,5 +1,7 @@
 //! MelloGram app entry point, shared by desktop (`main.rs`) and mobile
 //! (Android/iOS load this library and call the mobile entry point).
+// No hand-written unsafe code; Tauri macro expansions are exempt.
+#![deny(unsafe_code)]
 
 mod background;
 mod commands;

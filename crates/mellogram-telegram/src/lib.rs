@@ -4,6 +4,7 @@
 //!
 //! You need your own `api_id` / `api_hash` from <https://my.telegram.org>;
 //! MelloGram ships none.
+#![forbid(unsafe_code)]
 
 use std::path::PathBuf;
 use std::sync::Arc;

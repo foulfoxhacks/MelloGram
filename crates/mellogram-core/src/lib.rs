@@ -7,6 +7,7 @@
 //! * [`theme`] — CSS theme discovery, metadata, ordering and QuickCSS.
 //! * [`model`] — the message types plugins see. They are independent of the
 //!   Telegram library so plugins can be unit-tested without a network.
+#![forbid(unsafe_code)]
 
 pub mod appearance;
 pub mod background;
