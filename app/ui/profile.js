@@ -173,8 +173,8 @@
     }
     if (!profile.connections.length) connectionList.append(h("p", { class: "mg-muted", text: "No connections added yet." }));
 
-    body.addEventListener("input", previewUpdate);
-    body.addEventListener("change", previewUpdate);
+    body.oninput = previewUpdate;
+    body.onchange = previewUpdate;
     function previewUpdate() {
       try { renderPreview(preview, currentDraft()); } catch (e) { console.warn("MelloID preview", e); }
     }
@@ -185,7 +185,12 @@
     try {
       profile = await Bridge.invoke("get_melloid_profile");
       overlay = h("div", { class: "mg-overlay mg-melloid-overlay" });
-      const close = () => { overlay?.remove(); overlay = null; };
+      let onEscape;
+      const close = () => {
+        overlay?.remove();
+        overlay = null;
+        if (onEscape) document.removeEventListener("keydown", onEscape);
+      };
       const save = async () => {
         try {
           const next = currentDraft();
@@ -214,9 +219,8 @@
           h("aside", { class: "melloid-preview" })));
       overlay.append(editor);
       overlay.addEventListener("click", (event) => { if (event.target === overlay) close(); });
-      document.addEventListener("keydown", function onEscape(event) {
-        if (event.key === "Escape" && overlay) { close(); document.removeEventListener("keydown", onEscape); }
-      });
+      onEscape = (event) => { if (event.key === "Escape" && overlay) close(); };
+      document.addEventListener("keydown", onEscape);
       document.body.append(overlay);
       renderEditor();
     } catch (error) {
