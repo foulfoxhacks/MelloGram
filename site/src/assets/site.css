@@ -273,3 +273,44 @@ a{color:#a99aff}a:hover{color:#8dcaff}
 @media(max-width:900px){.home-feature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.home-showcase{grid-template-columns:1fr;gap:28px}}
 @media(max-width:600px){.home-hero{padding-top:55px;gap:26px}.home-hero h1{font-size:clamp(3rem,15vw,5rem)}.home-feature-grid{grid-template-columns:1fr}.home-feature-card{max-width:520px;width:100%;margin-inline:auto}.home-hero-shot img,.home-showcase-shot img{border-radius:11px}.section{padding:55px 0}}
 @media(prefers-reduced-motion:reduce){.home-feature-card,.btn{transition:none}.home-feature-card:hover,.btn:hover{transform:none}}
+
+
+/* MelloGram / Vencord-style site system: spacious, centered product splash and clean feature presentation. */
+:root{--max:1120px;--bg:#10101a;--bg-2:#171727;--surface:#1b1b2d;--text:#f4f2ff;--muted:#aaa8c3;--accent:#9a86ff;--accent-2:#79baff;--border:#2c2b45;color-scheme:dark}
+body{background:radial-gradient(ellipse 62% 34% at 50% 0%,rgba(111,91,235,.19),transparent 72%),#10101a}
+.site-header{padding:12px max(22px,calc((100vw - var(--max))/2));gap:26px}
+.site-header nav ul{gap:8px 22px}
+.site-header nav a{font-size:.9rem}
+.site-header nav a[aria-current=page]{color:#fff}
+.site-header .btn-small{white-space:nowrap}
+main{max-width:var(--max)}
+.home-hero{padding-top:clamp(72px,10vw,124px);padding-bottom:70px;gap:36px}
+.home-hero-copy{max-width:850px}
+.home-hero h1{font-size:clamp(3.25rem,8vw,6.6rem);font-weight:850;letter-spacing:-.075em;line-height:.98}
+.home-hero .lead{font-size:clamp(1.04rem,1.8vw,1.24rem);line-height:1.75;max-width:700px}
+.home-hero .eyebrow{background:rgba(137,117,255,.09);border:1px solid rgba(157,139,255,.26);border-radius:999px;padding:7px 15px;color:#c9c0ff}
+.home-hero-shot{max-width:1080px;padding:10px;border-radius:20px}
+.home-hero-shot img{border-radius:12px}
+.home-section-heading{max-width:760px}
+.home-section-heading h2{font-size:clamp(2.1rem,4.8vw,3.6rem);letter-spacing:-.06em}
+.home-feature-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.home-feature-card{border-radius:18px;background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.012));}
+.home-feature-image{aspect-ratio:16/9}
+.home-feature-card>div{padding:23px 24px 25px}
+.home-feature-card h3{font-size:1.13rem}
+.home-feature-card p{font-size:.95rem}
+.home-showcase{gap:58px}
+.home-showcase-copy h2{font-size:clamp(2.2rem,4.5vw,3.45rem);line-height:1.08}
+.section{padding:82px 0}
+.home-faq{max-width:900px}
+.home-download{margin:44px 0 70px}
+.page-head{padding:58px 0 28px}
+.page-head h1{font-size:clamp(2.7rem,6vw,4.6rem);letter-spacing:-.06em}
+.site-footer{padding-left:max(22px,calc((100vw - var(--max))/2));padding-right:max(22px,calc((100vw - var(--max))/2))}
+@media(max-width:760px){
+ .site-header{padding:10px 16px}
+ .home-feature-grid{grid-template-columns:1fr}
+ .home-feature-card{max-width:620px;width:100%;margin-inline:auto}
+ .section{padding:58px 0}
+}
+@media(prefers-reduced-motion:reduce){.home-feature-card,.btn{transition:none}.home-feature-card:hover,.btn:hover{transform:none}}
