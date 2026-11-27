@@ -29,7 +29,10 @@
           ],
           "deny": []
         }
-      }
+      },
+      "dangerousDisableAssetCspModification": [
+        "style-src"
+      ]
     }
   },
   "bundle": {
