@@ -119,7 +119,7 @@ export function pages(c) {
       priority: 1.0,
       changefreq: "weekly",
       images: ["screenshot-chat.webp", "screenshot-plugins.webp", "screenshot-wallpapers.webp", "screenshot-appearance-studio.webp", "og-image.png"],
-      jsonld: (c) => [softwareApp(c), faqJsonLd(home)],
+      jsonld: (c) => [softwareApp(c)],
       body: () => `
 <section class="home-hero">
   <div class="home-hero-copy">
