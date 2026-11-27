@@ -184,8 +184,14 @@ pub async fn logout(state: S<'_>) -> R<()> {
 
 #[tauri::command]
 pub async fn list_chats(state: S<'_>, limit: Option<usize>) -> R<Vec<ChatSummary>> {
-    let chats = state.telegram().await?.dialogs(limit.unwrap_or(200)).await.map_err(err)?;
+    let mut chats = state.telegram().await?.dialogs(limit.unwrap_or(200)).await.map_err(err)?;
     let limit = limit.unwrap_or(200);
+    // Never show an overlay ciphertext as the chat's last message.
+    for chat in &mut chats {
+        if chat.last_text.as_deref().is_some_and(mellogram_e2e::is_overlay_text) {
+            chat.last_text = Some("🔒 Encrypted message".into());
+        }
+    }
     let complete = chats.len() < limit;
     let lost = state.background.update_known_chats(&chats, complete);
     for (chat_id, title) in lost {
@@ -251,19 +257,44 @@ pub async fn send_message(state: S<'_>, request: SendRequest) -> R<SendOutcome> 
         })
         .collect();
     let processed = state.plugins.lock().unwrap().process_outgoing(msg);
-    let msg = match processed {
+    let mut msg = match processed {
         Ok(m) => m,
         Err(reason) => {
             crate::state::Counters::bump(&state.counters.cancelled_sends);
             return Ok(SendOutcome::Cancelled { reason });
         }
     };
-    let sent = state.telegram().await?.send(&msg).await;
+    let tg = state.telegram().await?;
+    // End-to-end overlay: the text is encrypted here and only the ciphertext
+    // ever reaches Telegram. The plaintext is kept locally for the bubble.
+    let mut encrypted_plaintext: Option<String> = None;
+    if state.e2e.chat_enabled(msg.chat_id) {
+        if !msg.attachments.is_empty() {
+            return Err("Encrypted messages can't carry attachments yet — send the file separately or turn encryption off for this chat.".into());
+        }
+        let me = tg.ensure_self_id().await.map_err(err)?;
+        state.e2e.set_self_id(me);
+        let plain = msg.text.clone();
+        msg.text = state.e2e.encrypt_for_chat(msg.chat_id, &plain)?;
+        msg.link_preview = false;
+        encrypted_plaintext = Some(plain);
+    }
+    let sent = tg.send(&msg).await;
     if sent.is_err() {
         crate::state::Counters::bump(&state.counters.send_failures);
     }
     let mut result = sent.map_err(err)?;
     crate::state::Counters::bump(&state.counters.sends);
+    if let Some(plain) = encrypted_plaintext {
+        state.e2e.remember_sent(result.message.chat_id, result.message.id, &plain);
+        result.message.text = plain;
+        result.message.add_class("mg-e2e");
+        result.message.badges.push(mellogram_core::MessageBadge {
+            plugin: "e2e".into(),
+            label: "🔒".into(),
+            tooltip: Some("Sent with the MelloGram end-to-end overlay".into()),
+        });
+    }
     state.decorate(std::slice::from_mut(&mut result.message));
     Ok(SendOutcome::Sent(result))
 }
@@ -295,6 +326,9 @@ pub async fn delete_messages(state: S<'_>, chat_id: i64, ids: Vec<i32>) -> R<()>
 
 #[tauri::command]
 pub async fn edit_message(state: S<'_>, chat_id: i64, id: i32, text: String) -> R<()> {
+    if state.e2e.chat_enabled(chat_id) {
+        return Err("Encrypted messages can't be edited — the ciphertext on Telegram's side would no longer match. Send a new message instead.".into());
+    }
     state.telegram().await?.edit(chat_id, id, &text).await.map_err(err)
 }
 

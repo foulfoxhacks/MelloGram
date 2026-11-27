@@ -60,7 +60,9 @@ mellogram/
 ├── crates/
 │   ├── mellogram-core       plugin trait + manager, settings, themes (no network, no UI)
 │   ├── mellogram-plugins    built-in plugins (Rust) + their UI halves (ui/*.js)
-│   └── mellogram-telegram   Telegram backend on grammers (pure-Rust MTProto)
+│   ├── mellogram-telegram   Telegram backend on grammers (pure-Rust MTProto)
+│   ├── mellogram-e2e        end-to-end overlay state: identity, sessions, per-chat mode
+│   └── ametherian-truee2e   X3DH + Double Ratchet protocol for the overlay
 ├── app/
 │   ├── src-tauri            desktop shell: commands, event pump, bundling
 │   └── ui                   HTML/CSS/JS front end (no build step)
