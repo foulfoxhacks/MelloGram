@@ -212,19 +212,41 @@ for (const page of pages(ctx)) {
 }
 
 writeFileSync(join(OUT, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="${href("/sitemap.xsl")}"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 ${built.map((p) => `  <url>
     <loc>${url(p.path)}</loc>
     <lastmod>${today}</lastmod>
     <changefreq>${p.changefreq || "monthly"}</changefreq>
     <priority>${p.priority ?? 0.7}</priority>${(p.images || []).map((i) => `
-    <image:image><image:loc>${url("/assets/" + i)}</image:loc></image:image>`).join("")}
+    <image:image><image:loc>${url("/assets/" + i)}</image:loc><image:title>MelloGram — ${i.replace(/[-.]/g, " ")}</image:title></image:image>`).join("")}
   </url>`).join("\n")}
 </urlset>
 `);
 
-writeFileSync(join(OUT, "robots.txt"), `# MelloGram website
+writeFileSync(join(OUT, "robots.txt"), `# MelloGram — official website
+# Public product information, documentation and source references are crawlable.
 User-agent: *
+Allow: /
+
+# Search and answer-engine crawlers
+User-agent: Googlebot
+Allow: /
+User-agent: Bingbot
+Allow: /
+User-agent: GPTBot
+Allow: /
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: anthropic-ai
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: Applebot
 Allow: /
 
 Sitemap: ${url("/sitemap.xml")}
@@ -246,7 +268,9 @@ writeFileSync(join(OUT, "site.webmanifest"), JSON.stringify({
 
 // llms.txt: a plain-language map for AI assistants and answer engines.
 const { llms } = await import("./pages.mjs");
-writeFileSync(join(OUT, "llms.txt"), llms(ctx));\nwriteFileSync(join(OUT, "llms-full.txt"), llms(ctx, { full: true }));\ncpSync(join(here, "sitemap.xsl"), join(OUT, "sitemap.xsl"));
+writeFileSync(join(OUT, "llms.txt"), llms(ctx));
+writeFileSync(join(OUT, "llms-full.txt"), llms(ctx, { full: true }));
+cpSync(join(here, "sitemap.xsl"), join(OUT, "sitemap.xsl"));\nwriteFileSync(join(OUT, "llms-full.txt"), llms(ctx, { full: true }));\ncpSync(join(here, "sitemap.xsl"), join(OUT, "sitemap.xsl"));
 writeFileSync(join(OUT, ".nojekyll"), "");
 writeFileSync(join(OUT, ".site-url"), SITE + "\n"); // read by check.mjs
 // Custom domain for GitHub Pages (only when served from a domain root).
