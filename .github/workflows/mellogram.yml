@@ -59,16 +59,13 @@ jobs:
             platform: macos
     runs-on: ${{ matrix.os }}
     env:
-      # Optional signing material; unset secrets are empty, so every signing
-      # step below skips itself instead of failing the build.
+      # Signing material is optional. These two mirrors decide which build step
+      # runs; the actual APPLE_* variables are only exported on the signed path,
+      # because an empty APPLE_CERTIFICATE reads as "sign with nothing" and
+      # breaks the unsigned build.
+      HAS_APPLE_SIGNING: ${{ secrets.APPLE_CERTIFICATE }}
       WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
       WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
-      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - uses: actions/checkout@v4
       - name: Linux system dependencies
@@ -138,8 +135,20 @@ jobs:
           Write-Host "Authenticode signatures applied"
 
       # ---- macOS: universal .dmg (Apple Silicon + Intel) ------------------------
-      - name: Build macOS universal app and DMG
-        if: runner.os == 'macOS'
+      - name: Build macOS universal app and DMG (signed)
+        if: runner.os == 'macOS' && env.HAS_APPLE_SIGNING != ''
+        working-directory: app/src-tauri
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: cargo tauri build --target universal-apple-darwin --bundles app,dmg
+
+      - name: Build macOS universal app and DMG (unsigned)
+        if: runner.os == 'macOS' && env.HAS_APPLE_SIGNING == ''
         working-directory: app/src-tauri
         run: cargo tauri build --target universal-apple-darwin --bundles app,dmg
       - name: Collect macOS packages
