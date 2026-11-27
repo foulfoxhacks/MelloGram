@@ -87,7 +87,14 @@ pub fn get_melloid_profile(state: S<'_>) -> MelloProfile {
 
 /// Validates and atomically persists the editable MelloID profile.
 #[tauri::command]
-pub fn save_melloid_profile(state: S<'_>, profile: MelloProfile) -> R<()> {
+pub fn save_melloid_profile(state: S<'_>, mut profile: MelloProfile) -> R<()> {
+    // Verification and awarded badges are reserved for a trusted issuer.
+    // The local editor cannot manufacture trust claims or achievement grants.
+    for connection in &mut profile.connections {
+        connection.verification_issuer = None;
+        connection.verified_at = None;
+    }
+    profile.badges.clear();
     state.melloid.lock().unwrap().save(profile).map_err(err)
 }
 
