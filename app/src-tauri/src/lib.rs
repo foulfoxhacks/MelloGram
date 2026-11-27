@@ -124,8 +124,11 @@ pub fn run() {
                     api.prevent_close();
                 }
             }
-            if let tauri::WindowEvent::Focused(true) = event {
-                background::window_focused_again(window.app_handle());
+            if let tauri::WindowEvent::Focused(focused) = event {
+                background::set_mobile_focus(*focused);
+                if *focused {
+                    background::window_focused_again(window.app_handle());
+                }
             }
             if let tauri::WindowEvent::Destroyed = event {
                 if let Some(state) = window.app_handle().try_state::<Arc<state::AppState>>() {

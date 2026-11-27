@@ -88,9 +88,30 @@ pub fn show_main(app: &AppHandle) {
     }
 }
 
+#[cfg(desktop)]
 fn window_focused(app: &AppHandle) -> bool {
     main_window(app).is_some_and(|w| w.is_visible().unwrap_or(false) && w.is_focused().unwrap_or(false))
 }
+
+/// Whether the app is in the foreground. Android/iOS webviews report neither
+/// visibility nor focus (`is_focused` is always `false`), so mobile tracks
+/// the activity's window-focus events instead; see [`set_mobile_focus`].
+#[cfg(mobile)]
+static MOBILE_FOCUSED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
+#[cfg(mobile)]
+fn window_focused(_: &AppHandle) -> bool {
+    MOBILE_FOCUSED.load(Ordering::Relaxed)
+}
+
+/// Records foreground/background changes from `WindowEvent::Focused`.
+#[cfg(mobile)]
+pub fn set_mobile_focus(focused: bool) {
+    MOBILE_FOCUSED.store(focused, Ordering::Relaxed);
+}
+
+#[cfg(desktop)]
+pub fn set_mobile_focus(_: bool) {}
 
 /// Raises a native notification for `msg` if the policy allows it.
 pub fn notify_message(state: &AppState, msg: &IncomingMessage) {

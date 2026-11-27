@@ -1,0 +1,183 @@
+/* Mobile (Android/iOS app) and touch layout. Loaded after style.css; every
+   rule is scoped to body.mg-mobile-app (the mobile app), body.mg-touch (coarse
+   pointer without hover) or body.mg-mobile (narrow viewport, set by app.js),
+   so the desktop layout is untouched. Themes can still override these. */
+
+/* ---- viewport, safe areas and keyboard ------------------------------------------- */
+
+body.mg-mobile-app {
+  /* Insets are 0 inside the Android app (MainActivity pads the WebView), and
+     real values in browsers / iOS with viewport-fit=cover. */
+  --mg-safe-top: env(safe-area-inset-top, 0px);
+  --mg-safe-right: env(safe-area-inset-right, 0px);
+  --mg-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --mg-safe-left: env(safe-area-inset-left, 0px);
+  --mg-touch-target: 44px;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+body.mg-mobile-app .mg-app {
+  /* Follows the visual viewport, so the composer stays above an on-screen
+     keyboard that overlays the page instead of resizing it. */
+  height: calc(100vh / var(--mg-ui-scale));
+  height: calc(var(--mg-vvh, 100dvh) / var(--mg-ui-scale));
+}
+body.mg-mobile-app .mg-titlebar {
+  padding-top: max(6px, var(--mg-safe-top));
+  padding-left: max(10px, var(--mg-safe-left));
+  padding-right: max(10px, var(--mg-safe-right));
+}
+body.mg-mobile-app .mg-sidebar { padding-left: var(--mg-safe-left); }
+body.mg-mobile-app .mg-chat-list { padding-bottom: calc(10px + var(--mg-safe-bottom)); }
+body.mg-mobile-app .mg-main { padding-right: var(--mg-safe-right); }
+body.mg-mobile-app .mg-composer {
+  padding-bottom: max(8px, var(--mg-safe-bottom));
+}
+body.mg-mobile-app .mg-overlay {
+  padding: var(--mg-safe-top) var(--mg-safe-right) var(--mg-safe-bottom) var(--mg-safe-left);
+}
+body.mg-mobile-app .mg-banner { top: calc(60px + var(--mg-safe-top)); max-width: calc(100vw - 16px); flex-wrap: wrap; }
+body.mg-mobile-app .mg-lock { padding-top: var(--mg-safe-top); padding-bottom: var(--mg-safe-bottom); }
+
+/* Scroll areas: momentum scrolling, no pull-to-refresh / page bounce. */
+body.mg-mobile-app .mg-chat-list,
+body.mg-mobile-app .mg-messages,
+body.mg-mobile-app .mg-settings-body,
+body.mg-mobile-app .mg-settings-nav,
+body.mg-mobile-app .mg-palette-list {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ---- touch targets (48dp Material / 44pt Apple guideline) ----------------------- */
+
+body.mg-touch .mg-icon-btn,
+body.mg-mobile-app .mg-icon-btn {
+  min-width: var(--mg-touch-target, 44px);
+  min-height: var(--mg-touch-target, 44px);
+  display: inline-grid; place-items: center;
+  font-size: 1.1em;
+}
+body.mg-touch .mg-btn,
+body.mg-mobile-app .mg-btn { min-height: var(--mg-touch-target, 44px); padding-inline: 16px; }
+body.mg-touch .mg-send,
+body.mg-mobile-app .mg-send { width: 44px; height: 44px; font-size: 1.1em; }
+body.mg-touch .mg-chat-item,
+body.mg-mobile-app .mg-chat-item { min-height: 60px; }
+body.mg-touch .mg-context-menu button,
+body.mg-mobile-app .mg-context-menu button { padding: 12px 14px; min-height: var(--mg-touch-target, 44px); }
+body.mg-touch .mg-command,
+body.mg-mobile-app .mg-command,
+body.mg-touch .mg-palette-item,
+body.mg-mobile-app .mg-palette-item { min-height: var(--mg-touch-target, 44px); align-items: center; }
+body.mg-touch .mg-settings-nav button,
+body.mg-mobile-app .mg-settings-nav button { min-height: var(--mg-touch-target, 44px); }
+body.mg-touch .mg-switch,
+body.mg-mobile-app .mg-switch { width: 46px; height: 28px; border-radius: 14px; }
+body.mg-touch .mg-switch::after,
+body.mg-mobile-app .mg-switch::after { width: 22px; height: 22px; }
+body.mg-touch .mg-switch:checked::after,
+body.mg-mobile-app .mg-switch:checked::after { transform: translateX(18px); }
+body.mg-touch input[type=checkbox]:not(.mg-switch),
+body.mg-touch input[type=radio] { width: 22px; height: 22px; }
+body.mg-touch input[type=range] { min-height: var(--mg-touch-target, 44px); }
+/* 16px stops mobile browsers zooming into focused fields. */
+body.mg-mobile-app input, body.mg-mobile-app textarea, body.mg-mobile-app select { font-size: max(16px, 1em); }
+body.mg-mobile-app input[type=text], body.mg-mobile-app input[type=search],
+body.mg-mobile-app input[type=password], body.mg-mobile-app input[type=number],
+body.mg-mobile-app input[type=tel], body.mg-mobile-app select { min-height: var(--mg-touch-target, 44px); }
+
+/* ---- no hover-only controls ------------------------------------------------------ */
+
+/* A tap toggles .mg-touch-reveal on a message (mobile.js); treat it as :hover
+   so "Timestamps: on hover" and hover-revealed theme controls stay usable. */
+body.mg-touch .mg-message.mg-touch-reveal .mg-time,
+body.mg-touch .mg-message.mg-touch-reveal [class*="hover"] { opacity: 1 !important; visibility: visible !important; }
+/* Sticky :hover after a tap looks like a selection on touch screens. */
+@media (hover: none) {
+  body.mg-touch .mg-chat-item:hover:not(.mg-selected) { background: none; }
+  body.mg-touch .mg-icon-btn:hover:not(.mg-active) { background: none; color: var(--mg-muted); }
+  body.mg-touch .mg-chat-item:active { background: var(--mg-surface); }
+  body.mg-touch .mg-icon-btn:active { background: var(--mg-surface); color: var(--mg-text); }
+}
+/* Long-press opens the context menu (app.js); don't also start a text
+   selection or the system callout. "Copy text" is in the menu. */
+body.mg-touch .mg-chat-item,
+body.mg-touch .mg-message {
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* ---- phone layout (narrow) -------------------------------------------------------- */
+
+body.mg-mobile .mg-chat-header {
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 10px 6px 4px;
+}
+body.mg-mobile .mg-chat-header > div { min-width: 0; }
+body.mg-mobile .mg-chat-title,
+body.mg-mobile .mg-chat-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.mg-mobile .mg-messages { padding: 8px 10px; }
+body.mg-mobile .mg-composer { padding-inline: 8px; }
+body.mg-mobile .mg-composer-row { gap: 4px; }
+body.mg-mobile #composer { max-height: 30vh; border-radius: 22px; padding: 10px 14px; }
+/* style.css gives the search field width:100% plus margins; stretch it in
+   the sidebar instead so it does not overflow on phones. */
+body.mg-mobile .mg-sidebar .mg-search { margin: 8px 10px; width: auto; align-self: stretch; }
+body.mg-mobile .mg-header-buttons { overflow-x: auto; scrollbar-width: none; }
+
+/* Context menu as a bottom sheet. */
+body.mg-mobile .mg-context-menu {
+  left: 8px !important; right: 8px; top: auto !important;
+  bottom: calc(8px + var(--mg-safe-bottom, 0px));
+  min-width: 0; padding: 6px; border-radius: 14px;
+  animation: mg-slide .15s ease-out;
+}
+
+/* Settings: full screen, sticky close button, horizontally scrolling tabs. */
+body.mg-mobile #settings { padding: 0; }
+body.mg-mobile .mg-settings {
+  width: 100vw; height: 100%; max-height: none; border: 0; border-radius: 0;
+  padding: var(--mg-safe-top, 0px) var(--mg-safe-right, 0px) 0 var(--mg-safe-left, 0px);
+}
+body.mg-mobile .mg-settings-nav {
+  scroll-snap-type: x proximity; scrollbar-width: none;
+  border-bottom: 1px solid var(--mg-border);
+  padding-right: 56px; /* room for the close button */
+}
+body.mg-mobile .mg-settings-nav button { scroll-snap-align: start; }
+body.mg-mobile .mg-settings-body { padding-bottom: calc(24px + var(--mg-safe-bottom, 0px)); }
+body.mg-mobile .mg-settings .mg-close {
+  position: fixed; top: calc(4px + var(--mg-safe-top, 0px)); right: calc(4px + var(--mg-safe-right, 0px));
+  z-index: 3; background: var(--mg-bg-2); border-radius: 50%;
+}
+body.mg-mobile .mg-field-row { flex-wrap: wrap; }
+body.mg-mobile .mg-field-row > :first-child { flex: 1 1 60%; min-width: 0; }
+body.mg-mobile .mg-toolbar input[type=search] { flex: 1 1 100%; min-width: 0; }
+body.mg-mobile .mg-toolbar select { flex: 1 1 0; min-width: 0; }
+body.mg-mobile .mg-code { min-height: 240px; font-size: 13px; }
+body.mg-mobile .mg-theme-row { flex-wrap: wrap; }
+
+/* Dialogs, palette and the MelloID editor fill the screen. */
+body.mg-mobile .mg-modal {
+  width: 100vw; max-height: 100%; overflow-y: auto; border-radius: 0; border: 0;
+  padding: 16px max(16px, var(--mg-safe-right, 0px)) calc(16px + var(--mg-safe-bottom, 0px)) max(16px, var(--mg-safe-left, 0px));
+}
+body.mg-mobile .mg-palette-overlay { place-items: start center; }
+body.mg-mobile .mg-palette { width: 100vw; border-radius: 0 0 14px 14px; }
+body.mg-mobile .mg-melloid-overlay { padding: 0; }
+body.mg-mobile .mg-melloid-editor { width: 100vw; height: 100%; border-radius: 0; border: 0; }
+body.mg-mobile .melloid-editor-header { flex-wrap: wrap; }
+body.mg-mobile .melloid-editor-layout { grid-template-columns: 1fr; overflow-y: auto; }
+body.mg-mobile .melloid-editor-scroll { border-right: 0; overflow: visible; }
+body.mg-mobile .melloid-preview { overflow: visible; }
+body.mg-mobile .mg-login { width: 100%; max-width: 420px; border-radius: 0; border: 0; box-shadow: none; }
+
+/* Toasts sit above the composer and the gesture bar. */
+body.mg-mobile .mg-toasts { left: 8px !important; right: 8px !important; }
+body.mg-mobile .mg-toasts.bottom-right,
+body.mg-mobile .mg-toasts.bottom-left { bottom: calc(76px + var(--mg-safe-bottom, 0px)); }
+body.mg-mobile .mg-toasts.top-right,
+body.mg-mobile .mg-toasts.top-left { top: calc(56px + var(--mg-safe-top, 0px)); }
+body.mg-mobile .mg-toast { max-width: none; }
