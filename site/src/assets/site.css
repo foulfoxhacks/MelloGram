@@ -145,7 +145,7 @@ thead th{background:var(--surface-2)}
 
 /* Footer */
 .site-footer{border-top:1px solid rgba(169,157,255,.13);background:#0c0c15;padding:38px max(20px,calc((100vw - var(--max))/2)) 26px}
-.footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:32px}
+.footer-grid{display:grid;grid-template-columns:2fr repeat(3,minmax(0,1fr));gap:32px}
 .footer-brand,.footer-title{margin:0 0 10px;font-size:1.05rem;font-weight:850;color:#f4f2ff}
 .site-footer p{color:#9491ad}
 .site-footer ul{list-style:none;padding:0;margin:0}
@@ -157,7 +157,8 @@ thead th{background:var(--surface-2)}
   .site-header{gap:18px}
   .site-header nav ul{gap:5px 14px}
   .home-feature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .footer-grid{grid-template-columns:1.5fr 1fr 1fr}
+  .footer-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .footer-grid>div:first-child{grid-column:1/-1}
 }
 @media(max-width:700px){
   main{width:min(var(--max),calc(100% - 30px))}
@@ -191,4 +192,76 @@ thead th{background:var(--surface-2)}
   html{scroll-behavior:auto}
   *,*:before,*:after{transition:none!important;animation:none!important}
   .btn:hover,.home-feature-card:hover{transform:none}
+}
+
+/* ---- Telegram-style homepage ------------------------------------------------
+   Reference: telegram.org (centred tagline hero, per-platform download tiles,
+   "Why <product>?" grid, spotlight rows). MelloGram's dark palette, same
+   information order, no borrowed artwork or copy. */
+
+.tg-hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:clamp(44px,6.4vw,78px) 0 30px}
+.tg-hero h1{font-size:clamp(3rem,7.6vw,5.2rem);margin:0 0 4px;color:var(--text)}
+.tg-hero .hero-tagline{font-size:clamp(1.3rem,2.6vw,2rem);color:var(--accent);margin:0 0 16px}
+.tg-hero .lead{max-width:720px;margin:0 auto}
+.tg-hero .home-hero-mark{margin-bottom:14px}
+
+.tg-downloads{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;width:100%;max-width:920px;list-style:none;margin:32px 0 0;padding:0}
+.tg-tile{display:flex;flex-direction:column;align-items:center;gap:5px;padding:16px 10px 14px;border:1px solid var(--border);border-radius:14px;
+  background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.012));color:var(--text);text-decoration:none;
+  transition:transform .16s ease,border-color .16s ease,background .16s ease}
+.tg-tile svg{width:26px;height:26px;color:var(--accent);margin-bottom:3px}
+.tg-tile-name{font-weight:750;font-size:.95rem}
+.tg-tile-meta{color:var(--muted);font-size:.72rem;letter-spacing:.01em}
+.tg-tile:hover,.tg-tile:focus-visible{transform:translateY(-3px);border-color:var(--accent);background:rgba(160,140,255,.09)}
+
+.tg-why{padding-top:56px}
+.tg-why-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;list-style:none;margin:0;padding:0}
+.tg-why-card{padding:22px 22px 20px;border:1px solid var(--border);border-radius:14px;background:var(--surface)}
+.tg-why-card h3{margin:0 0 6px;font-size:1.06rem;color:var(--accent-2)}
+.tg-why-card p{margin:0;color:var(--muted);font-size:.92rem;line-height:1.66}
+
+.tg-rows{display:grid;gap:clamp(44px,6vw,76px)}
+.tg-row{display:grid;grid-template-columns:1.02fr 1fr;gap:clamp(22px,4vw,54px);align-items:center}
+.tg-row-copy h2{margin-bottom:12px;font-size:clamp(1.6rem,3.2vw,2.35rem)}
+.tg-row-copy p{color:var(--muted)}
+.tg-row-flip .tg-row-copy{order:2}
+.tg-row-shot{padding:8px;border:1px solid rgba(160,140,255,.26);border-radius:16px;
+  background:linear-gradient(150deg,rgba(157,137,255,.12),rgba(84,127,230,.06) 60%,rgba(255,255,255,.02));
+  box-shadow:0 20px 54px rgba(0,0,0,.34)}
+.tg-row-shot img{width:100%;border:1px solid rgba(255,255,255,.08);border-radius:10px}
+.tg-row-shot figcaption{padding:9px 3px 1px;color:#8d8aa6;font-size:.76rem;text-align:center}
+.tg-list{list-style:none;margin:14px 0 18px;padding:0;display:grid;gap:8px}
+.tg-list li{position:relative;padding-left:22px;color:#c6c3da;font-size:.94rem}
+.tg-list li::before{content:"";position:absolute;left:4px;top:.55em;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(160,140,255,.16)}
+.tg-link{display:inline-block;font-weight:750;font-size:.92rem;color:#b5a6ff;text-decoration:none}
+.tg-link:hover{color:var(--accent-2)}
+
+.tg-compare{overflow-x:auto;border:1px solid var(--border);border-radius:16px;background:var(--surface)}
+.tg-compare table{width:100%;min-width:620px;border-collapse:collapse;font-size:.92rem}
+.tg-compare th,.tg-compare td{padding:13px 18px;text-align:left;border-bottom:1px solid rgba(169,157,255,.1);vertical-align:top}
+.tg-compare thead th{font-size:.76rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:750;background:rgba(255,255,255,.02)}
+.tg-compare tbody th{width:26%;font-weight:650;color:#d6d3e6}
+.tg-compare tbody tr:last-child th,.tg-compare tbody tr:last-child td{border-bottom:0}
+.tg-compare .tg-compare-us{color:var(--accent)}
+.tg-compare tbody td:nth-child(2){color:var(--muted)}
+.tg-compare tbody td:nth-child(3){color:#d3cffb;background:rgba(160,140,255,.05)}
+.tg-compare-section .muted{margin-top:14px}
+
+.tg-do-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;list-style:none;margin:0;padding:0}
+.tg-do-grid a{display:grid;gap:4px;height:100%;padding:18px 20px;border:1px solid var(--border);border-radius:13px;background:var(--surface);
+  text-decoration:none;color:var(--text);transition:border-color .16s ease,transform .16s ease}
+.tg-do-grid a:hover,.tg-do-grid a:focus-visible{border-color:var(--accent);transform:translateY(-2px)}
+.tg-do-grid strong{font-size:.98rem}
+.tg-do-grid span{color:var(--muted);font-size:.86rem;line-height:1.5}
+
+@media(max-width:900px){
+  .tg-downloads{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .tg-why-grid,.tg-do-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tg-row{grid-template-columns:1fr}
+  .tg-row-flip .tg-row-copy{order:0}
+}
+@media(max-width:620px){
+  .tg-downloads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tg-why-grid,.tg-do-grid{grid-template-columns:1fr}
+  .tg-hero h1{font-size:clamp(2.6rem,13vw,3.6rem)}
 }

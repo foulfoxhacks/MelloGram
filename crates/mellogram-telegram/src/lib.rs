@@ -315,6 +315,15 @@ impl Telegram {
         Ok(Me { id: me.id().bare_id_unchecked(), name: me.full_name(), username: me.username().map(str::to_owned) })
     }
 
+    /// Our own user id, fetched once and cached. `0` only if we never logged in.
+    pub async fn ensure_self_id(&self) -> Result<i64> {
+        let id = self.self_id.load(std::sync::atomic::Ordering::Relaxed);
+        if id != 0 {
+            return Ok(id);
+        }
+        Ok(self.me().await?.id)
+    }
+
     // ---- chats & messages ----------------------------------------------------
 
     async fn peer_ref(&self, chat_id: i64) -> Result<PeerRef> {
@@ -549,6 +558,28 @@ impl Telegram {
             });
         }
         Ok(out)
+    }
+
+    /// Every member the account may see, following the participant pager up to
+    /// `max`. The bool says whether the list is complete: `false` means the cap
+    /// was hit and there are more members, so it must not be treated as a full
+    /// roster (a group sweep would read the missing tail as departures).
+    pub async fn chat_members_all(&self, chat_id: i64, max: usize) -> Result<(Vec<Member>, bool)> {
+        use grammers_client::peer::Role;
+        let peer = self.peer_ref(chat_id).await?;
+        let mut iter = self.client.iter_participants(peer);
+        let mut out = Vec::new();
+        while out.len() < max {
+            let Some(p) = iter.next().await? else { return Ok((out, true)) };
+            out.push(Member {
+                id: p.user.id().bare_id_unchecked(),
+                name: p.user.full_name(),
+                username: p.user.username().map(str::to_owned),
+                role: match p.role { Role::Creator(_) => "owner", Role::Admin(_) => "admin", Role::Banned(_) => "banned", Role::Left(_) => "left", _ => "member" },
+                presence: user_presence(&p.user),
+            });
+        }
+        Ok((out, false))
     }
 
     // ---- updates ---------------------------------------------------------------

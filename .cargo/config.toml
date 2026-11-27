@@ -1,0 +1,6 @@
+# getrandom refuses to pick a backend on wasm32-unknown-unknown without an
+# explicit cfg. The browser build uses Web Crypto through wasm-bindgen's JS
+# glue, so the overlay crate's `wasm` feature enables getrandom's wasm_js
+# backend and this flag selects it. The setting only applies to the wasm target.
+[target.wasm32-unknown-unknown]
+rustflags = ['--cfg', 'getrandom_backend="wasm_js"']

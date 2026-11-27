@@ -29,6 +29,7 @@
     workspaces: { group: "Customize", label: "Workspaces & Sharing", render: () => P().workspaces() },
     backup: { group: "Data", label: "Backup & Restore", render: renderBackup },
     privacy: { group: "Security", label: "Privacy & Security", render: () => P().privacy() },
+    e2e: { group: "Security", label: "End-to-End Overlay", render: () => P().e2e() },
     diagnostics: { group: "System", label: "Diagnostics", render: () => P().diagnostics() },
     telegram: { group: "System", label: "Telegram", render: renderTelegram },
     mellorpc: { group: "System", label: "MelloRPC Presence", render: renderMelloRpc },

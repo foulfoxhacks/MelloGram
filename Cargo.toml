@@ -4,8 +4,12 @@ members = [
     "crates/mellogram-core",
     "crates/mellogram-plugins",
     "crates/mellogram-telegram",
+    "crates/mellogram-e2e",
+    "crates/ametherian-truee2e",
+    "crates/ametherian-truee2e-wasm",
     "crates/mellorpc-core",
     "crates/melloid-core",
+    "crates/ametherian-truee2e",
     "app/src-tauri",
 ]
 
@@ -20,6 +24,7 @@ rust-version = "1.80"
 mellogram-core = { path = "crates/mellogram-core" }
 mellogram-plugins = { path = "crates/mellogram-plugins" }
 mellogram-telegram = { path = "crates/mellogram-telegram" }
+mellogram-e2e = { path = "crates/mellogram-e2e" }
 melloid-core = { path = "crates/melloid-core" }
 mellorpc-core = { path = "crates/mellorpc-core" }
 serde = { version = "1", features = ["derive"] }

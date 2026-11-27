@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MelloGram Web</title>
+    <meta name="description" content="The browser client for MelloGram. Early skeleton." />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <main class="page">
+      <header class="masthead">
+        <div class="wordmark"><span class="dot"></span>MelloGram <span class="web">Web</span></div>
+        <span class="badge" id="stage">skeleton</span>
+      </header>
+
+      <section class="intro">
+        <h1>Your chats, in the browser.</h1>
+        <p class="lede">
+          This is the web client's shell. It runs as a Cloudflare Worker and serves the page
+          you are reading. The parts that matter — signing in, reading chats and the
+          end-to-end overlay — are not wired up yet, and this page will not pretend otherwise.
+        </p>
+      </section>
+
+      <section class="panel" aria-labelledby="status-heading">
+        <div class="panel-head">
+          <h2 id="status-heading">What works today</h2>
+          <span class="muted" id="version"></span>
+        </div>
+        <ul class="capabilities" id="capabilities">
+          <li class="muted">Loading status…</li>
+        </ul>
+        <p class="muted" id="status-note"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="overlay-heading">
+        <div class="panel-head">
+          <h2 id="overlay-heading">Overlay in the browser</h2>
+          <span class="muted">in memory only</span>
+        </div>
+        <p class="muted">
+          The same Rust protocol the desktop app uses, compiled to WebAssembly: key
+          generation, a 60-digit safety number and a pairwise round trip. Nothing is
+          saved, and no chat is touched.
+        </p>
+        <button class="action" id="overlay-run" type="button">Run the protocol</button>
+        <dl class="result" id="overlay-out" hidden>
+          <div><dt>Safety number</dt><dd id="overlay-safety"></dd></div>
+          <div><dt>Ciphertext</dt><dd id="overlay-cipher"></dd></div>
+          <div><dt>Round trip</dt><dd id="overlay-roundtrip"></dd></div>
+        </dl>
+        <p class="muted" id="overlay-note" role="status"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="next-heading">
+        <h2 id="next-heading">What comes next</h2>
+        <ol class="roadmap">
+          <li>Sign-in: a QR-code login handshake, so no password or code ever reaches this server.</li>
+          <li>Chats and messages, read straight from Telegram with the session this browser holds.</li>
+          <li>The overlay: the Rust protocol compiled to WebAssembly, sharing one identity with the desktop app.</li>
+        </ol>
+        <p class="muted">
+          Until then, <strong>MelloGram desktop</strong> is the full client, including the
+          encryption overlay.
+        </p>
+      </section>
+
+      <footer class="foot">
+        <span>MelloGram</span>
+        <a href="https://mellogram.foulfoxhacks.dev">mellogram.foulfoxhacks.dev</a>
+      </footer>
+    </main>
+  </body>
+</html>

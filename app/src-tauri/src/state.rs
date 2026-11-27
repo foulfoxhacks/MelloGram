@@ -14,8 +14,14 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{mpsc, Mutex as AsyncMutex};
 
+use mellogram_e2e::{E2eState, GroupDistribution};
+
 /// Recent messages, so edits can be compared with what was on screen.
 const MESSAGE_CACHE: usize = 20_000;
+/// How many members one sweep reads. Hitting this means the list is partial.
+/// Hard cap on a roster read. Large groups are followed to this many members;
+/// above it the read is reported as incomplete, never as a full roster.
+const SWEEP_MEMBER_CAP: usize = 5_000;
 
 #[derive(Default)]
 pub struct MessageCache {
@@ -98,6 +104,8 @@ pub struct AppState {
     pub background: crate::background::BackgroundState,
     pub media: crate::media::MediaState,
     pub tg: AsyncMutex<Option<Arc<Telegram>>>,
+    /// End-to-end privacy overlay: identity, sessions and per-chat mode.
+    pub e2e: E2eState,
 }
 
 impl AppState {
@@ -105,6 +113,7 @@ impl AppState {
         let store = SettingsStore::open(&dir)?;
         let melloid = MelloIdStore::open(&dir)?;
         let themes = ThemeManager::new(dir.join("themes"))?;
+        let e2e = E2eState::open(&dir);
         // Crash / safe-mode bookkeeping.
         let running = dir.join("running.lock");
         let unclean_shutdown = running.exists();
@@ -145,6 +154,7 @@ impl AppState {
             background: Default::default(),
             media: Default::default(),
             tg: AsyncMutex::new(None),
+            e2e,
         })
     }
 
@@ -199,6 +209,10 @@ impl AppState {
             .map_err(|e| e.to_string())?;
         *self.tg.lock().await = Some(Arc::clone(&tg));
         if tg.client().is_authorized().await.unwrap_or(false) {
+            // The overlay binds messages to our own user id.
+            if let Ok(mellogram_telegram::LoginState::Ready { me }) = tg.login_state().await {
+                self.e2e.set_self_id(me.id);
+            }
             self.start_updates().await?;
         }
         Ok(())
@@ -210,6 +224,79 @@ impl AppState {
             .await
             .clone()
             .ok_or_else(|| "Telegram is not configured yet — add your API ID and hash in Settings → Telegram.".into())
+    }
+
+    /// Sends queued group key replies through their pairwise sessions.
+    pub async fn deliver_group_replies(
+        &self,
+        replies: Vec<GroupDistribution>,
+    ) -> Result<(), String> {
+        let tg = self.telegram().await?;
+        for reply in replies {
+            let armored = match self.e2e.encrypt_for_peer(reply.peer_id, &reply.text) {
+                Ok(armored) => armored,
+                Err(e) => {
+                    tracing::warn!("could not encrypt a group key reply for {}: {e}", reply.peer_id);
+                    continue;
+                }
+            };
+            let message = mellogram_core::OutgoingMessage {
+                chat_id: reply.peer_id,
+                text: armored,
+                link_preview: false,
+                ..Default::default()
+            };
+            if let Err(e) = tg.send(&message).await {
+                tracing::warn!("could not send a group key reply to {}: {e}", reply.peer_id);
+            }
+        }
+        Ok(())
+    }
+
+    /// Re-reads the member list of every encrypted group. A removal that never
+    /// arrived as an event still forces a rotation this way.
+    pub async fn sweep_group_keys(&self) -> Result<usize, String> {
+        let groups = self.e2e.encrypted_groups();
+        if groups.is_empty() {
+            return Ok(0);
+        }
+        let tg = self.telegram().await?;
+        let me = tg.ensure_self_id().await.map_err(|e| e.to_string())?;
+        self.e2e.set_self_id(me);
+        let mut flagged = 0;
+        for chat_id in groups {
+            match tg.chat_members_all(chat_id, SWEEP_MEMBER_CAP).await {
+                Ok((members, complete)) => {
+                    let ids: Vec<i64> = members
+                        .iter()
+                        .map(|m| m.id)
+                        .filter(|id| *id != me)
+                        .collect();
+                    if self.e2e.group_note_members(chat_id, &ids, complete).rotation_needed {
+                        flagged += 1;
+                    }
+                }
+                Err(e) => {
+                    tracing::debug!("group key sweep could not read members of {chat_id}: {e}")
+                }
+            }
+        }
+        Ok(flagged)
+    }
+
+    /// Starts the periodic key sweep. Runs a little after sign-in, then every
+    /// half hour while the app is open.
+    pub fn start_key_sweep(self: &Arc<Self>) {
+        let state = Arc::clone(self);
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(90)).await;
+            loop {
+                if let Err(e) = state.sweep_group_keys().await {
+                    tracing::debug!("group key sweep skipped: {e}");
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(30 * 60)).await;
+            }
+        });
     }
 
     /// Pipes Telegram updates through the plugin hooks to the UI.
@@ -227,6 +314,17 @@ impl AppState {
                 }
                 let changed = matches!(event, TgEvent::ChatChanged { .. });
                 let ui = state.process_event(event);
+                // A decrypted message may have been a group key request; answer
+                // it over the same pairwise session it arrived on.
+                let replies = state.e2e.take_replies();
+                if !replies.is_empty() {
+                    let s = Arc::clone(&state);
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(e) = s.deliver_group_replies(replies).await {
+                            tracing::warn!("group key replies were not delivered: {e}");
+                        }
+                    });
+                }
                 if changed {
                     // A channel changed state: re-read the chat list and look for lost access.
                     let s = Arc::clone(&state);
@@ -238,6 +336,7 @@ impl AppState {
                 let _ = state.app.emit("mg://event", ui);
             }
         });
+        self.start_key_sweep();
         Ok(())
     }
 
@@ -248,6 +347,8 @@ impl AppState {
                 if let (Some(id), Some(name)) = (m.sender_id, m.sender_name.clone()) {
                     self.background.user_names.lock().unwrap().insert(id, name);
                 }
+                // Overlay messages are decrypted before plugins and the UI see them.
+                let _ = self.e2e.apply_incoming(&mut m);
                 plugins.on_message(&mut m);
                 self.cache.lock().unwrap().insert(&m);
                 UiEvent::NewMessage(m)
@@ -255,6 +356,7 @@ impl AppState {
             TgEvent::Edited(mut m) => {
                 let mut cache = self.cache.lock().unwrap();
                 let previous = cache.get(m.chat_id, m.id).cloned();
+                let _ = self.e2e.apply_incoming(&mut m);
                 plugins.on_message(&mut m);
                 plugins.on_edit(previous.as_ref(), &mut m);
                 cache.map.insert((m.chat_id, m.id), m.clone());
@@ -276,6 +378,18 @@ impl AppState {
 
     /// Enriches, de-duplicates, logs and alerts a membership event.
     pub fn membership(&self, mut event: mellogram_core::relationships::MembershipEvent) -> UiEvent {
+        // A group that loses a member must rotate its sender keys, or the
+        // person who left could still read what is sent afterwards.
+        if event.chat_id < 0
+            && matches!(
+                event.kind,
+                mellogram_core::relationships::MembershipKind::Banned
+                    | mellogram_core::relationships::MembershipKind::Removed
+                    | mellogram_core::relationships::MembershipKind::Left
+            )
+        {
+            self.e2e.group_mark_rotation(event.chat_id);
+        }
         let bg = &self.background;
         if event.chat_title.is_none() {
             event.chat_title = bg.chat_titles.lock().unwrap().get(&event.chat_id).cloned();
@@ -338,6 +452,7 @@ impl AppState {
                 m.edit_history = cached.edit_history.clone();
                 m.badges = cached.badges.clone();
             }
+            let _ = self.e2e.apply_incoming(m);
             plugins.on_message(m);
             cache.insert(m);
         }
@@ -388,6 +503,7 @@ impl AppState {
         self.plugins.lock().unwrap().shutdown();
         self.store.lock().unwrap().settings.save_active_workspace();
         let _ = self.save();
+        self.e2e.flush();
         let _ = std::fs::remove_file(self.dir.join("running.lock"));
     }
 }

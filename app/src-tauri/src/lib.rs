@@ -3,6 +3,7 @@
 
 mod background;
 mod commands;
+mod e2e;
 mod media;
 mod extras;
 mod mellorpc;
@@ -56,6 +57,22 @@ pub fn run() {
             wallpapers::import_wallpaper_image,
             wallpapers::delete_wallpaper_image,
             commands::app_info,
+            e2e::e2e_status,
+            e2e::e2e_identity,
+            e2e::e2e_reset_identity,
+            e2e::e2e_import_peer,
+            e2e::e2e_forget_peer,
+            e2e::e2e_chat_state,
+            e2e::e2e_set_chat,
+            e2e::e2e_verify_peer,
+            e2e::e2e_clear_history,
+            e2e::e2e_group_state,
+            e2e::e2e_group_enable,
+            e2e::e2e_group_disable,
+            e2e::e2e_group_rotate,
+            e2e::e2e_group_share,
+            e2e::e2e_group_request_keys,
+            e2e::e2e_group_sweep,
             commands::membership_log,
             commands::chat_info,
             commands::chat_members,

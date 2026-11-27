@@ -583,3 +583,11 @@ body.mg-wallpaper-target-window { background: var(--mg-bg); }
 .mg-viewer img, .mg-viewer video { max-width: 94vw; max-height: 90vh; transition: transform .1s; }
 .mg-viewer-close { position: fixed; top: 14px; right: 18px; color: #fff; font-size: 22px; }
 .mg-location-preview { min-height: 60px; }
+
+/* End-to-end overlay: composer lock button and undecryptable messages. */
+#e2e-toggle[data-state="off"] { color: var(--mg-muted); }
+#e2e-toggle[data-state="waiting"] { color: var(--mg-warning); }
+#e2e-toggle[data-state="on"] { color: var(--mg-success); }
+.mg-message.mg-e2e-locked .mg-text { font-family: var(--mg-mono); font-size: .82em; opacity: .75; word-break: break-all; }
+/* Safety numbers wrap in groups of five instead of scrolling sideways. */
+.mg-e2e-safety { white-space: pre-wrap; overflow-wrap: anywhere; }
