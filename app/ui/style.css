@@ -596,3 +596,4 @@ body.mg-wallpaper-target-window { background: var(--mg-bg); }
 .mg-avatar { overflow: visible; }
 .mg-avatar-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .mg-avatar.mg-has-photo { color: transparent; }
+.mg-tag-premium { color: var(--mg-warning); }

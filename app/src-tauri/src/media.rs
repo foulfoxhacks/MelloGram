@@ -117,13 +117,14 @@ pub async fn media_file(state: S<'_>, chat_id: i64, message_id: i32, variant: St
 /// A chat's small profile photo, cached by photo id (a new photo gets a new
 /// file). Only digits are accepted for the id, so it can never form a path.
 #[tauri::command]
-pub async fn chat_photo(state: S<'_>, chat_id: i64, photo_id: String) -> R<Option<String>> {
+pub async fn chat_photo(state: S<'_>, chat_id: i64, photo_id: String, big: Option<bool>) -> R<Option<String>> {
+    let big = big.unwrap_or(false);
     if photo_id.is_empty() || photo_id.len() > 20 || !photo_id.bytes().all(|b| b.is_ascii_digit() || b == b'-') {
         return Err("invalid photo id".into());
     }
     let id: i64 = photo_id.parse().map_err(|_| "invalid photo id".to_string())?;
     let dir = cache_dir(&state)?;
-    let stem = format!("avatar_{chat_id}_{id}");
+    let stem = format!("avatar_{chat_id}_{id}{}", if big { "_big" } else { "" });
     let path = dir.join(format!("{stem}.jpg"));
     let lock = {
         let mut map = state.media.inflight.lock().unwrap();
@@ -134,7 +135,7 @@ pub async fn chat_photo(state: S<'_>, chat_id: i64, photo_id: String) -> R<Optio
         Ok(true)
     } else {
         match state.telegram().await {
-            Ok(tg) => tg.download_profile_photo(chat_id, id, &path).await.map_err(|e| e.to_string()),
+            Ok(tg) => tg.download_profile_photo(chat_id, id, big, &path).await.map_err(|e| e.to_string()),
             Err(e) => Err(e),
         }
     };

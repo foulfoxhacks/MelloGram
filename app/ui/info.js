@@ -123,6 +123,18 @@
     const avatar = src ? src.cloneNode(true) : h("div", { class: "mg-avatar", text: (info.title || chat.title || "?").split(/\s+/).map((w) => [...w][0] || "").join("").slice(0, 2).toUpperCase() });
     avatar.classList.add("mg-info-avatar");
     avatar.classList.remove("mg-avatar-online");
+    // Full-size (640px) photo for the panel; the list keeps the small one.
+    if (info.photo) {
+      Bridge.invoke("chat_photo", { chatId: chat.id, photoId: info.photo, big: true }).then((url) => {
+        if (!url || !avatar.isConnected) return;
+        const img = h("img", { class: "mg-avatar-img", alt: "", src: url, draggable: false });
+        img.addEventListener("load", () => { avatar.querySelector(".mg-avatar-img:not(:last-child)")?.remove(); avatar.classList.add("mg-has-photo"); });
+        avatar.append(img);
+        avatar.classList.add("mg-clickable");
+        avatar.title = "Open photo";
+        avatar.onclick = () => window.MelloGram.Media?.viewer(url, "img");
+      }).catch(() => {});
+    }
     const link = info.username ? `https://t.me/${info.username}` : info.invite_link;
 
     const members = h("div", { class: "mg-info-members" });
@@ -133,14 +145,27 @@
         h("div", { class: "mg-info-badges" },
           h("span", { class: "mg-tag", text: kindLabel }),
           info.verified ? h("span", { class: "mg-tag mg-tag-good", text: "Verified" }) : null,
+          info.premium ? h("span", { class: "mg-tag mg-tag-premium", text: "★ Premium" }) : null,
+          info.mutual_contact ? h("span", { class: "mg-tag", text: "Mutual contact" }) : info.contact ? h("span", { class: "mg-tag", text: "Contact" }) : null,
+          info.business_open_now === true ? h("span", { class: "mg-tag mg-tag-good", text: "Open now" }) : info.business_open_now === false ? h("span", { class: "mg-tag", text: "Closed now" }) : null,
           info.scam ? h("span", { class: "mg-tag mg-tag-bad", text: "Flagged as scam/fake" }) : null,
           info.blocked ? h("span", { class: "mg-tag mg-tag-bad", text: "Blocked" }) : null),
         panelPresence),
       info.about ? h("p", { class: "mg-info-about", text: info.about }) : null,
+      info.bot_description ? h("p", { class: "mg-info-about", text: info.bot_description }) : null,
+      info.business_intro ? h("p", { class: "mg-info-about", text: info.business_intro }) : null,
       h("div", { class: "mg-info-rows" },
         row("Username", info.username ? `@${info.username}` : null),
         row("Phone", info.phone ? `+${info.phone}` : null),
+        row("Also known as", info.extra_usernames?.length ? info.extra_usernames.map((u) => `@${u}`).join(", ") : null),
         row("Birthday", info.birthday),
+        row("Business address", info.business_location),
+        row("Business hours", info.business_timezone ? `Time zone ${info.business_timezone}` : null),
+        row("Location", info.location),
+        row("Language", info.language),
+        row("Gifts", info.gifts?.toLocaleString()),
+        row("Boosts", info.boosts?.toLocaleString()),
+        row("Join requests", info.join_requests?.toLocaleString()),
         row(info.kind === "channel" ? "Subscribers" : "Members", info.members?.toLocaleString()),
         row("Online now", info.online?.toLocaleString()),
         row("Admins", info.admins),
@@ -153,6 +178,7 @@
       h("div", { class: "mg-toolbar" },
         link ? h("button", { class: "mg-btn", text: "Copy link", onclick: () => navigator.clipboard.writeText(link).then(() => UI.toast("Link copied", "success")) }) : null,
         h("button", { class: "mg-btn", text: "Copy ID", onclick: () => navigator.clipboard.writeText(String(chat.id)).then(() => UI.toast("ID copied", "success")) }),
+        info.personal_channel_id ? h("button", { class: "mg-btn", text: "Personal channel", onclick: () => App().openChatById(info.personal_channel_id).catch((e) => UI.toast(String(e), "info")) }) : null,
         info.pinned_message_id ? h("button", { class: "mg-btn", text: "Pinned message", onclick: () => App().jumpTo(info.pinned_message_id) }) : null,
         info.linked_chat_id ? h("button", { class: "mg-btn", text: info.kind === "channel" ? "Discussion group" : "Linked channel", onclick: () => App().openChatById(info.linked_chat_id).catch((e) => UI.toast(String(e), "info")) }) : null),
       members);
