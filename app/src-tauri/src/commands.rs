@@ -7,7 +7,7 @@ use std::sync::Arc;
 use mellogram_core::{CommandDef, OutgoingFile, OutgoingMessage, PluginInfo, Theme};
 use mellogram_core::settings::{GeneralSettings, NotificationSettings, RpcSettings};
 use mellogram_telegram::{ChatSummary, LoginState, SendResult};
-use melloid_core::MelloProfile;
+use melloid_core::{BadgeCategory, MelloProfile};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tauri::{Emitter, State};
@@ -94,15 +94,43 @@ pub fn get_melloid_profile(state: S<'_>) -> MelloProfile {
 
 /// Validates and atomically persists the editable MelloID profile.
 #[tauri::command]
-pub fn save_melloid_profile(state: S<'_>, mut profile: MelloProfile) -> R<()> {
-    // Verification and awarded badges are reserved for a trusted issuer.
-    // The local editor cannot manufacture trust claims or achievement grants.
+pub fn save_melloid_profile(state: S<'_>, mut profile: MelloProfile) -> R<MelloProfile> {
+    let mut store = state.melloid.lock().unwrap();
+    let previous = store.profile();
+
+    // Preserve verifier claims only when the underlying account identity has
+    // not changed. Changing provider/account/link invalidates the old claim.
     for connection in &mut profile.connections {
-        connection.verification_issuer = None;
-        connection.verified_at = None;
+        if let Some(trusted) = previous.connections.iter().find(|record| {
+            record.id == connection.id
+                && record.provider == connection.provider
+                && record.display_name == connection.display_name
+                && record.profile_url == connection.profile_url
+        }) {
+            connection.verification_issuer = trusted.verification_issuer.clone();
+            connection.verified_at = trusted.verified_at.clone();
+        } else {
+            connection.verification_issuer = None;
+            connection.verified_at = None;
+        }
     }
-    profile.badges.clear();
-    state.melloid.lock().unwrap().save(profile).map_err(err)
+
+    // Only self-curated cosmetic collectibles may be authored by the client.
+    // Keep server-issued and trusted badge categories from the prior store.
+    let trusted_badges = previous.badges.iter()
+        .filter(|badge| badge.server_issued || badge.category != BadgeCategory::Collectible)
+        .cloned()
+        .collect::<Vec<_>>();
+    profile.badges.retain(|badge| badge.category == BadgeCategory::Collectible && !badge.server_issued);
+    for badge in &mut profile.badges {
+        badge.issuer = "self".into();
+        badge.awarded_at = None;
+        badge.server_issued = false;
+    }
+    profile.badges.extend(trusted_badges);
+
+    store.save(profile).map_err(err)?;
+    Ok(store.profile().clone())
 }
 
 // ---- login -----------------------------------------------------------------------

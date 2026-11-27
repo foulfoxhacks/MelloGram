@@ -434,3 +434,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--mg-accent); }
   .melloid-editor-header .mg-toolbar .mg-btn { padding: 5px 8px; font-size: .85rem; }
   .melloid-preview { padding: 10px; }
 }
+
+
+/* MelloID trust and collectible badge details */
+.melloid-verified-label { color: var(--melloid-accent); font-size: .76rem; font-weight: 650; }
+.melloid-trusted-badges { background: color-mix(in srgb, var(--mg-surface) 86%, var(--mg-accent) 8%); }
+.melloid-trusted-badge { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 0; border-top: 1px solid var(--mg-border); }
+.melloid-trusted-badge small { color: var(--mg-muted); font-size: .75rem; }

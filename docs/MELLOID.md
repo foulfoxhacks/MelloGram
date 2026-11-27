@@ -51,7 +51,7 @@ Native MelloRPC should have a documented local SDK/protocol, application registr
 
 ## Profile Studio implementation
 
-The desktop client now includes MelloID Studio: structured Bio Studio sections, display-name and slug editing, public/unlisted/private visibility intent, avatar/banner/accent customization, connection cards, per-item visibility, and a live preview. Users can export their local profile as JSON or download a static public HTML page. The HTML export requires Public visibility, includes only visible bio sections/connections/badges, escapes user text, and is a portable file rather than a hosted or synchronized profile URL.
+The desktop client now includes MelloID Studio: structured Bio Studio sections, display-name and slug editing, public/unlisted/private visibility intent, avatar/banner/accent customization, connection cards, per-item visibility, and a live preview. Users can export their local profile as JSON or download a static public HTML page. The HTML export requires Public visibility, includes only visible bio sections/connections/badges, escapes user text, and is a portable file rather than a hosted or synchronized profile URL. Users can also create up to 24 self-curated collectible badges. The client cannot mint verified, achievement, community, or official awards. Existing trusted badge records are preserved during local edits. Connection verification metadata is retained only while the provider, account display name, and profile URL remain unchanged; changing those identity fields invalidates the claim.
 
 ## Planned delivery stages
 

@@ -1,3 +1,10 @@
+## MelloID collectible badges and native RPC example — 2026-11-27
+
+- Added up to 24 self-curated collectible badges with bounded titles/descriptions and per-badge visibility.
+- Preserved issuer-awarded badges and verified connections during ordinary profile edits.
+- Added a dependency-free Node.js MelloRPC client example with automatic lease refresh.
+- Extended CI JavaScript syntax checks to the profile editor and RPC sample client.
+
 ## MelloRPC local IPC service — 2026-11-27
 
 - Added opt-in native MelloRPC and Discord Rich Presence IPC listeners.

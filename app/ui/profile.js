@@ -69,6 +69,16 @@
       verified_at: null,
       visible: row.querySelector("[data-connection-visible]").checked,
     }));
+    next.badges = [...document.querySelectorAll(".melloid-badge-row")].map((row, index) => ({
+      id: row.dataset.id || `collectible-${index + 1}`,
+      issuer: "self",
+      title: row.querySelector("[data-badge-title]").value.trim(),
+      description: row.querySelector("[data-badge-description]").value.trim(),
+      category: "collectible",
+      awarded_at: null,
+      visible: row.querySelector("[data-badge-visible]").checked,
+      server_issued: false,
+    }));
     return next;
   }
 
@@ -110,6 +120,7 @@
             ...connections.map((connection) => h("div", { class: "melloid-preview-connection" },
               h("b", { text: connection.provider || "Service" }),
               h("span", { text: connection.display_name || "Connected account" }),
+              connection.verification_issuer ? h("small", { class: "melloid-verified-label", text: "✓ Verified" }) : null,
               connection.profile_url && safeUrl(connection.profile_url)
                 ? h("a", { href: safeUrl(connection.profile_url), target: "_blank", rel: "noopener noreferrer", text: "Open ↗" }) : null)))
             : h("p", { class: "mg-muted", text: "No public connections added yet." })),
@@ -153,6 +164,18 @@
         profile.connections.push({ id: `connection-${Date.now()}`, provider: "", kind: "social", display_name: "", profile_url: null, verification_issuer: null, verified_at: null, visible: true });
         renderEditor();
       }}),
+      h("div", { class: "melloid-section-title" }, h("h2", { text: "Badge showcase" }), h("p", { class: "mg-muted", text: "Create personal collectible labels. Verified, official, achievement, and community badges are granted by trusted issuers only." })),
+      h("div", { id: "melloid-badge-list", class: "melloid-editor-list" }),
+      h("button", { class: "mg-btn", type: "button", text: "+ Add collectible badge", onclick: () => {
+        profile = currentDraft();
+        const collectibleCount = profile.badges.filter((badge) => badge.category === "collectible" && !badge.server_issued).length;
+        if (collectibleCount >= 24) {
+          UI.toast("You can showcase up to 24 personal collectibles.", "warning");
+          return;
+        }
+        profile.badges.push({ id: `collectible-${Date.now()}`, issuer: "self", title: "New collectible", description: "", category: "collectible", awarded_at: null, visible: true, server_issued: false });
+        renderEditor();
+      }}),
     );
 
     const bioList = $("melloid-bio-list");
@@ -174,6 +197,7 @@
       connectionList.append(h("div", { class: "melloid-list-card melloid-connection-row", "data-id": connection.id },
         h("div", { class: "melloid-row-head" }, h("b", { text: `Connection ${index + 1}` }),
           h("button", { class: "mg-icon-btn mg-danger", type: "button", text: "Remove", onclick: () => { profile = currentDraft(); profile.connections.splice(index, 1); renderEditor(); } })),
+        connection.verification_issuer ? h("small", { class: "melloid-verified-label", text: "✓ Verified by a trusted MelloID issuer. Editing account identity details removes this claim." }) : null,
         h("input", { "data-connection-provider": "", value: connection.provider, maxlength: 40, placeholder: "Service (e.g. GitHub)" }),
         kind,
         h("input", { "data-connection-name": "", value: connection.display_name, maxlength: 80, placeholder: "Account display name" }),
@@ -181,6 +205,28 @@
         h("label", { class: "melloid-inline-check" }, h("input", { "data-connection-visible": "", type: "checkbox", checked: connection.visible }), " Show publicly")));
     }
     if (!profile.connections.length) connectionList.append(h("p", { class: "mg-muted", text: "No connections added yet." }));
+
+    const badgeList = $("melloid-badge-list");
+    const collectibleBadges = profile.badges.filter((badge) => badge.category === "collectible" && !badge.server_issued);
+    const trustedBadges = profile.badges.filter((badge) => badge.server_issued || badge.category !== "collectible");
+    if (trustedBadges.length) {
+      badgeList.append(h("div", { class: "melloid-list-card melloid-trusted-badges" },
+        h("b", { text: "Issuer-awarded badges (read-only)" }),
+        ...trustedBadges.map((badge) => h("div", { class: "melloid-trusted-badge" },
+          h("span", { text: badge.title }),
+          h("small", { text: `${badge.category} · ${badge.issuer || "Trusted issuer"}` })))));
+    }
+    for (const [index, badge] of collectibleBadges.entries()) {
+      badgeList.append(h("div", { class: "melloid-list-card melloid-badge-row", "data-id": badge.id },
+        h("div", { class: "melloid-row-head" },
+          h("b", { text: `Custom collectible ${index + 1}` }),
+          h("button", { class: "mg-icon-btn mg-danger", type: "button", text: "Remove", onclick: () => { profile = currentDraft(); profile.badges.splice(index, 1); renderEditor(); } })),
+        h("input", { "data-badge-title": "", value: badge.title || "", maxlength: 48, placeholder: "Badge title" }),
+        h("input", { "data-badge-description": "", value: badge.description || "", maxlength: 160, placeholder: "Description (optional)" }),
+        h("label", { class: "melloid-inline-check" },
+          h("input", { "data-badge-visible": "", type: "checkbox", checked: badge.visible }), " Show on profile")));
+    }
+    if (!collectibleBadges.length) badgeList.append(h("p", { class: "mg-muted", text: "No personal collectibles yet." }));
 
     body.oninput = previewUpdate;
     body.onchange = previewUpdate;

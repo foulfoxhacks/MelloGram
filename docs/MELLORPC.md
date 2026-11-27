@@ -19,6 +19,30 @@ separate from Telegram MTProto and from the profile editor.
   sizes.
 - Tests for framing, translation, secret non-disclosure, validation and expiry.
 
+## Native client example
+
+A minimal Node.js example is available at
+`docs/examples/mellorpc-node-example.js`. It connects to the local endpoint,
+sends the v1 Hello frame, sets an activity with a 120-second lease, refreshes
+that lease every 45 seconds, and clears the activity on shutdown.
+
+Native clients send a four-byte little-endian payload length followed by UTF-8
+JSON. Example handshake:
+
+```json
+{"type":"hello","protocol_version":1,"client_id":"com.example.game","client_name":"Example game"}
+```
+
+Example activity:
+
+```json
+{"type":"set_activity","client_id":"com.example.game","lease_seconds":120,"activity":{"application":"Example Game","activity":"Playing","kind":"playing"}}
+```
+
+Optional `PresenceActivity` fields include details, state, start/end timestamps,
+party size, join URL, and image identifiers. The server validates required
+fields and applies a bounded lease. Clients should refresh well before expiry.
+
 ## Compatibility boundary
 
 The compatibility layer currently parses protocol frames and translates the

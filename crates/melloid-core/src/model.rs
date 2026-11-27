@@ -237,6 +237,12 @@ impl MelloProfile {
                 return Err("bio headings are limited to 48 characters and section text to 2000".into());
             }
         }
+        for badge in &self.badges {
+            if badge.title.trim().is_empty() || badge.title.chars().count() > 48
+                || badge.description.chars().count() > 160 {
+                return Err("badge titles must be 1-48 characters and descriptions 160 characters or fewer".into());
+            }
+        }
         for connection in &self.connections {
             if connection.provider.trim().is_empty() || connection.display_name.chars().count() > 80 {
                 return Err("connections require a provider and an 80-character display name or less".into());
@@ -269,6 +275,20 @@ mod tests {
         p.bio_sections[0].body = "x".repeat(2001);
         assert!(p.validate().is_err());
     }
+    #[test]
+    fn rejects_empty_or_oversized_badge_labels() {
+        let mut p = MelloProfile::default();
+        p.badges.push(BadgeRecord {
+            category: BadgeCategory::Collectible,
+            title: String::new(),
+            ..Default::default()
+        });
+        assert!(p.validate().is_err());
+        p.badges[0].title = "Personal collectible".into();
+        p.badges[0].description = "x".repeat(161);
+        assert!(p.validate().is_err());
+    }
+
     #[test]
     fn connection_urls_must_be_http() {
         let mut p = MelloProfile::default();
