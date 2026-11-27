@@ -1,66 +1,94 @@
-# MelloID — identity foundation
+# MelloID — identity and profile system
 
-MelloID is MelloGram's identity and profile layer. It is intentionally a separate Rust subsystem from Telegram messaging so profile features can evolve without changing the MTProto session or chat pipeline.
+MelloID is MelloGram's identity layer, deliberately separated from the Telegram
+MTProto session and chat pipeline. It provides a customizable local profile,
+a portable public HTML export, and the data contracts needed for a hosted
+profile service later.
 
-## Implemented in the foundation
+## Available in the client
 
-- Versioned MelloProfile schema (schema_version = 1).
-- Public, unlisted, and private profile visibility.
-- Structured bio sections with bounded lengths.
-- External connection records with provider/category, display name, optional HTTP(S) profile URL, visibility, and verifier metadata.
-- Badge records with distinct verified, achievement, community, official, and collectible categories.
-- Ordered profile widgets with JSON configuration.
-- A normalized activity model for playing, listening, watching, streaming, creating, working, and custom activities.
-- Atomic local profile persistence in melloid-profile.json.
-- Tauri commands get_melloid_profile and save_melloid_profile.
-- Validation for slugs, display names, bio sizes, connection counts, URL schemes, and accent colors.
+- Versioned MelloProfile schema (schema_version = 1) with local atomic
+  persistence in melloid-profile.json.
+- Profile handle, display name, headline, avatar and banner URLs, accent color.
+- Six built-in profile themes, five avatar frames, and five decorative effects.
+  These are allowlisted preset tokens, not arbitrary CSS.
+- Public, unlisted, and private visibility intent.
+- Up to 12 structured Bio Studio sections with per-section visibility.
+- Up to 40 external connection cards with service/category, display name,
+  optional HTTP(S) URL, and per-connection visibility.
+- Verifier metadata for trusted account links. A local edit preserves a
+  verification claim only when the existing connection ID, provider, display
+  name, and profile URL remain unchanged. Changing those values invalidates
+  the claim.
+- Up to 100 badge records. Users can create up to 24 self-curated collectible
+  badges; the client cannot mint verified, achievement, community, or official
+  awards. Existing trusted/server-issued badge records are preserved by local
+  edits.
+- Up to 24 reorderable widgets: Games, Music, Projects, Communities, Activity,
+  About, and Custom Link. Each widget can be enabled/disabled and has bounded
+  text items and an optional HTTP(S) link.
+- Live profile preview, JSON export/import, and static public HTML export.
 
-## Current boundaries
+## Export and import behavior
 
-The local profile is a client-side draft/cache. Setting visibility to public does not publish it to the internet. A public profile requires an authenticated MelloID service, ownership verification, a public read API, abuse controls, and a hosted profile renderer. Those services are not present in this repository yet.
+**JSON export** is a full local backup. It can contain hidden biography sections,
+private connection cards, verifier metadata, badge records, and profile
+preferences. Treat the file as private and store it accordingly.
 
-Likewise, connection records are not proof of ownership. The profile editor must not be allowed to set trusted verification metadata. A future verifier must issue and sign verification claims after OAuth or another provider-owned challenge. Imported profile data must be treated as untrusted.
+**JSON import** accepts files up to 1 MiB and requires the supported schema
+version. The application validates the imported object through the native Rust
+model before saving it. Trust is not imported blindly:
+- Existing connection verification is preserved only when it still matches
+  the same local connection identity.
+- New or altered connections lose verifier metadata.
+- Imported collectible badges are rewritten as self-issued.
+- Verified, achievement, community, official, and server-issued badges are
+  retained only from the current local profile, not granted by an import.
 
-Badges are data records at this stage. Once synchronized, badge definitions and grants must be server-authoritative; clients may display but must not mint official, verified, or achievement awards.
+**Static public HTML export** requires the profile visibility to be Public.
+It includes visible bio sections, connections, badges, enabled widgets, the
+chosen appearance presets, and activity only when presence display is enabled.
+Text is HTML-escaped and link destinations are restricted to HTTP(S). The
+result is a portable HTML file that the owner can host on their own website.
+It is not a canonical MelloID URL and does not synchronize future edits.
 
-Presence is a normalized data contract only. The current foundation does not publish live activity or run a Discord IPC listener.
+## What Public means today
 
-## Public profile service contract (next stage)
+The visibility field is the intended audience setting used by the editor and
+exporter. It does not upload a profile to a MelloGram-hosted website. No public
+profile API, account directory, slug registry, or remote synchronization
+service is currently deployed.
 
-The client can export a static HTML profile when visibility is set to Public. The export includes only visible bio sections and connections, escapes user-provided text, and can be hosted independently. It does not provide synchronized updates, account ownership verification, or a canonical hosted MelloID URL.\n\nA hosted service should provide:
+A hosted public profile service remains a separate stage. It should provide:
 
-- Immutable account/profile ID independent of the editable slug.
-- Authenticated profile writes and public read-only profile endpoints.
-- Slug uniqueness and rename cooldowns.
-- Per-section visibility filtering on the server, not just in the UI.
-- Revocable OAuth connections and encrypted token storage.
-- Signed verification claims and issuer provenance.
-- Badge catalog, award history, and anti-forgery validation.
-- Presence leases with expiry, source attribution, rate limits, and opt-out.
-- Data export and account/profile deletion.
+- Immutable server-side profile IDs independent of editable slugs.
+- Authenticated profile writes and anonymous, read-only public views.
+- Server-side visibility filtering and slug uniqueness/cooldowns.
+- Revocable OAuth/account-link flows and encrypted provider tokens.
+- Signed verification claims with issuer provenance.
+- Server-authoritative badge catalog and award history.
+- Presence leases with expiry, source attribution, privacy controls, and rate
+  limits.
+- Data export, profile deletion, abuse reporting, and account recovery.
 
-Telegram identity should be linked through a user-consented authorization flow. Do not expose Telegram phone numbers, access hashes, session files, or private profile fields through public MelloID endpoints.
+Telegram phone numbers, access hashes, MTProto session files, and other
+private Telegram credentials must never be exposed in public profile APIs.
 
-## MelloRPC compatibility plan
+## Data and API boundaries
 
-The shared PresenceActivity model is transport-neutral. Native MelloRPC and the Discord compatibility adapter should both normalize into this model.
+The Rust crate melloid-core owns the profile model, validation, and local store.
+Tauri commands get_melloid_profile and save_melloid_profile are the UI boundary.
+Telegram connection state is not used as profile identity.
 
-The Discord adapter should begin with the local desktop IPC transport and supported Rich Presence activity update/clear operations. It must be opt-in, bound to the local machine, and never expose a remote unauthenticated listener. Compatibility is incremental: document supported fields and gracefully ignore unsupported Discord fields rather than claiming complete SDK parity.
+The shared PresenceActivity model is transport-neutral. The local MelloRPC
+service can project an unexpired local activity lease into the local profile
+when show_presence is enabled. This local projection is not remote publication
+or public presence synchronization.
 
-Native MelloRPC should have a documented local SDK/protocol, application registration, activity expiry, process ownership, and explicit user privacy controls. The public presence service should accept short-lived signed leases, not trust arbitrary client timestamps indefinitely.
+## Next MelloID work
 
-## Profile Studio implementation
-
-The desktop client now includes MelloID Studio: structured Bio Studio sections, display-name and slug editing, public/unlisted/private visibility intent, avatar/banner/accent customization, connection cards, per-item visibility, and a live preview. Users can export their local profile as JSON or download a static public HTML page. The HTML export requires Public visibility, includes only visible bio sections/connections/badges, escapes user text, and is a portable file rather than a hosted or synchronized profile URL. Users can also create up to 24 self-curated collectible badges. Profile appearance includes six built-in themes, five avatar frames, and five decorative effects. These are validated preset tokens rather than arbitrary CSS. The widget editor supports Games, Music, Projects, Communities, Activity, About, and Custom Link blocks. Users can add up to 24 widgets, reorder them, enable/disable each, add up to 20 bounded text items, and supply an optional HTTP(S) link. The public HTML export includes enabled widgets in their saved order. The client cannot mint verified, achievement, community, or official awards. Existing trusted badge records are preserved during local edits. Connection verification metadata is retained only while the provider, account display name, and profile URL remain unchanged; changing those identity fields invalidates the claim.
-
-## Planned delivery stages
-
-1. Foundation: schema, validation, local persistence, Tauri read/write commands, and architecture boundaries.
-2. Profile experience: editor, preview, public profile renderer, section privacy, and safe media handling.
-3. Connections and badges: OAuth verifier service, public connection cards, badge catalog, award issuance, and achievement progress.
-4. MelloRPC: native local protocol, Discord IPC compatibility bridge, activity cards, expiration, and presence privacy.
-5. Widgets and social features: widget SDK/sandbox, timeline, squads, spaces, and community recognition.
-
-## Local data
-
-The profile is stored beside MelloGram settings in the application's config directory as melloid-profile.json. It is not included in portable settings backups yet. This avoids accidentally exporting personal profile or linked account metadata before the user-facing export/privacy controls exist.
+1. Hosted public profile service and profile pages.
+2. OAuth/ownership verification for supported connection providers.
+3. Server-issued badge catalog, award rules, and achievement progress.
+4. Per-provider connection management, token revocation, and sync controls.
+5. Public profile discovery, share links, and abuse/privacy controls.

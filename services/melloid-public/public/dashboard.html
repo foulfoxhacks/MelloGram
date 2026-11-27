@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MelloID Dashboard</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/dashboard.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="brand"><div class="mark">M</div><div><strong>MelloID Dashboard</strong><span>Manage your hosted profile</span></div><button id="logout" class="button ghost">Sign out</button></header>
+    <section class="panel">
+      <h1>Publish from MelloGram</h1>
+      <p class="lead">Export your profile as JSON from MelloGram → MelloID Studio, then import that file here. The service validates the file and removes untrusted verification claims before publishing.</p>
+      <label class="file-picker">Choose MelloGram profile JSON<input id="profile-file" type="file" accept="application/json,.json"></label>
+      <p id="file-status" class="muted" role="status">No profile file selected.</p>
+      <div id="profile-summary" class="summary" hidden></div>
+      <div class="actions">
+        <button id="publish" class="button primary" disabled>Publish profile</button>
+        <button id="delete" class="button danger" disabled>Delete hosted profile</button>
+      </div>
+      <div id="result" class="result" role="status"></div>
+    </section>
+    <footer><a href="/">MelloID home</a> · <a href="https://github.com/foulfoxhacks/MelloGram">MelloGram source</a></footer>
+  </main>
+</body>
+</html>
