@@ -448,6 +448,35 @@ footer{padding:16px 28px;border-top:1px solid #303449;color:#858da6;font-size:12
     UI.toast("Public profile HTML exported. Review it before uploading or sharing.", "success");
   }
 
+  async function importProfileJson() {
+    const picker = h("input", { type: "file", accept: "application/json,.json" });
+    const file = await new Promise((resolve) => {
+      picker.onchange = () => resolve(picker.files?.[0] || null);
+      picker.click();
+    });
+    if (!file) return;
+    if (file.size > 1024 * 1024) {
+      UI.toast("Profile JSON must be 1 MiB or smaller.", "error");
+      return;
+    }
+    try {
+      const candidate = JSON.parse(await file.text());
+      if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)
+          || candidate.schema_version !== 1) {
+        throw new Error("This file is not a supported MelloID profile export.");
+      }
+      // The native save command validates every field, strips forged trust
+      // claims, and preserves existing verifier-issued records when unchanged.
+      const saved = await Bridge.invoke("save_melloid_profile", { profile: candidate });
+      profile = saved || candidate;
+      activePresence = profile.presence || null;
+      renderEditor();
+      UI.toast("MelloID profile imported and validated on this device.", "success");
+    } catch (error) {
+      UI.toast(`Profile import failed: ${error}`, "error");
+    }
+  }
+
   async function open() {
     try {
       profile = await Bridge.invoke("get_melloid_profile");
@@ -475,7 +504,8 @@ footer{padding:16px 28px;border-top:1px solid #303449;color:#858da6;font-size:12
           h("div", {}, h("strong", { text: "MelloID Studio" }), h("small", { text: "Your identity, your layout, your audience." })),
           h("div", { class: "mg-toolbar" },
             h("button", { class: "mg-btn", text: "Export Public HTML", onclick: exportPublicHtml }),
-            h("button", { class: "mg-btn", text: "Export JSON", onclick: () => {
+            h("button", { class: "mg-btn", text: "Import JSON", onclick: importProfileJson, title: "Restore a MelloID JSON export" }),
+            h("button", { class: "mg-btn", text: "Export JSON", title: "Includes hidden sections and connections; keep this file private", onclick: () => {
               const data = JSON.stringify(currentDraft(), null, 2);
               const url = URL.createObjectURL(new Blob([data], { type: "application/json" }));
               const link = h("a", { href: url, download: `melloid-${profile.slug || "profile"}.json` });
