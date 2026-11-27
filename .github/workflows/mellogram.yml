@@ -283,3 +283,21 @@ jobs:
       - name: Test profile validation and public projection
         working-directory: services/melloid-public
         run: node --test test/*.test.js
+
+  web-client-service:
+    name: Web client service tests
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate Worker and shell JavaScript
+        working-directory: services/web-client
+        run: |
+          node --check src/worker.js
+          node --check src/capabilities.js
+          node --check public/app.js
+      - name: Test routing, headers and capability claims
+        working-directory: services/web-client
+        run: node --test test/*.test.js

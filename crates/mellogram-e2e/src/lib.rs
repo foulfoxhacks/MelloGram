@@ -21,9 +21,10 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
 use ametherian_truee2e::{
-    decrypt, encrypt_with, is_armored, is_initial_message, open_at_rest, private_chat_conversation_id,
-    respond, seal_at_rest, DeviceKey, EncryptOptions, Error as OverlayError, IdentityKeyPair,
-    IdentityPublic, PublicBundle, SafetyNumber, Session,
+    decrypt, encrypt_with, is_armored, is_group_message, is_initial_message, open_at_rest,
+    private_chat_conversation_id, respond, seal_at_rest, DeviceKey, EncryptOptions,
+    Error as OverlayError, GroupReceiver, IdentityKeyPair, IdentityPublic, PublicBundle,
+    SafetyNumber, SenderKey, Session,
 };
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
@@ -48,12 +49,32 @@ const PADDED_MAX: usize = 1020;
 /// How many decrypted messages we keep so history renders again after a
 /// restart without touching the ratchet.
 const PLAINTEXT_VAULT_MAX: usize = 5000;
+/// Envelope for a sender key delivered inside a pairwise encrypted message.
+const DISTRIBUTION_PREFIX: &str = "mg-e2e-groupkey:v1:";
 
 #[derive(Clone, Default)]
 struct Peer {
     bundle: Option<PublicBundle>,
     session: Option<Session>,
     verified: bool,
+}
+
+/// One member's sender key for one group.
+#[derive(Clone)]
+struct GroupPeer {
+    /// Who the key belongs to (pinned through their pairwise bundle).
+    identity: IdentityPublic,
+    receiver: GroupReceiver,
+}
+
+/// Sender keys for one group we participate in.
+#[derive(Clone, Default)]
+struct GroupChat {
+    /// Our own sending chain. Rotated on membership changes.
+    own: Option<SenderKey>,
+    /// sender user id -> their chain.
+    senders: BTreeMap<i64, GroupPeer>,
+    rotation_needed: bool,
 }
 
 struct E2eStore {
@@ -65,6 +86,8 @@ struct E2eStore {
     chats: BTreeMap<i64, bool>,
     /// (chat id, message id) -> plaintext
     plaintext: BTreeMap<(i64, i32), String>,
+    /// Group id -> sender keys.
+    groups: BTreeMap<i64, GroupChat>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -79,6 +102,24 @@ struct Persisted {
     /// "chat:message" -> plaintext.
     #[serde(default)]
     plaintext: BTreeMap<String, String>,
+    #[serde(default)]
+    groups: BTreeMap<i64, PersistedGroup>,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+struct PersistedGroup {
+    #[serde(default)]
+    own: Option<String>,
+    #[serde(default)]
+    senders: BTreeMap<i64, PersistedGroupPeer>,
+    #[serde(default)]
+    rotation_needed: bool,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+struct PersistedGroupPeer {
+    #[serde(default)]
+    receiver: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -111,6 +152,41 @@ pub struct PeerView {
     pub has_session: bool,
     pub fingerprint: Option<String>,
     pub safety_number: Option<String>,
+}
+
+/// Group overlay state for the chat that is open.
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct GroupView {
+    pub chat_id: i64,
+    pub enabled: bool,
+    pub has_sender_key: bool,
+    /// A member left or was removed: rotate before sending anything else.
+    pub rotation_needed: bool,
+    /// Members whose sender key this device holds.
+    pub senders: Vec<GroupSenderView>,
+    /// Contacts we can hand keys to (they have a pairwise overlay session).
+    pub pairwise_peers: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct GroupSenderView {
+    pub sender_id: i64,
+    pub key: String,
+    pub verified: bool,
+}
+
+/// A key to deliver to one member, encrypted with that member's pairwise
+/// session by the caller.
+pub struct GroupDistribution {
+    pub peer_id: i64,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct GroupInstall {
+    pub group_id: i64,
+    pub sender_id: i64,
+    pub key: String,
 }
 
 /// Overlay state for the chat that is open.
@@ -169,6 +245,24 @@ fn fingerprint(identity: &IdentityPublic) -> String {
         .join("-")
 }
 
+fn key_fingerprint(id: &[u8; 16]) -> String {
+    id.iter()
+        .take(6)
+        .map(|b| format!("{b:02X}"))
+        .collect::<Vec<_>>()
+        .chunks(2)
+        .map(|c| c.join(""))
+        .collect::<Vec<_>>()
+        .join("-")
+}
+
+fn distribution_text(group_id: i64, key: &SenderKey) -> String {
+    let payload = serde_json::json!({ "group": group_id, "key": key.to_armored() });
+    let mut text = String::from(DISTRIBUTION_PREFIX);
+    text.push_str(&STANDARD.encode(payload.to_string()));
+    text
+}
+
 impl E2eStore {
     fn open(dir: &Path) -> E2eStore {
         let dir = dir.join("e2e");
@@ -179,6 +273,7 @@ impl E2eStore {
             peers: BTreeMap::new(),
             chats: BTreeMap::new(),
             plaintext: BTreeMap::new(),
+            groups: BTreeMap::new(),
         };
         if let Err(e) = store.load() {
             tracing::warn!("encrypted overlay state could not be loaded: {e}");
@@ -246,6 +341,41 @@ impl E2eStore {
             );
         }
         self.chats = persisted.chats;
+        for (chat_id, record) in persisted.groups {
+            let own = record.own.and_then(|text| SenderKey::from_armored(&text).ok());
+            let mut group = GroupChat {
+                own,
+                senders: BTreeMap::new(),
+                rotation_needed: record.rotation_needed,
+            };
+            for (sender_id, peer) in record.senders {
+                let Some(receiver) = peer
+                    .receiver
+                    .and_then(|text| STANDARD.decode(text).ok())
+                    .and_then(|bytes| serde_json::from_slice::<GroupReceiver>(&bytes).ok())
+                else {
+                    continue;
+                };
+                // The sender's identity comes from the pinned pairwise bundle;
+                // a sender we have no bundle for cannot be authenticated.
+                let Some(identity) = self
+                    .peers
+                    .get(&sender_id)
+                    .and_then(|p| p.bundle.as_ref())
+                    .map(|b| b.identity())
+                else {
+                    continue;
+                };
+                group.senders.insert(
+                    sender_id,
+                    GroupPeer {
+                        identity,
+                        receiver,
+                    },
+                );
+            }
+            self.groups.insert(chat_id, group);
+        }
         for (key, text) in persisted.plaintext {
             if let Some((chat, id)) = key.split_once(':') {
                 if let (Ok(chat), Ok(id)) = (chat.parse::<i64>(), id.parse::<i32>()) {
@@ -291,6 +421,24 @@ impl E2eStore {
         for ((chat, id), text) in &self.plaintext {
             plaintext.insert(format!("{chat}:{id}"), text.clone());
         }
+        let mut groups = BTreeMap::new();
+        for (chat_id, group) in &self.groups {
+            let mut senders = BTreeMap::new();
+            for (sender_id, peer) in &group.senders {
+                let receiver = serde_json::to_vec(&peer.receiver)
+                    .ok()
+                    .map(|bytes| STANDARD.encode(bytes));
+                senders.insert(*sender_id, PersistedGroupPeer { receiver });
+            }
+            groups.insert(
+                *chat_id,
+                PersistedGroup {
+                    own: group.own.as_ref().map(SenderKey::to_armored),
+                    senders,
+                    rotation_needed: group.rotation_needed,
+                },
+            );
+        }
         let persisted = Persisted {
             version: STORE_VERSION,
             identity: self
@@ -300,6 +448,7 @@ impl E2eStore {
             peers,
             chats: self.chats.clone(),
             plaintext,
+            groups,
         };
         let json = serde_json::to_vec(&persisted)
             .map_err(|e| format!("could not encode the overlay state: {e}"))?;
@@ -348,6 +497,29 @@ impl E2eStore {
             peer_key_known: peer.is_some_and(|p| p.bundle.is_some()),
             verified: peer.is_some_and(|p| p.verified),
             safety_number: self.safety(chat_id),
+        }
+    }
+
+    fn group_view(&self, chat_id: i64) -> GroupView {
+        let group = self.groups.get(&chat_id);
+        GroupView {
+            chat_id,
+            enabled: self.chats.get(&chat_id).copied().unwrap_or(false),
+            has_sender_key: group.is_some_and(|g| g.own.is_some()),
+            rotation_needed: group.is_some_and(|g| g.rotation_needed),
+            senders: group
+                .map(|g| {
+                    g.senders
+                        .iter()
+                        .map(|(id, peer)| GroupSenderView {
+                            sender_id: *id,
+                            key: key_fingerprint(&peer.receiver.id()),
+                            verified: self.peers.get(id).is_some_and(|p| p.verified),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
+            pairwise_peers: self.peers.values().filter(|p| p.session.is_some()).count(),
         }
     }
 
@@ -702,6 +874,9 @@ impl E2eState {
     /// reason when we could not, for logging; the ciphertext stays visible with
     /// a lock badge either way.
     pub fn apply_incoming(&self, message: &mut IncomingMessage) -> Option<String> {
+        if is_group_message(&message.text) {
+            return self.apply_group_message(message);
+        }
         if !is_armored(&message.text) {
             return None;
         }
@@ -716,13 +891,18 @@ impl E2eState {
             overlay_badge(message, true, true);
             return None;
         }
-        let peer_id = if message.chat_id > 0 {
-            message.chat_id
-        } else {
-            message.sender_id.unwrap_or(0)
-        };
+        if message.chat_id <= 0 {
+            message.add_class("mg-e2e-locked");
+            overlay_badge(message, false, false);
+            return Some("pairwise overlay messages only work in one-to-one chats".into());
+        }
+        let peer_id = message.chat_id;
         match self.decrypt_incoming(message.chat_id, peer_id, message.id, &message.text) {
             Ok((text, verified)) => {
+                if text.trim_start().starts_with(DISTRIBUTION_PREFIX) {
+                    // Key envelopes are rendered as a note, not as text.
+                    return self.handle_distribution(message, peer_id, &text);
+                }
                 message.text = text;
                 overlay_badge(message, verified, false);
                 None
@@ -730,6 +910,71 @@ impl E2eState {
             Err(reason) => {
                 message.add_class("mg-e2e-locked");
                 overlay_badge(message, false, false);
+                Some(reason)
+            }
+        }
+    }
+
+    /// Group messages are sealed with the sender's group chain.
+    fn apply_group_message(&self, message: &mut IncomingMessage) -> Option<String> {
+        message.add_class("mg-e2e");
+        let own = message.outgoing;
+        if let Some(text) = self.cached_plaintext(message.chat_id, message.id) {
+            message.text = text;
+            group_badge(message, true);
+            return None;
+        }
+        if own {
+            group_badge(message, true);
+            return None;
+        }
+        if message.chat_id >= 0 {
+            message.add_class("mg-e2e-locked");
+            group_badge(message, false);
+            return Some("group messages only decrypt inside a group".into());
+        }
+        let sender = message.sender_id.unwrap_or(0);
+        match self.group_decrypt(message.chat_id, sender, &message.text) {
+            Ok((text, verified)) => {
+                message.text = text;
+                group_badge(message, verified);
+                None
+            }
+            Err(reason) => {
+                message.add_class("mg-e2e-locked");
+                group_badge(message, false);
+                Some(reason)
+            }
+        }
+    }
+
+    /// A pairwise message may carry a group sender key; install it and show a
+    /// note instead of the envelope.
+    fn handle_distribution(
+        &self,
+        message: &mut IncomingMessage,
+        peer_id: i64,
+        text: &str,
+    ) -> Option<String> {
+        if !text.trim_start().starts_with(DISTRIBUTION_PREFIX) {
+            return None;
+        }
+        match self.install_group_key(peer_id, text) {
+            Ok(Some(installed)) => {
+                let friendly = "🔑 Shared an encryption key for a group".to_string();
+                self.remember_sent(message.chat_id, message.id, &friendly);
+                message.text = friendly;
+                message.badges.push(MessageBadge {
+                    plugin: "e2e".into(),
+                    label: "🔑".into(),
+                    tooltip: Some(format!("Group sender key {}", installed.key)),
+                });
+                None
+            }
+            Ok(None) => None,
+            Err(reason) => {
+                message.text = "🔑 A group key arrived but could not be installed".into();
+                message.add_class("mg-e2e-locked");
                 Some(reason)
             }
         }
@@ -744,12 +989,332 @@ impl E2eState {
         store.persist()?;
         Ok(dropped)
     }
+
+    // ---- groups (sender keys) ---------------------------------------------
+
+    /// Group overlay state for the UI.
+    pub fn group_state(&self, chat_id: i64) -> GroupView {
+        self.lock().group_view(chat_id)
+    }
+
+    /// Turns the overlay on for a group and creates our sender key.
+    pub fn group_enable(&self, chat_id: i64) -> Result<GroupView, String> {
+        if chat_id >= 0 {
+            return Err("This is a one-to-one chat: use the lock button instead.".into());
+        }
+        let mut store = self.lock();
+        if store.identity.is_none() {
+            return Err("Create your overlay key first (Settings → End-to-End Overlay).".into());
+        }
+        {
+            let group = store.groups.entry(chat_id).or_default();
+            if group.own.is_none() {
+                group.own = Some(
+                    SenderKey::generate()
+                        .map_err(|_| "could not generate a group key".to_string())?,
+                );
+                group.rotation_needed = false;
+            }
+        }
+        store.chats.insert(chat_id, true);
+        store.persist()?;
+        Ok(store.group_view(chat_id))
+    }
+
+    /// Turns group encryption off without throwing the keys away.
+    pub fn group_disable(&self, chat_id: i64) -> Result<(), String> {
+        let mut store = self.lock();
+        store.chats.insert(chat_id, false);
+        store.persist()
+    }
+
+    /// Rotates our sender key. Members need the new key before they can read
+    /// anything we send next.
+    pub fn group_rotate(&self, chat_id: i64) -> Result<GroupView, String> {
+        if chat_id >= 0 {
+            return Err("Group keys only exist for groups and supergroups.".into());
+        }
+        let mut store = self.lock();
+        if store.identity.is_none() {
+            return Err("Create your overlay key first.".into());
+        }
+        let key = SenderKey::generate().map_err(|_| "could not generate a group key".to_string())?;
+        {
+            let group = store.groups.entry(chat_id).or_default();
+            group.own = Some(key);
+            group.rotation_needed = false;
+        }
+        store.chats.insert(chat_id, true);
+        store.persist()?;
+        Ok(store.group_view(chat_id))
+    }
+
+    /// Flags a group whose membership changed: sending is refused until the
+    /// key is rotated and re-shared, so a removed member cannot read on.
+    pub fn group_mark_rotation(&self, chat_id: i64) {
+        let mut store = self.lock();
+        if !store.chats.get(&chat_id).copied().unwrap_or(false) {
+            return;
+        }
+        let Some(group) = store.groups.get_mut(&chat_id) else {
+            return;
+        };
+        if group.own.is_none() || group.rotation_needed {
+            return;
+        }
+        group.rotation_needed = true;
+        if let Err(e) = store.persist() {
+            tracing::warn!("could not record the group key rotation: {e}");
+        }
+    }
+
+    /// Key envelopes for the members we can reach: those with a pairwise
+    /// overlay session. The caller encrypts each one with
+    /// [`Self::encrypt_for_peer`] before sending it.
+    pub fn group_distributions(
+        &self,
+        chat_id: i64,
+        members: &[i64],
+    ) -> Result<Vec<GroupDistribution>, String> {
+        let me = self.self_id();
+        if me <= 0 {
+            return Err("Sign in to Telegram first.".into());
+        }
+        let store = self.lock();
+        let group = store
+            .groups
+            .get(&chat_id)
+            .ok_or_else(|| "Group encryption is not set up for this chat yet.".to_string())?;
+        let key = group
+            .own
+            .as_ref()
+            .ok_or_else(|| "Your group key is missing — rotate it first.".to_string())?;
+        let text = distribution_text(chat_id, key);
+        let mut out = Vec::new();
+        for member in members {
+            if *member == me || *member <= 0 {
+                continue;
+            }
+            let Some(peer) = store.peers.get(member) else {
+                continue;
+            };
+            if peer.session.is_none() {
+                continue;
+            }
+            out.push(GroupDistribution {
+                peer_id: *member,
+                text: text.clone(),
+            });
+        }
+        Ok(out)
+    }
+
+    /// True when we hold a pairwise overlay session with this person.
+    pub fn has_pairwise(&self, peer_id: i64) -> bool {
+        self.lock()
+            .peers
+            .get(&peer_id)
+            .is_some_and(|p| p.session.is_some())
+    }
+
+    /// Pairwise encryption without the per-chat switch: used to deliver group
+    /// keys, which must arrive authenticated by the pairwise ratchet.
+    pub fn encrypt_for_peer(&self, peer_id: i64, text: &str) -> Result<String, String> {
+        let me = self.self_id();
+        if me <= 0 {
+            return Err("Sign in to Telegram before using the encrypted overlay.".into());
+        }
+        if peer_id <= 0 {
+            return Err("Pairwise sessions belong to people, not groups.".into());
+        }
+        let options = EncryptOptions {
+            pad: text.len() <= PADDED_MAX,
+        };
+        let conversation = private_chat_conversation_id(me, peer_id);
+        let mut store = self.lock();
+        let (armored, backup) = {
+            let peer = store
+                .peers
+                .get_mut(&peer_id)
+                .ok_or_else(|| "no overlay key for this person yet".to_string())?;
+            let session = peer
+                .session
+                .as_mut()
+                .ok_or_else(|| "no pairwise session with this person yet".to_string())?;
+            let backup = session.clone();
+            match encrypt_with(session, text.as_bytes(), conversation, options) {
+                Ok(armored) => (armored, backup),
+                Err(e) => return Err(e.to_string()),
+            }
+        };
+        if let Err(e) = store.persist() {
+            if let Some(peer) = store.peers.get_mut(&peer_id) {
+                peer.session = Some(backup);
+            }
+            return Err(e);
+        }
+        Ok(armored)
+    }
+
+    /// Installs a sender key that arrived inside a pairwise message. Returns
+    /// `Ok(None)` when the text is not a key envelope.
+    pub fn install_group_key(
+        &self,
+        from_peer: i64,
+        text: &str,
+    ) -> Result<Option<GroupInstall>, String> {
+        let Some(body) = text.trim().strip_prefix(DISTRIBUTION_PREFIX) else {
+            return Ok(None);
+        };
+        let json = STANDARD
+            .decode(body)
+            .map_err(|_| "the group key message is malformed".to_string())?;
+        let value: serde_json::Value = serde_json::from_slice(&json)
+            .map_err(|_| "the group key message is malformed".to_string())?;
+        let group_id = value
+            .get("group")
+            .and_then(|v| v.as_i64())
+            .ok_or_else(|| "the group key message has no group id".to_string())?;
+        if group_id >= 0 {
+            return Err("the group key message names a chat that is not a group".into());
+        }
+        let key_text = value
+            .get("key")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "the group key message has no key".to_string())?;
+        let key = SenderKey::from_armored(key_text)
+            .map_err(|e| format!("the group key is invalid: {e}"))?;
+        let mut store = self.lock();
+        let identity = store
+            .peers
+            .get(&from_peer)
+            .and_then(|p| p.bundle.as_ref())
+            .map(|b| b.identity())
+            .ok_or_else(|| "a group key arrived from someone with no overlay key".to_string())?;
+        let fingerprint = key_fingerprint(&key.id());
+        let receiver = key.receiver();
+        {
+            let group = store.groups.entry(group_id).or_default();
+            group.senders.insert(
+                from_peer,
+                GroupPeer {
+                    identity,
+                    receiver,
+                },
+            );
+        }
+        store.persist()?;
+        Ok(Some(GroupInstall {
+            group_id,
+            sender_id: from_peer,
+            key: fingerprint,
+        }))
+    }
+
+    /// Encrypts one group message with our sender key.
+    pub fn group_encrypt(&self, chat_id: i64, text: &str) -> Result<String, String> {
+        let me = self.self_id();
+        if me <= 0 {
+            return Err("Sign in to Telegram before using the encrypted overlay.".into());
+        }
+        if chat_id >= 0 {
+            return Err("This is a one-to-one chat: use the lock button instead.".into());
+        }
+        if text.len() > MAX_ENCRYPTED_PLAINTEXT {
+            return Err(format!(
+                "Encrypted messages are limited to {MAX_ENCRYPTED_PLAINTEXT} bytes of text."
+            ));
+        }
+        let mut store = self.lock();
+        if !store.chats.get(&chat_id).copied().unwrap_or(false) {
+            return Err("Encryption is off for this chat.".into());
+        }
+        let Some(identity) = store.local_identity() else {
+            return Err("Create your overlay key first.".into());
+        };
+        let (armored, backup) = {
+            let group = store
+                .groups
+                .get_mut(&chat_id)
+                .ok_or_else(|| "Group encryption is not set up for this chat yet.".to_string())?;
+            if group.rotation_needed {
+                return Err(
+                    "The group's membership changed: rotate the group key and share it before sending."
+                        .into(),
+                );
+            }
+            let key = group
+                .own
+                .as_mut()
+                .ok_or_else(|| "Your group key is missing — rotate it first.".to_string())?;
+            let backup = key.clone();
+            match key.encrypt(&identity, chat_id, text.as_bytes()) {
+                Ok(armored) => (armored, backup),
+                Err(e) => return Err(e.to_string()),
+            }
+        };
+        if let Err(e) = store.persist() {
+            if let Some(group) = store.groups.get_mut(&chat_id) {
+                group.own = Some(backup);
+            }
+            return Err(e);
+        }
+        Ok(armored)
+    }
+
+    /// Decrypts a group message from `sender_id`.
+    fn group_decrypt(
+        &self,
+        chat_id: i64,
+        sender_id: i64,
+        armored: &str,
+    ) -> Result<(String, bool), String> {
+        let mut store = self.lock();
+        let (text, backup) = {
+            let group = store.groups.get_mut(&chat_id).ok_or_else(|| {
+                "this group has no encryption keys on this device yet".to_string()
+            })?;
+            let peer = group
+                .senders
+                .get_mut(&sender_id)
+                .ok_or_else(|| "no group key from this member yet".to_string())?;
+            let sender = peer.identity;
+            let backup = peer.receiver.clone();
+            match peer.receiver.decrypt(&sender, chat_id, armored) {
+                Ok(plain) => (utf8(plain.to_vec())?, backup),
+                Err(e) => return Err(e.to_string()),
+            }
+        };
+        if let Err(e) = store.persist() {
+            if let Some(group) = store.groups.get_mut(&chat_id) {
+                if let Some(peer) = group.senders.get_mut(&sender_id) {
+                    peer.receiver = backup;
+                }
+            }
+            return Err(e);
+        }
+        let verified = store.peers.get(&sender_id).is_some_and(|p| p.verified);
+        Ok((text, verified))
+    }
 }
 
 /// True when `text` is an armored overlay message (`mg-e2e:v1:`). The chat
 /// list uses it to avoid showing ciphertext as the last message.
 pub fn is_overlay_text(text: &str) -> bool {
     is_armored(text)
+}
+
+fn group_badge(message: &mut IncomingMessage, verified: bool) {
+    message.badges.push(MessageBadge {
+        plugin: "e2e".into(),
+        label: if verified { "🔒" } else { "🔓" }.into(),
+        tooltip: Some(if verified {
+            "Group message, end-to-end encrypted · verified member"
+        } else {
+            "Group message, end-to-end encrypted · member not verified"
+        }
+        .into()),
+    });
 }
 
 fn overlay_badge(message: &mut IncomingMessage, trusted: bool, own: bool) {

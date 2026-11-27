@@ -21,6 +21,7 @@ pub(crate) mod label {
     pub const RATCHET_ROOT: &[u8] = b"mellogram/e2e/v1/ratchet/root";
     pub const MESSAGE_KEY: &[u8] = b"mellogram/e2e/v1/ratchet/message-key";
     pub const AD: &[u8] = b"mellogram/e2e/v1/associated-data";
+    pub const GROUP_AD: &[u8] = b"mellogram/e2e/v1/group-associated-data";
     pub const SAFETY: &[u8] = b"mellogram/e2e/v1/safety-number";
     pub const PRIVATE_CHAT: &[u8] = b"mellogram/e2e/v1/private-chat-id";
 }

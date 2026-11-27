@@ -68,7 +68,8 @@ mellogram/
 │   └── ui                   HTML/CSS/JS front end (no build step)
 ├── themes/                  bundled example themes
 ├── services/
-│   └── melloid-public       Cloudflare Worker, D1 profile API and public pages
+│   ├── melloid-public       Cloudflare Worker, D1 profile API and public pages
+│   └── web-client           browser client skeleton: Worker, static shell, status API
 └── docs/                    features, plugin API, theming, roadmap
 ```
 
