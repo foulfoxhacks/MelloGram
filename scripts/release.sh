@@ -114,8 +114,17 @@ build_android() {
   ( cd "$ROOT/app/src-tauri" && run cargo tauri android build --apk --aab )
   local gen="$ROOT/app/src-tauri/gen/android/app/build/outputs"
   run mkdir -p "$1"
-  run cp "$gen"/apk/universal/release/*.apk "$1/MelloGram-android.apk"
+  run cp "$gen"/apk/universal/release/*.apk "$1/MelloGram-android-unsigned.apk"
   run cp "$gen"/bundle/release/*.aab      "$1/MelloGram-android-unsigned.aab"
+  # Gradle emits an unsigned APK; Android will not install it. Sign it here when
+  # the keystore is present, and say so plainly when it is not, instead of
+  # naming an unsigned file like a release artifact.
+  if [ "$(host_platform)" = windows ] && [ -f "${MELLOGRAM_KEYSTORE:-$HOME/mellogram-release.jks}" ]; then
+    ( cd "$ROOT" && run powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sign-android.ps1 \
+        -Keystore "${MELLOGRAM_KEYSTORE:-$HOME/mellogram-release.jks}" -OutDir "$1" )
+  else
+    warn "the APK and AAB are unsigned. Sign them with scripts/sign-android.ps1 (Windows) or apksigner before publishing."
+  fi
 }
 
 cmd_local() {
