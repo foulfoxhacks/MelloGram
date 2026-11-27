@@ -33,6 +33,7 @@
     telegram: { group: "System", label: "Telegram", render: renderTelegram },
     mellorpc: { group: "System", label: "MelloRPC Presence", render: renderMelloRpc },
     notifications: { group: "System", label: "Notifications", render: renderNotifications },
+    media: { group: "System", label: "Media & Storage", render: renderMedia },
     general: { group: "System", label: "General", render: renderGeneral },
     about: { group: "System", label: "About & Updates", render: renderAbout },
     developer: { group: "System", label: "Developer", render: renderDeveloper, devOnly: true },
@@ -386,6 +387,26 @@
     function nrow(key, label, hint) {
       return h("div", { class: "mg-field-row" }, h("div", {}, h("label", { text: label }), hint ? h("div", { class: "mg-hint", text: hint }) : null), sw(!!n[key], (v) => { n[key] = v; save(); }));
     }
+  }
+
+  async function renderMedia() {
+    const m = await Bridge.invoke("get_media_settings");
+    const save = async () => { await call("set_media_settings", { media: m }); await window.MelloGram.Media?.reloadSettings(); };
+    const toggle = (key, label, hint) => h("div", { class: "mg-field-row" }, h("div", {}, h("label", { text: label }), hint ? h("div", { class: "mg-hint", text: hint }) : null), sw(!!m[key], (v) => { m[key] = v; save(); }));
+    return [
+      h("h2", { text: "Media & Storage" }),
+      h("div", { class: "mg-field" }, h("label", { text: "Download photos, stickers and GIFs automatically up to (MB)" }),
+        h("input", { type: "number", min: 0, max: 200, value: m.auto_download_mb, onchange: (e) => { m.auto_download_mb = Math.max(0, Math.min(200, Number(e.target.value) || 0)); save(); } }),
+        h("div", { class: "mg-hint", text: "0 = only download when you click. Videos and files always wait for a click." })),
+      h("div", { class: "mg-field" }, h("label", { text: "Largest file you can download (MB)" }),
+        h("input", { type: "number", min: 1, max: 4000, value: m.max_download_mb, onchange: (e) => { m.max_download_mb = Math.max(1, Math.min(4000, Number(e.target.value) || 1)); save(); } })),
+      toggle("autoplay_gifs", "Autoplay GIFs", "Silent and looping, like Telegram."),
+      toggle("autoplay_video_stickers", "Autoplay video stickers", ""),
+      toggle("respect_spoilers", "Blur media marked as spoiler", "Click to reveal."),
+      toggle("load_map_tiles", "Show map previews for locations", "Loads map images from OpenStreetMap, which then learns roughly which places you look at. Off: coordinates and an “Open map” link only."),
+      h("div", { class: "mg-field-row" }, h("div", {}, h("label", { text: "Media cache" }), h("div", { class: "mg-hint", text: "Downloaded media is kept on this device so it opens instantly next time." })),
+        h("button", { class: "mg-btn", text: "Clear cache", onclick: async () => { const freed = await call("clear_media_cache"); UI.toast(`Freed ${(freed / 1048576).toFixed(1)} MB`, "success"); } })),
+    ];
   }
 
   function renderGeneral() {

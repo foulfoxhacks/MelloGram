@@ -53,6 +53,8 @@ pub enum UiEvent {
     /// A ban, removal, restriction or lost access. `alerts` are the texts
     /// plugins chose to raise (empty = record only).
     Membership { event: mellogram_core::relationships::MembershipEvent, alerts: Vec<String> },
+    /// A user's online status changed.
+    Presence { user_id: i64, presence: mellogram_telegram::Presence },
     /// Nothing for the UI (internal bookkeeping only).
     Quiet,
 }
@@ -94,6 +96,7 @@ pub struct AppState {
     pub themes: ThemeManager,
     pub cache: Mutex<MessageCache>,
     pub background: crate::background::BackgroundState,
+    pub media: crate::media::MediaState,
     pub tg: AsyncMutex<Option<Arc<Telegram>>>,
 }
 
@@ -140,6 +143,7 @@ impl AppState {
             themes,
             cache: Mutex::new(MessageCache::default()),
             background: Default::default(),
+            media: Default::default(),
             tg: AsyncMutex::new(None),
         })
     }
@@ -181,7 +185,16 @@ impl AppState {
     }
 
     pub async fn connect(self: &Arc<Self>, api_id: i32, api_hash: String) -> Result<(), String> {
-        let tg = Telegram::connect(TelegramConfig { api_id, api_hash, session_path: self.session_path() })
+        let net = self.store.lock().unwrap().settings.network.clone();
+        let proxy_url = net.proxy_url.filter(|u| mellogram_core::settings::validate_proxy_url(u).is_ok());
+        let tg = Telegram::connect(TelegramConfig {
+            api_id,
+            api_hash,
+            session_path: self.session_path(),
+            obfuscated: net.obfuscated_transport,
+            proxy_url,
+            app_version: env!("CARGO_PKG_VERSION").into(),
+        })
             .await
             .map_err(|e| e.to_string())?;
         *self.tg.lock().await = Some(Arc::clone(&tg));
@@ -257,6 +270,7 @@ impl AppState {
                 self.membership(event)
             }
             TgEvent::ChatChanged { .. } => UiEvent::Quiet,
+            TgEvent::Presence { user_id, presence } => UiEvent::Presence { user_id, presence },
         }
     }
 

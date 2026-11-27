@@ -74,7 +74,7 @@
 
   function swatch(css) {
     const el = h("div", { class: "mg-wp-swatch" }, h("div", { class: "mg-wp-swatch-layer" }));
-    if (css) el.firstChild.setAttribute("style", css.replace(/inset:[^;]+;/, ""));
+    if (css) el.firstChild.style.cssText = css.replace(/inset:[^;]+;/, "");
     return el;
   }
 
@@ -115,7 +115,7 @@
     async function updatePreview() {
       const wp = target();
       const css = wp ? await Bridge.invoke("wallpaper_preview_css", { wallpaper: wp }) : null;
-      previewLayer.setAttribute("style", css || "");
+      previewLayer.style.cssText = css || "";
       previewLayer.style.setProperty("--mg-wp-dim", String((wp?.dim || 0) / 100));
     }
 

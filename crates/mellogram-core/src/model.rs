@@ -64,6 +64,96 @@ pub struct IncomingMessage {
     pub classes: Vec<String>,
     /// Highlight colour from a highlighting plugin (already validated).
     pub highlight: Option<String>,
+    /// What the attachment is, so the UI can render it.
+    pub media: Option<MediaInfo>,
+    /// Messages sharing this id form one album.
+    pub grouped_id: Option<i64>,
+}
+
+/// Backend-neutral description of a message attachment.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct MediaInfo {
+    pub kind: MediaKind,
+    pub mime: Option<String>,
+    pub file_name: Option<String>,
+    pub size: Option<u64>,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    /// Seconds (audio/video).
+    pub duration: Option<f64>,
+    pub title: Option<String>,
+    pub performer: Option<String>,
+    /// Sticker emoji / dice emoji.
+    pub emoji: Option<String>,
+    pub has_thumbnail: bool,
+    pub spoiler: bool,
+    pub geo: Option<GeoInfo>,
+    pub web: Option<WebPreview>,
+    pub contact: Option<ContactInfo>,
+    pub poll: Option<PollInfo>,
+    /// Dice value.
+    pub value: Option<i32>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum MediaKind {
+    Photo,
+    Video,
+    /// Looping silent animation (GIF / MP4).
+    Gif,
+    RoundVideo,
+    Voice,
+    Audio,
+    Sticker,
+    /// Lottie (TGS) sticker.
+    AnimatedSticker,
+    /// WebM sticker.
+    VideoSticker,
+    Document,
+    Location,
+    LiveLocation,
+    Venue,
+    Contact,
+    Poll,
+    Dice,
+    WebPage,
+    #[default]
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct GeoInfo {
+    pub lat: f64,
+    pub long: f64,
+    pub accuracy_m: Option<i32>,
+    pub title: Option<String>,
+    pub address: Option<String>,
+    /// Live location: seconds it is shared for.
+    pub live_period: Option<i32>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WebPreview {
+    pub url: String,
+    pub site_name: Option<String>,
+    pub title: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ContactInfo {
+    pub name: String,
+    pub phone: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PollInfo {
+    pub question: String,
+    pub options: Vec<String>,
+    pub voters: Option<i32>,
+    pub closed: bool,
+    pub quiz: bool,
 }
 
 impl IncomingMessage {
