@@ -48,7 +48,7 @@
     const pages = [
       ["appearance", "Appearance Studio"], ["plugins", "Plugins"], ["themes", "Themes"], ["quickcss", "QuickCSS"],
       ["workspaces", "Workspaces & Sharing"], ["backup", "Backup & Restore"], ["privacy", "Privacy & Security"],
-      ["diagnostics", "Diagnostics"], ["telegram", "Telegram account"], ["notifications", "Notifications"],
+      ["diagnostics", "Diagnostics"], ["telegram", "Telegram account"], ["mellorpc", "MelloRPC Presence"], ["notifications", "Notifications"],
       ["general", "General"], ["about", "About & Updates"],
     ];
     for (const [key, label] of pages) items.push({ group: "Settings", label: `Open ${label}`, run: () => Settings().open(key) });

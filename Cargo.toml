@@ -28,7 +28,7 @@ thiserror = "2"
 tracing = "0.1"
 regex = "1"
 url = "2"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 
 [profile.release]

@@ -6,6 +6,7 @@
   const $ = (id) => document.getElementById(id);
   let profile = null;
   let overlay = null;
+  let activePresence = null;
 
   const safeColor = (value) => /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value || "") ? value : "#35bdb1";
   const safeUrl = (value) => {
@@ -51,6 +52,7 @@
     next.avatar_url = $("melloid-avatar").value.trim() || null;
     next.banner_url = $("melloid-banner").value.trim() || null;
     next.show_presence = $("melloid-presence").checked;
+    next.presence = next.show_presence ? activePresence : null;
     next.bio_sections = [...document.querySelectorAll(".melloid-bio-row")].map((row, index) => ({
       id: row.dataset.id || `bio-${index + 1}`,
       heading: row.querySelector("[data-bio-heading]").value,
@@ -77,6 +79,7 @@
     const initials = (data.display_name || "M").split(/\s+/).slice(0, 2).map((part) => part[0] || "").join("").toUpperCase();
     const visibleSections = (data.bio_sections || []).filter((section) => section.visible);
     const connections = (data.connections || []).filter((connection) => connection.visible);
+    const activity = data.show_presence && data.presence ? data.presence : null;
     const badges = (data.badges || []).filter((badge) => badge.visible);
     const card = h("article", { class: "melloid-preview-card", style: `--melloid-accent:${accent}` },
       h("div", { class: "melloid-preview-banner" },
@@ -92,6 +95,12 @@
         h("div", { class: "melloid-preview-meta" },
           h("span", { class: "mg-tag", text: `◉ ${data.visibility || "public"}` }),
           data.show_presence ? h("span", { class: "mg-tag", text: "Presence enabled" }) : h("span", { class: "mg-tag", text: "Presence hidden" })),
+        activity ? h("section", { class: "melloid-preview-section melloid-live-activity" },
+          h("h3", { text: "Live activity" }),
+          h("b", { text: activity.activity || "Active" }),
+          h("p", { text: [activity.application, activity.details, activity.state].filter(Boolean).join(" · ") }),
+          activity.party_current != null && activity.party_max != null
+            ? h("span", { class: "mg-tag", text: `Party ${activity.party_current}/${activity.party_max}` }) : null) : null,
         ...visibleSections.map((section) => h("section", { class: "melloid-preview-section" },
           h("h3", { text: section.heading || "About" }),
           h("p", { text: section.body || "Add something about yourself…" }))),
@@ -250,6 +259,7 @@ footer{padding:16px 28px;border-top:1px solid #303449;color:#858da6;font-size:12
   async function open() {
     try {
       profile = await Bridge.invoke("get_melloid_profile");
+      activePresence = profile.presence || null;
       overlay = h("div", { class: "mg-overlay mg-melloid-overlay" });
       let onEscape;
       const close = () => {
@@ -294,6 +304,14 @@ footer{padding:16px 28px;border-top:1px solid #303449;color:#858da6;font-size:12
       UI.toast(`Could not open MelloID: ${error}`, "error");
     }
   }
+
+  Bridge.listen("mellorpc://presence", (activity) => {
+    activePresence = activity || null;
+    if (overlay && profile) {
+      try { renderPreview(overlay.querySelector(".melloid-preview"), currentDraft()); }
+      catch (error) { console.warn("MelloID presence preview", error); }
+    }
+  });
 
   const button = h("button", { class: "mg-icon-btn", id: "open-melloid", title: "Open MelloID profile studio", text: "ID", onclick: open });
   $("header-buttons").append(button);

@@ -29,6 +29,7 @@ pub struct Settings {
     pub workspaces: Vec<crate::workspace::Workspace>,
     pub active_workspace: Option<String>,
     pub privacy: PrivacySettings,
+    pub rpc: RpcSettings,
 }
 
 /// Local-only privacy controls. These change what this screen shows; they
@@ -57,6 +58,7 @@ impl Default for Settings {
             workspaces: Vec::new(),
             active_workspace: None,
             privacy: PrivacySettings::default(),
+            rpc: RpcSettings::default(),
         }
     }
 }
@@ -83,6 +85,17 @@ impl Default for GeneralSettings {
             frameless: false,
         }
     }
+}
+
+
+/// Local rich-presence listeners. Both are opt-in and restart-required.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct RpcSettings {
+    /// Enable the native MelloRPC local IPC endpoint.
+    pub native_enabled: bool,
+    /// Enable the Discord IPC Rich Presence compatibility endpoint.
+    pub discord_compat_enabled: bool,
 }
 
 /// Telegram application credentials from <https://my.telegram.org>.
@@ -299,6 +312,14 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("mellogram-test-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         dir
+    }
+
+
+    #[test]
+    fn rpc_listeners_are_disabled_by_default() {
+        let settings = Settings::default();
+        assert!(!settings.rpc.native_enabled);
+        assert!(!settings.rpc.discord_compat_enabled);
     }
 
     #[test]

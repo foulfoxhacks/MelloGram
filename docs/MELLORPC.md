@@ -43,6 +43,35 @@ The future desktop listener must:
 - Require user opt-in and expose per-application block/allow controls.
 - Publish only the fields the user has allowed in MelloID presence settings.
 
+## Local transport implementation
+
+The desktop client can now opt into two local listeners from Settings → MelloRPC
+Presence. Both are off by default and require an application restart after
+changing the settings.
+
+- Native MelloRPC uses `mellorpc.sock` under the MelloGram config directory on
+  Unix-like desktops, or the `mellorpc-v1` named pipe on Windows.
+- Discord compatibility searches the standard local `discord-ipc-N` endpoint
+  locations on Unix-like desktops and `discord-ipc-N` named pipes on Windows.
+- The bridge accepts the v1 handshake and supported Rich Presence
+  `SET_ACTIVITY` / `CLEAR_ACTIVITY` commands, plus PING/PONG and CLOSE.
+- A connected Discord client renews its local activity lease while connected;
+  closing the IPC connection clears its activity immediately.
+- The local registry projects the newest unexpired lease into the profile and
+  emits a local `mellorpc://presence` UI event. Public profile hosting/sync is
+  still separate.
+
+Both listeners are disabled by default. Users opt in under Settings → MelloRPC Presence and restart the client to apply changes. Only local sockets/named pipes are opened. No TCP, LAN, or public network listener is created. On Unix sockets, filesystem permissions are restricted
+to the current user. On Windows, the named-pipe security descriptor is the
+OS process default; a later hardening pass should explicitly constrain ACLs to
+the current user SID.
+
+When Discord itself is already running and owns the first standard IPC path,
+MelloGram will try a free subsequent endpoint. Some SDKs prefer the first live
+Discord endpoint and will keep using Discord, so compatibility testing may
+require closing Discord or configuring the app's IPC path. This bridge does
+not claim full Discord RPC parity.
+
 ## Next transport work
 
 1. Implement the native MelloRPC local IPC listener and a small client SDK.

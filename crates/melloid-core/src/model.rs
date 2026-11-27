@@ -41,6 +41,7 @@ pub enum PresenceKind {
     Listening,
     Watching,
     Streaming,
+    Competing,
     Creating,
     Working,
     Custom,

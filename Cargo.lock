@@ -2331,6 +2331,7 @@ dependencies = [
  "mellogram-core",
  "mellogram-plugins",
  "mellogram-telegram",
+ "mellorpc-core",
  "melloid-core",
  "serde",
  "serde_json",

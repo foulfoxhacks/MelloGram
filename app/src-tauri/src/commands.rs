@@ -5,7 +5,7 @@ use std::io::Read as _;
 use std::sync::Arc;
 
 use mellogram_core::{CommandDef, OutgoingFile, OutgoingMessage, PluginInfo, Theme};
-use mellogram_core::settings::{GeneralSettings, NotificationSettings};
+use mellogram_core::settings::{GeneralSettings, NotificationSettings, RpcSettings};
 use mellogram_telegram::{ChatSummary, LoginState, SendResult};
 use melloid_core::MelloProfile;
 use serde::{Deserialize, Serialize};
@@ -43,6 +43,7 @@ pub fn get_settings(state: S<'_>) -> Value {
     json!({
         "general": s.general,
         "notifications": s.notifications,
+        "rpc": s.rpc,
         "telegram": { "api_id": s.telegram.api_id, "has_hash": s.telegram.api_hash.is_some() },
         "themes": { "enabled": s.themes.enabled, "quick_css": s.themes.quick_css,
                     "quick_css_enabled": s.themes.quick_css_enabled, "variables": s.themes.variables },
@@ -58,6 +59,12 @@ pub fn set_general(state: S<'_>, general: GeneralSettings) -> R<()> {
 #[tauri::command]
 pub fn set_notifications(state: S<'_>, notifications: NotificationSettings) -> R<()> {
     state.store.lock().unwrap().settings.notifications = notifications;
+    state.save()
+}
+
+#[tauri::command]
+pub fn set_rpc_settings(state: S<'_>, rpc: RpcSettings) -> R<()> {
+    state.store.lock().unwrap().settings.rpc = rpc;
     state.save()
 }
 

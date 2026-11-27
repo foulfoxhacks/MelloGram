@@ -30,6 +30,7 @@
     privacy: { group: "Security", label: "Privacy & Security", render: () => P().privacy() },
     diagnostics: { group: "System", label: "Diagnostics", render: () => P().diagnostics() },
     telegram: { group: "System", label: "Telegram", render: renderTelegram },
+    mellorpc: { group: "System", label: "MelloRPC Presence", render: renderMelloRpc },
     notifications: { group: "System", label: "Notifications", render: renderNotifications },
     general: { group: "System", label: "General", render: renderGeneral },
     about: { group: "System", label: "About & Updates", render: renderAbout },
@@ -379,6 +380,36 @@
       h("h2", { text: "General" }),
       row("auto_check_updates", "Check for updates on launch", "Looks for new GitHub releases. Nothing else is sent."),
       row("developer_mode", "Developer mode", "Shows the Developer tab with the live stylesheet and event log."),
+    ];
+  }
+
+
+  // ---- MelloRPC ------------------------------------------------------------------
+
+  async function renderMelloRpc() {
+    const rpc = { ...(settings.rpc || { native_enabled: false, discord_compat_enabled: false }) };
+    const row = (key, title, hint) => h("div", { class: "mg-field-row" },
+      h("div", {}, h("label", { text: title }), h("div", { class: "mg-hint", text: hint })),
+      sw(rpc[key], (value) => { rpc[key] = value; }));
+    const save = async (restart) => {
+      await call("set_rpc_settings", { rpc }, "MelloRPC settings saved.");
+      settings.rpc = { ...rpc };
+      if (restart) await Bridge.invoke("restart_app", { safeMode: false });
+      else UI.toast("Restart MelloGram to apply the local IPC listeners.", "info");
+    };
+    const endpoint = navigator.userAgent.includes("Windows")
+      ? "\\\\.\\pipe\\mellorpc-v1"
+      : "mellorpc.sock in the MelloGram config directory";
+    return [
+      h("h2", { text: "MelloRPC Presence" }),
+      h("p", { class: "mg-muted", text: "Local rich presence for games and apps. These listeners are disabled by default and never open a TCP port." }),
+      row("native_enabled", "Enable native MelloRPC", "Lets applications send structured activity to MelloGram through a local IPC endpoint."),
+      row("discord_compat_enabled", "Enable Discord Rich Presence compatibility", "Accepts the supported Discord IPC handshake and SET_ACTIVITY / CLEAR_ACTIVITY commands. Not every Discord RPC command is implemented."),
+      h("p", { class: "mg-hint", text: `Native endpoint: ${endpoint}. Discord compatibility uses the local discord-ipc-N socket or named pipe discovered by Discord SDKs.` }),
+      h("p", { class: "mg-hint", text: "When a separate Discord desktop client already owns the standard IPC endpoint, Discord SDKs may continue connecting to that client instead of MelloGram. Close it or configure the SDK to use MelloGram's available endpoint for compatibility testing." }),
+      h("div", { class: "mg-toolbar" },
+        h("button", { class: "mg-btn", text: "Save settings", onclick: () => save(false) }),
+        h("button", { class: "mg-btn mg-primary", text: "Save & Restart", onclick: () => save(true) })),
     ];
   }
 

@@ -207,11 +207,13 @@ pub fn translate_discord_activity(
     let kind = match object.get("type").and_then(|v| v.as_u64()).unwrap_or(0) {
         0 => PresenceKind::Playing, 1 => PresenceKind::Streaming,
         2 => PresenceKind::Listening, 3 => PresenceKind::Watching,
+        5 => PresenceKind::Competing,
         _ => PresenceKind::Custom,
     };
     let timestamps = object.get("timestamps");
-    let started_at = timestamps.and_then(|v| v.get("start")).and_then(|v| v.as_i64()).map(|v| v / 1000);
-    let ends_at = timestamps.and_then(|v| v.get("end")).and_then(|v| v.as_i64()).map(|v| v / 1000);
+    let normalize_timestamp = |value: i64| if value > 10_000_000_000 { value / 1000 } else { value };
+    let started_at = timestamps.and_then(|v| v.get("start")).and_then(|v| v.as_i64()).map(normalize_timestamp);
+    let ends_at = timestamps.and_then(|v| v.get("end")).and_then(|v| v.as_i64()).map(normalize_timestamp);
     let party = object.get("party").and_then(|v| v.get("size")).and_then(|v| v.as_array());
     let party_current = party.and_then(|v| v.first()).and_then(|v| v.as_u64()).and_then(|v| u32::try_from(v).ok());
     let party_max = party.and_then(|v| v.get(1)).and_then(|v| v.as_u64()).and_then(|v| u32::try_from(v).ok());
@@ -284,7 +286,7 @@ mod tests {
     fn discord_activity_maps_to_shared_presence_without_secret_leakage() {
         let input = serde_json::json!({
             "details": "Exploring the world", "state": "In a multiplayer session", "type": 0,
-            "timestamps": { "start": 1700000000000_i64 }, "party": { "size": [2, 8] },
+            "timestamps": { "start": 1700000000_i64 }, "party": { "size": [2, 8] },
             "assets": { "large_image": "world-art", "small_image": "avatar" },
             "secrets": { "join": "opaque-secret" }
         });
@@ -295,6 +297,20 @@ mod tests {
         assert_eq!(translated.party_current, Some(2));
         assert_eq!(translated.party_max, Some(8));
         assert_eq!(translated.join_url, None);
+    }
+
+
+    #[test]
+    fn discord_competing_activity_and_mixed_timestamp_units_are_supported() {
+        let input = serde_json::json!({
+            "details": "Tournament",
+            "type": 5,
+            "timestamps": { "start": 1_700_000_000_i64, "end": 1_700_000_100_000_i64 }
+        });
+        let translated = translate_discord_activity("com.example.game", &input).unwrap().unwrap();
+        assert_eq!(translated.kind, PresenceKind::Competing);
+        assert_eq!(translated.started_at, Some(1_700_000_000));
+        assert_eq!(translated.ends_at, Some(1_700_000_100));
     }
 
     #[test]

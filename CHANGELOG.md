@@ -1,3 +1,10 @@
+## MelloRPC local IPC service — 2026-11-27
+
+- Added opt-in native MelloRPC and Discord Rich Presence IPC listeners.
+- Added Windows named-pipe and Unix domain socket transports; no TCP listener.
+- Added runtime lease expiry, disconnect cleanup, and profile presence events.
+- Added MelloRPC settings (both listeners disabled by default; restart required).
+
 ## MelloID and MelloRPC foundation — 2026-11-27
 
 - Added MelloID Studio with structured bios, profile appearance, visibility, connection cards and a live preview.

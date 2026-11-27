@@ -3,6 +3,7 @@
 
 mod commands;
 mod extras;
+mod mellorpc;
 mod state;
 
 use std::sync::Arc;
@@ -23,9 +24,14 @@ pub fn run() {
             let dir = app.path().app_config_dir()?;
             let state = Arc::new(state::AppState::open(app.handle().clone(), dir)?);
             app.manage(Arc::clone(&state));
+            // Clear any presence left by an interrupted previous session.
+            state.publish_presence();
+            let rpc = state.store.lock().unwrap().settings.rpc.clone();
+            mellorpc::start(Arc::clone(&state), rpc.native_enabled, rpc.discord_compat_enabled);
             // Reconnect in the background if credentials are already saved.
+            let connection_state = Arc::clone(&state);
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = state.connect_if_configured().await {
+                if let Err(e) = connection_state.connect_if_configured().await {
                     tracing::warn!("auto-connect failed: {e}");
                 }
             });
@@ -38,6 +44,7 @@ pub fn run() {
             commands::get_settings,
             commands::set_general,
             commands::set_notifications,
+            commands::set_rpc_settings,
             commands::set_credentials,
             commands::login_state,
             commands::request_code,

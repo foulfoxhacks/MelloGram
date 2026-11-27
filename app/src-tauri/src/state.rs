@@ -8,6 +8,7 @@ use std::time::Instant;
 
 use mellogram_core::{IncomingMessage, PluginManager, SettingsStore, ThemeManager, Toast};
 use melloid_core::MelloIdStore;
+use mellorpc_core::PresenceRegistry;
 use mellogram_telegram::{Telegram, TelegramConfig, TgEvent};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
@@ -82,6 +83,8 @@ pub struct AppState {
     pub store: Mutex<SettingsStore>,
     /// Local MelloID profile cache; remote publication is handled by a future service.
     pub melloid: Mutex<MelloIdStore>,
+    /// Active local RPC presence leases; remote publication is handled separately.
+    pub rpc_presence: Mutex<PresenceRegistry>,
     pub plugins: Mutex<PluginManager>,
     pub themes: ThemeManager,
     pub cache: Mutex<MessageCache>,
@@ -126,11 +129,36 @@ impl AppState {
             dir,
             store: Mutex::new(store),
             melloid: Mutex::new(melloid),
+            rpc_presence: Mutex::new(PresenceRegistry::default()),
             plugins: Mutex::new(plugins),
             themes,
             cache: Mutex::new(MessageCache::default()),
             tg: AsyncMutex::new(None),
         })
+    }
+
+
+    /// Projects the newest unexpired local activity lease into the local MelloID
+    /// profile. The hosted public profile service is a separate future stage.
+    pub fn publish_presence(&self) {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+            .min(i64::MAX as u128) as i64;
+        let next = self.rpc_presence.lock().unwrap().active(now_ms).into_iter()
+            .max_by_key(|lease| lease.expires_at_ms)
+            .map(|lease| lease.activity);
+        let mut profile_store = self.melloid.lock().unwrap();
+        let mut profile = profile_store.profile().clone();
+        let visible = if profile.show_presence { next } else { None };
+        if profile.presence != visible {
+            profile.presence = visible.clone();
+            if let Err(error) = profile_store.save(profile) {
+                tracing::warn!("could not persist MelloID presence: {error}");
+            }
+            let _ = self.app.emit("mellorpc://presence", visible);
+        }
     }
 
     pub fn session_path(&self) -> PathBuf {
