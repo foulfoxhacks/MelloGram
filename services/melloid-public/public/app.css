@@ -16,3 +16,8 @@ footer{border-top:1px solid #293248;margin-top:52px;padding-top:17px;color:#8290
 .frame-glow{box-shadow:0 0 22px var(--accent)}.frame-neon{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent),0 0 18px var(--accent)}.frame-orbit{border-radius:50%;outline:2px dashed var(--accent);outline-offset:4px}.frame-paw{border-radius:48%;border:5px dotted var(--accent)}
 .effect-glow .profile-banner{filter:saturate(1.25) brightness(1.08)}.effect-aurora .profile-banner:after{content:"";position:absolute;inset:0;background:linear-gradient(120deg,#35bdb155,#8d52bc55,#d46e8055);pointer-events:none}.effect-stars .profile-banner:after{content:"✦  ·   ✧";position:absolute;right:24px;top:30px;font-size:32px;color:#fff;opacity:.7}
 @media(max-width:700px){.feature-grid{grid-template-columns:1fr}.hero{padding:25px 0 40px}.brand{margin-bottom:30px}.profile-banner{height:135px}.profile-head,.profile-content{padding-left:17px;padding-right:17px}}
+
+.connection-list{display:grid;gap:10px;margin-top:18px}
+.connection-card{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:14px 16px;border:1px solid #303a51;border-radius:12px;background:#20283a}
+.connection-card strong{display:block}.connection-card p{margin:4px 0 0}
+.verified-label{grid-column:1/-1;color:#8ee3d0;font-size:12px;font-weight:700;letter-spacing:.03em}

@@ -1,5 +1,6 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { publicProfileProjection, validateAndSanitizeProfile } from "./profile.js";
+import { normalizeProviderIdentity, normalizeSteamIdentity, validateSteamOpenIdResponse } from "./connections.js";
 
 const TELEGRAM_ISSUER = "https://oauth.telegram.org";
 const TELEGRAM_JWKS = createRemoteJWKSet(new URL("https://oauth.telegram.org/.well-known/jwks.json"));
@@ -218,13 +219,340 @@ async function saveOwnProfile(request, env) {
     updated_at: updatedAt,
   });
 }
+
+const STEAM_OPENID_LOGIN_URL = "https://steamcommunity.com/openid/login";
+const STEAM_OPENID_NAMESPACE = "http://specs.openid.net/auth/2.0";
+const SUPPORTED_CONNECTION_PROVIDERS = new Set(["github", "discord", "steam"]);
+
+const CONNECTION_PROVIDERS = {
+  github: {
+    clientIdKey: "GITHUB_OAUTH_CLIENT_ID",
+    clientSecretKey: "GITHUB_OAUTH_CLIENT_SECRET",
+    authorizeUrl: "https://github.com/login/oauth/authorize",
+    tokenUrl: "https://github.com/login/oauth/access_token",
+    scopes: "read:user",
+    label: "GitHub",
+  },
+  discord: {
+    clientIdKey: "DISCORD_OAUTH_CLIENT_ID",
+    clientSecretKey: "DISCORD_OAUTH_CLIENT_SECRET",
+    authorizeUrl: "https://discord.com/oauth2/authorize",
+    tokenUrl: "https://discord.com/api/v10/oauth2/token",
+    scopes: "identify",
+    label: "Discord",
+  },
+};
+
+function connectionCookie(provider) {
+  return `melloid_connect_state_${provider}`;
+}
+function requireConnectionProvider(provider, env) {
+  const config = CONNECTION_PROVIDERS[provider];
+  if (!config) throw new Error("Unsupported connection provider.");
+  if (!env[config.clientIdKey] || !env[config.clientSecretKey]) {
+    throw new Error(`${config.label} account linking is not configured yet.`);
+  }
+  return config;
+}
+function connectionCallbackUrl(provider, env) {
+  return new URL(`/auth/connections/${provider}/callback`, env.PUBLIC_BASE_URL).toString();
+}
+
+async function storeVerifiedConnection(session, provider, identity, env) {
+  const existingOwner = await env.DB.prepare(
+    "SELECT owner_telegram_id FROM connections WHERE provider = ?1 AND provider_user_id = ?2"
+  ).bind(provider, identity.provider_user_id).first();
+  if (existingOwner && existingOwner.owner_telegram_id !== session.telegramId) {
+    throw new Error("That external account is already linked to a different MelloID.");
+  }
+  const now = Math.floor(Date.now() / 1000);
+  const verifiedAt = new Date().toISOString();
+  await env.DB.prepare(
+    "INSERT INTO connections (owner_telegram_id, provider, provider_user_id, username, display_name, profile_url, avatar_url, verified_at, visible, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, ?9, ?9) ON CONFLICT(owner_telegram_id, provider) DO UPDATE SET provider_user_id = excluded.provider_user_id, username = excluded.username, display_name = excluded.display_name, profile_url = excluded.profile_url, avatar_url = excluded.avatar_url, verified_at = excluded.verified_at, visible = 1, updated_at = excluded.updated_at"
+  ).bind(session.telegramId, provider, identity.provider_user_id, identity.username, identity.display_name,
+    identity.profile_url, identity.avatar_url, verifiedAt, now).run();
+  return verifiedAt;
+}
+
+async function startConnection(request, env, provider) {
+  const session = await requireSession(request, env);
+  if (!session) return redirect(new URL("/", env.PUBLIC_BASE_URL).toString());
+  const config = requireConnectionProvider(provider, env);
+  const state = randomToken();
+  const verifier = randomToken(48);
+  const challenge = base64url(await crypto.subtle.digest("SHA-256", encoder.encode(verifier)));
+  const now = Math.floor(Date.now() / 1000);
+  const stateHash = await sha256(state);
+  await env.DB.prepare("DELETE FROM oauth_transactions WHERE expires_at <= ?1").bind(now).run();
+  await env.DB.prepare(
+    "INSERT INTO oauth_transactions (state_hash, provider, owner_telegram_id, session_hash, code_verifier, expires_at, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"
+  ).bind(stateHash, provider, session.telegramId, session.sessionHash, verifier, now + 600, now).run();
+
+  const authorize = new URL(config.authorizeUrl);
+  authorize.searchParams.set("client_id", env[config.clientIdKey]);
+  authorize.searchParams.set("redirect_uri", connectionCallbackUrl(provider, env));
+  authorize.searchParams.set("response_type", "code");
+  authorize.searchParams.set("scope", config.scopes);
+  authorize.searchParams.set("state", state);
+  authorize.searchParams.set("code_challenge", challenge);
+  authorize.searchParams.set("code_challenge_method", "S256");
+  if (provider === "github") authorize.searchParams.set("allow_signup", "false");
+  return redirect(authorize.toString(), [cookieHeader(connectionCookie(provider), state, 600)]);
+}
+
+async function exchangeConnectionCode(provider, code, verifier, env) {
+  const config = requireConnectionProvider(provider, env);
+  const callback = connectionCallbackUrl(provider, env);
+  const form = new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: callback,
+    code_verifier: verifier,
+  });
+  // GitHub OAuth apps accept client credentials in the form body; Discord
+  // uses HTTP Basic client authentication. Do not send both mechanisms.
+  if (provider === "github") {
+    form.set("client_id", env[config.clientIdKey]);
+    form.set("client_secret", env[config.clientSecretKey]);
+  }
+  const headers = { "Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded" };
+  if (provider === "discord") {
+    headers.Authorization = "Basic " + btoa(`${env[config.clientIdKey]}:${env[config.clientSecretKey]}`);
+  }
+  const response = await fetch(config.tokenUrl, { method: "POST", headers, body: form });
+  const tokens = await response.json().catch(() => ({}));
+  if (!response.ok || typeof tokens.access_token !== "string") {
+    console.warn(`${config.label} OAuth code exchange failed`, response.status);
+    throw new Error(`${config.label} did not accept the account-link authorization.`);
+  }
+  return tokens.access_token;
+}
+
+async function fetchConnectedIdentity(provider, accessToken) {
+  if (provider === "github") {
+    const response = await fetch("https://api.github.com/user", {
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "MelloID",
+      },
+    });
+    if (!response.ok) throw new Error("GitHub did not return the authorized account profile.");
+    return normalizeProviderIdentity("github", await response.json());
+  }
+
+  if (provider === "discord") {
+    const response = await fetch("https://discord.com/api/v10/users/@me", {
+      headers: { "Authorization": `Bearer ${accessToken}` },
+    });
+    if (!response.ok) throw new Error("Discord did not return the authorized account profile.");
+    return normalizeProviderIdentity("discord", await response.json());
+  }
+  throw new Error("Unsupported account provider.");
+}
+
+async function finishConnection(request, env, provider) {
+  const config = requireConnectionProvider(provider, env);
+  const url = new URL(request.url);
+  const state = url.searchParams.get("state");
+  const code = url.searchParams.get("code");
+  const stateCookie = connectionCookie(provider);
+  const cookieState = cookie(request, stateCookie);
+  const clearState = expiredCookie(stateCookie);
+  if (url.searchParams.has("error")) {
+    return redirect(new URL("/dashboard?connection_error=authorization_denied", env.PUBLIC_BASE_URL).toString(), [clearState]);
+  }
+  if (!state || !code || !cookieState || state !== cookieState) {
+    return errorPage("The account-link state expired or did not match. Start the connection again.", 400);
+  }
+  const session = await requireSession(request, env);
+  if (!session) return redirect(new URL("/", env.PUBLIC_BASE_URL).toString(), [clearState]);
+
+  const stateHash = await sha256(state);
+  const transaction = await env.DB.prepare(
+    "SELECT owner_telegram_id, session_hash, code_verifier, expires_at FROM oauth_transactions WHERE state_hash = ?1 AND provider = ?2"
+  ).bind(stateHash, provider).first();
+  await env.DB.prepare("DELETE FROM oauth_transactions WHERE state_hash = ?1").bind(stateHash).run();
+  const now = Math.floor(Date.now() / 1000);
+  if (!transaction || transaction.expires_at <= now
+      || transaction.owner_telegram_id !== session.telegramId
+      || transaction.session_hash !== session.sessionHash) {
+    return errorPage("The account-link request expired or no longer matches this signed-in session.", 400);
+  }
+
+  try {
+    const accessToken = await exchangeConnectionCode(provider, code, transaction.code_verifier, env);
+    // The provider token is used only for this identity lookup. It is never
+    // written to D1, exposed to the browser, or retained after this function.
+    const identity = await fetchConnectedIdentity(provider, accessToken);
+    await storeVerifiedConnection(session, provider, identity, env);
+    return redirect(
+      new URL(`/dashboard?connection=${provider}&status=connected`, env.PUBLIC_BASE_URL).toString(),
+      [clearState]
+    );
+  } catch (error) {
+    console.warn("MelloID connection callback failed", provider, error?.message || "unknown error");
+    return redirect(
+      new URL(`/dashboard?connection_error=${provider}`, env.PUBLIC_BASE_URL).toString(),
+      [clearState]
+    );
+  }
+}
+
+
+async function startSteamConnection(request, env) {
+  const session = await requireSession(request, env);
+  if (!session) return redirect(new URL("/", env.PUBLIC_BASE_URL).toString());
+  const state = randomToken();
+  const stateHash = await sha256(state);
+  const now = Math.floor(Date.now() / 1000);
+  const callback = new URL("/auth/connections/steam/callback", env.PUBLIC_BASE_URL);
+  callback.searchParams.set("state", state);
+  const realm = new URL(env.PUBLIC_BASE_URL).origin + "/";
+  await env.DB.prepare("DELETE FROM oauth_transactions WHERE expires_at <= ?1").bind(now).run();
+  await env.DB.prepare("DELETE FROM steam_openid_nonces WHERE expires_at <= ?1").bind(now).run();
+  await env.DB.prepare(
+    "INSERT INTO oauth_transactions (state_hash, provider, owner_telegram_id, session_hash, code_verifier, expires_at, created_at) VALUES (?1, 'steam', ?2, ?3, '', ?4, ?5)"
+  ).bind(stateHash, session.telegramId, session.sessionHash, now + 600, now).run();
+
+  const authorize = new URL(STEAM_OPENID_LOGIN_URL);
+  authorize.searchParams.set("openid.ns", STEAM_OPENID_NAMESPACE);
+  authorize.searchParams.set("openid.mode", "checkid_setup");
+  authorize.searchParams.set("openid.return_to", callback.toString());
+  authorize.searchParams.set("openid.realm", realm);
+  authorize.searchParams.set("openid.identity", `${STEAM_OPENID_NAMESPACE}/identifier_select`);
+  authorize.searchParams.set("openid.claimed_id", `${STEAM_OPENID_NAMESPACE}/identifier_select`);
+  return redirect(authorize.toString(), [cookieHeader(connectionCookie("steam"), state, 600)]);
+}
+
+async function verifySteamAssertion(url, expectedReturnTo) {
+  const assertion = validateSteamOpenIdResponse(
+    url.searchParams,
+    expectedReturnTo,
+    Math.floor(Date.now() / 1000)
+  );
+  if (!assertion) return null;
+
+  const form = new URLSearchParams();
+  for (const [key, value] of url.searchParams.entries()) {
+    if (key.startsWith("openid.") && key !== "openid.mode") form.append(key, value);
+  }
+  form.set("openid.mode", "check_authentication");
+  const response = await fetch(assertion.opEndpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: form,
+  });
+  if (!response.ok) return null;
+  const text = await response.text();
+  if (!text.split(/\r?\n/).some((line) => line.trim() === "is_valid:true")) return null;
+  return assertion;
+}
+
+async function steamPlayerSummary(steamId, env) {
+  if (!env.STEAM_WEB_API_KEY) return null;
+  const url = new URL("https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/");
+  url.searchParams.set("key", env.STEAM_WEB_API_KEY);
+  url.searchParams.set("steamids", steamId);
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const body = await response.json();
+    const player = body.response?.players?.[0];
+    return player?.steamid === steamId ? player : null;
+  } catch {
+    return null;
+  }
+}
+
+async function finishSteamConnection(request, env) {
+  const url = new URL(request.url);
+  const state = url.searchParams.get("state");
+  const stateCookie = connectionCookie("steam");
+  const cookieState = cookie(request, stateCookie);
+  const clearState = expiredCookie(stateCookie);
+  if (!state || !cookieState || state !== cookieState) {
+    return errorPage("The Steam account-link state expired or did not match. Start the connection again.", 400);
+  }
+  const session = await requireSession(request, env);
+  if (!session) return redirect(new URL("/", env.PUBLIC_BASE_URL).toString(), [clearState]);
+
+  const stateHash = await sha256(state);
+  const transaction = await env.DB.prepare(
+    "SELECT owner_telegram_id, session_hash, expires_at FROM oauth_transactions WHERE state_hash = ?1 AND provider = 'steam'"
+  ).bind(stateHash).first();
+  await env.DB.prepare("DELETE FROM oauth_transactions WHERE state_hash = ?1").bind(stateHash).run();
+  const now = Math.floor(Date.now() / 1000);
+  if (!transaction || transaction.expires_at <= now
+      || transaction.owner_telegram_id !== session.telegramId
+      || transaction.session_hash !== session.sessionHash) {
+    return errorPage("The Steam account-link request expired or no longer matches this signed-in session.", 400);
+  }
+
+  try {
+    const callback = new URL("/auth/connections/steam/callback", env.PUBLIC_BASE_URL);
+    callback.searchParams.set("state", state);
+    const assertion = await verifySteamAssertion(url, callback.toString());
+    if (!assertion) throw new Error("Steam OpenID assertion could not be verified.");
+
+    const nonceHash = await sha256(assertion.responseNonce);
+    await env.DB.prepare(
+      "INSERT INTO steam_openid_nonces (nonce_hash, expires_at, created_at) VALUES (?1, ?2, ?3)"
+    ).bind(nonceHash, now + 600, now).run();
+
+    const summary = await steamPlayerSummary(assertion.steamId, env);
+    const identity = normalizeSteamIdentity(assertion.steamId, summary);
+    await storeVerifiedConnection(session, "steam", identity, env);
+    return redirect(
+      new URL("/dashboard?connection=steam&status=connected", env.PUBLIC_BASE_URL).toString(),
+      [clearState]
+    );
+  } catch (error) {
+    console.warn("MelloID Steam OpenID callback failed", error?.message || "unknown error");
+    return redirect(
+      new URL("/dashboard?connection_error=steam", env.PUBLIC_BASE_URL).toString(),
+      [clearState]
+    );
+  }
+}
+
+async function getOwnConnections(session, env) {
+  const result = await env.DB.prepare(
+    "SELECT provider, provider_user_id, username, display_name, profile_url, avatar_url, verified_at, visible FROM connections WHERE owner_telegram_id = ?1 ORDER BY provider"
+  ).bind(session.telegramId).all();
+  return (result.results || []);
+}
+async function updateConnectionVisibility(request, env, session, provider) {
+  if (!requireSameOrigin(request, env)) return json({ error: "Origin check failed." }, 403);
+  if (!SUPPORTED_CONNECTION_PROVIDERS.has(provider)) return json({ error: "Unsupported connection provider." }, 400);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
+  if (!body || typeof body.visible !== "boolean") return json({ error: "visible must be a boolean." }, 400);
+  await env.DB.prepare(
+    "UPDATE connections SET visible = ?1, updated_at = ?2 WHERE owner_telegram_id = ?3 AND provider = ?4"
+  ).bind(body.visible ? 1 : 0, Math.floor(Date.now() / 1000), session.telegramId, provider).run();
+  return json({ ok: true, visible: body.visible });
+}
+async function unlinkConnection(request, env, session, provider) {
+  if (!requireSameOrigin(request, env)) return json({ error: "Origin check failed." }, 403);
+  if (!CONNECTION_PROVIDERS[provider]) return json({ error: "Unsupported connection provider." }, 400);
+  await env.DB.prepare(
+    "DELETE FROM connections WHERE owner_telegram_id = ?1 AND provider = ?2"
+  ).bind(session.telegramId, provider).run();
+  return json({ ok: true });
+}
+
 async function getPublicProfile(slug, env) {
   if (!/^[a-z0-9-]{1,32}$/.test(slug)) return json({ error: "Profile not found." }, 404);
   const row = await env.DB.prepare(
-    "SELECT profile_json, visibility, updated_at FROM profiles WHERE slug = ?1"
+    "SELECT owner_telegram_id, profile_json, visibility, updated_at FROM profiles WHERE slug = ?1"
   ).bind(slug).first();
   if (!row || row.visibility === "private") return json({ error: "Profile not found." }, 404);
-  const profile = publicProfileProjection(JSON.parse(row.profile_json));
+  const linked = await env.DB.prepare(
+    "SELECT provider, provider_user_id, username, display_name, profile_url, avatar_url, verified_at, visible FROM connections WHERE owner_telegram_id = ?1 AND visible = 1"
+  ).bind(row.owner_telegram_id).all();
+  const profile = publicProfileProjection(JSON.parse(row.profile_json), linked.results || []);
   if (!profile) return json({ error: "Profile not found." }, 404);
   return json({ profile, updated_at: row.updated_at }, 200, { "Cache-Control": "public, max-age=60" });
 }
@@ -239,7 +567,35 @@ export default {
       const path = url.pathname;
       if (path === "/auth/telegram/start" && request.method === "GET") return setSecurityHeaders(await startTelegramLogin(request, env));
       if (path === "/auth/telegram/callback" && request.method === "GET") return setSecurityHeaders(await finishTelegramLogin(request, env));
+      const connectionStart = path.match(/^\/auth\/connections\/(github|discord|steam)\/start$/);
+      if (connectionStart && request.method === "GET") {
+        const provider = connectionStart[1];
+        return setSecurityHeaders(await (provider === "steam"
+          ? startSteamConnection(request, env) : startConnection(request, env, provider)));
+      }
+      const connectionCallback = path.match(/^\/auth\/connections\/(github|discord|steam)\/callback$/);
+      if (connectionCallback && request.method === "GET") {
+        const provider = connectionCallback[1];
+        return setSecurityHeaders(await (provider === "steam"
+          ? finishSteamConnection(request, env) : finishConnection(request, env, provider)));
+      }
       if (path === "/auth/logout" && request.method === "POST") return setSecurityHeaders(await logout(request, env));
+      if (path === "/api/v1/me/connections" && request.method === "GET") {
+        const session = await requireSession(request, env);
+        if (!session) return json({ error: "Sign in with Telegram first." }, 401);
+        return setSecurityHeaders(json({ connections: await getOwnConnections(session, env) }));
+      }
+      const connectionVisibility = path.match(/^\/api\/v1\/me\/connections\/(github|discord|steam)$/);
+      if (connectionVisibility && request.method === "PUT") {
+        const session = await requireSession(request, env);
+        if (!session) return json({ error: "Sign in with Telegram first." }, 401);
+        return setSecurityHeaders(await updateConnectionVisibility(request, env, session, connectionVisibility[1]));
+      }
+      if (connectionVisibility && request.method === "DELETE") {
+        const session = await requireSession(request, env);
+        if (!session) return json({ error: "Sign in with Telegram first." }, 401);
+        return setSecurityHeaders(await unlinkConnection(request, env, session, connectionVisibility[1]));
+      }
       if (path === "/api/v1/me/profile" && request.method === "GET") return setSecurityHeaders(await getOwnProfile(request, env));
       if (path === "/api/v1/me/profile" && request.method === "PUT") return setSecurityHeaders(await saveOwnProfile(request, env));
       if (path === "/api/v1/me/profile" && request.method === "DELETE") {
@@ -247,6 +603,8 @@ export default {
         const session = await requireSession(request, env);
         if (!session) return json({ error: "Sign in with Telegram first." }, 401);
         await env.DB.prepare("DELETE FROM profiles WHERE owner_telegram_id = ?1").bind(session.telegramId).run();
+        await env.DB.prepare("DELETE FROM connections WHERE owner_telegram_id = ?1").bind(session.telegramId).run();
+        await env.DB.prepare("DELETE FROM oauth_transactions WHERE owner_telegram_id = ?1").bind(session.telegramId).run();
         return setSecurityHeaders(json({ ok: true }));
       }
       if (path.startsWith("/api/v1/profiles/") && request.method === "GET") {

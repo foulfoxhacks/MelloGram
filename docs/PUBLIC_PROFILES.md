@@ -78,6 +78,57 @@ a 1 MiB local file ceiling).
   are in place.
 - Configure social preview metadata and custom error pages for public pages.
 
+## Verified account connections
+
+The dashboard supports GitHub and Discord account linking through their
+official OAuth authorization-code flows with S256 PKCE, plus Steam through
+Steam Community OpenID 2.0:
+
+- GitHub requests only read:user and reads the authorized /user profile.
+- Discord requests only identify and reads /users/@me.
+- Steam uses a one-time OpenID state tied to the current Telegram session and
+  validates the signed assertion against Steam's own check_authentication endpoint.
+- The callback state is one-time, expires after 10 minutes, and is bound to
+  the current Telegram-backed MelloID session.
+- The provider access token is used only to fetch the account identity; it is
+  not stored in D1, returned to the browser, or retained by the Worker.
+- D1 stores the provider's stable account ID, display name, profile URL,
+  approved avatar URL, verification timestamp, and the owner's public/private
+  visibility choice.
+- The same provider account cannot be linked to two different MelloID owners.
+  Each owner may link one GitHub, one Discord, and one Steam account.
+- Steam profile name and avatar are optional metadata. Set STEAM_WEB_API_KEY
+  as a Wrangler secret to enrich the SteamID64 with the public player summary;
+  Steam OpenID verification works without this key.
+- Users can hide a link from their public profile or disconnect it at any time.
+
+Configure these secrets with Wrangler (do not commit them):
+
+    npx wrangler secret put GITHUB_OAUTH_CLIENT_ID
+    npx wrangler secret put GITHUB_OAUTH_CLIENT_SECRET
+    npx wrangler secret put DISCORD_OAUTH_CLIENT_ID
+    npx wrangler secret put DISCORD_OAUTH_CLIENT_SECRET
+    npx wrangler secret put STEAM_WEB_API_KEY
+
+Register these callback URLs with your GitHub OAuth App and Discord
+application:
+
+    https://YOUR_PROFILE_DOMAIN/auth/connections/github/callback
+    https://YOUR_PROFILE_DOMAIN/auth/connections/discord/callback
+
+Steam does not require an OAuth client ID, secret, or separately registered
+callback. The return URL is constructed by MelloID and includes a one-time
+state parameter. The initial OpenID request fixes the realm to your profile
+domain. The callback requires an exact return URL match, a SteamID64
+claimed_id, signed identity fields, a recent response_nonce, and a successful
+server-to-server check_authentication response before saving the account.
+A nonce hash is stored with a short expiry to prevent replay.
+
+The GitHub OAuth App needs the matching callback URL; the Worker asks only
+for read:user. The Discord application needs the matching redirect URL and
+the identify scope. The service does not request GitHub repository access,
+Discord email, Discord guild access, or Discord connections.
+
 The service stores a Telegram numeric subject ID to associate an owner with
 their profile. It does not request or store a phone number, Telegram MTProto
 session, API hash, or access hash.

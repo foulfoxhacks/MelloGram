@@ -42,7 +42,7 @@ first-class client instead of a patch.
 - **QuickCSS** — live CSS editor.
 - **Backup & Restore** — one JSON file; Telegram credentials never exported.
 - **MelloRPC** — opt-in native presence and Discord Rich Presence IPC bridge; bounded activity leases, local-only Unix sockets/Windows named pipes, SET_ACTIVITY/CLEAR_ACTIVITY compatibility, and a Node.js client example. The listeners are disabled by default and never open a TCP port.
-- **MelloID Public Profiles** — deployable Cloudflare Worker/D1 service with Telegram OIDC login, slug-based public pages, private-field filtering, and JSON import from MelloGram. Requires your own BotFather login credentials and domain before it can be deployed.
+- **MelloID Public Profiles** — Cloudflare Worker/D1 service with Telegram OIDC login, slug-based public pages, private-field filtering, JSON import, and OAuth-verified GitHub/Discord and OpenID-verified Steam links. Requires your own BotFather, GitHub, and Discord OAuth credentials plus a domain before deployment.
 - **MelloID** — dedicated profile studio with structured Bio Studio sections, banner/avatar/accent customization, six themes, five avatar frames, and five profile effects, profile visibility, connection cards, live preview, JSON backup, static public HTML export, reorderable Games/Music/Projects/Communities/Activity/About/Custom Link widgets, self-curated collectibles, and a versioned local identity store. Public hosting, OAuth verification, and live RPC are staged separately.
 - **Telegram** — phone + code + 2FA login, chat list, history with infinite
   scroll, send/reply/edit/delete, file attachments by drag & drop, live updates.

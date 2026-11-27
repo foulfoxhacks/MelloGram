@@ -1,3 +1,25 @@
+## Steam OpenID verification hardening — 2026-11-27
+
+- Added a testable Steam OpenID response validator for exact return URL, signed identity fields, SteamID64, allowed OP endpoint, and recent nonce checks.
+- The callback uses the validated OP endpoint for server-side check_authentication.
+- Expanded connection visibility and disconnect endpoints to include Steam.
+- Added a distinct steam-openid verification issuer marker.
+
+## MelloID Steam account linking — 2026-11-27
+
+- Added Steam Community OpenID 2.0 linking with callback assertion verification and nonce replay protection.
+- Added optional Steam Web API player summary enrichment; account verification does not require a Steam Web API key.
+- Added Steam to verified public connections and dashboard privacy controls.
+
+## MelloID verified connections — 2026-11-27
+
+- Added GitHub OAuth account linking (read:user) and Discord OAuth account linking (identify).
+- Bound one-time PKCE connection requests to the signed-in Telegram session.
+- Stored stable provider account IDs and public profile metadata only; provider tokens are not persisted.
+- Added per-provider visibility toggles and disconnect controls.
+- Added verified external accounts to public profiles only from owner-bound D1 records.
+- Added database uniqueness constraints to prevent one external account being linked to multiple MelloID owners.
+
 ## MelloID Public Profiles service scaffold — 2026-11-27
 
 - Added a Cloudflare Worker/D1 service with Telegram OpenID Connect login and PKCE.
