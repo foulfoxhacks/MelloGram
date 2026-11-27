@@ -2,6 +2,9 @@
 //!
 //! The bridge never opens a TCP listener. Unix builds use filesystem sockets;
 //! Windows builds use named pipes. Both listeners are disabled by default.
+//! Mobile builds have no local IPC listeners, so the protocol handlers are
+//! compiled but unused there.
+#![cfg_attr(mobile, allow(dead_code))]
 
 use std::io;
 use std::sync::Arc;

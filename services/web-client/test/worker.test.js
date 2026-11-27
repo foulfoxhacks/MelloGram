@@ -50,7 +50,7 @@ test("unfinished capabilities are reported as not ready", async () => {
 test("mutating API requests are refused with Allow", async () => {
   const response = await call("/api/status", { method: "POST" });
   assert.equal(response.status, 405);
-  assert.equal(response.headers.get("allow"), "GET, HEAD");
+  assert.equal(response.headers.get("allow"), "GET, HEAD, OPTIONS");
 });
 
 test("unknown API endpoints are JSON 404s, never the shell", async () => {
@@ -90,4 +90,39 @@ test("withSecurityHeaders keeps the body and adds the policy", async () => {
   assert.equal(response.status, 201);
   assert.equal(await response.text(), "ok");
   assert.equal(response.headers.get("permissions-policy").includes("camera=()"), true);
+});
+
+const apiEnv = () => env({ API_BASE_URL: "https://wc-api.example.com" });
+const callApi = (path, init) => worker.fetch(new Request(`https://wc-api.example.com${path}`, init), apiEnv());
+
+test("the API host serves only the API", async () => {
+  const status = await callApi("/api/status");
+  assert.equal(status.status, 200);
+  assert.equal((await status.json()).api, "https://wc-api.example.com");
+  const page = await callApi("/index.html");
+  assert.equal(page.status, 404);
+  assert.equal((await callApi("/")).status, 200);
+});
+
+test("CORS is granted to the web client origin only", async () => {
+  const ok = await callApi("/api/status", { headers: { Origin: "https://wc.example.com" } });
+  assert.equal(ok.headers.get("access-control-allow-origin"), "https://wc.example.com");
+  assert.match(ok.headers.get("vary"), /Origin/);
+  const other = await callApi("/api/status", { headers: { Origin: "https://evil.example" } });
+  assert.equal(other.headers.get("access-control-allow-origin"), null);
+  const preflight = await callApi("/api/status", { method: "OPTIONS", headers: { Origin: "https://evil.example" } });
+  assert.equal(preflight.status, 403);
+  const good = await callApi("/api/status", { method: "OPTIONS", headers: { Origin: "https://wc.example.com" } });
+  assert.equal(good.status, 204);
+});
+
+test("plain HTTP is upgraded and HSTS is always sent", async () => {
+  const redirect = await worker.fetch(new Request("http://wc.example.com/chat?x=1"), env());
+  assert.equal(redirect.status, 308);
+  assert.equal(redirect.headers.get("location"), "https://wc.example.com/chat?x=1");
+  const post = await worker.fetch(new Request("http://wc.example.com/api/status", { method: "POST" }), env());
+  assert.equal(post.status, 403);
+  const page = await call("/");
+  assert.match(page.headers.get("strict-transport-security"), /max-age=\d+/);
+  assert.match(page.headers.get("content-security-policy"), /upgrade-insecure-requests/);
 });

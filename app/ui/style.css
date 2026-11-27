@@ -591,3 +591,9 @@ body.mg-wallpaper-target-window { background: var(--mg-bg); }
 .mg-message.mg-e2e-locked .mg-text { font-family: var(--mg-mono); font-size: .82em; opacity: .75; word-break: break-all; }
 /* Safety numbers wrap in groups of five instead of scrolling sideways. */
 .mg-e2e-safety { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Profile photos sit over the initials once loaded. */
+.mg-avatar { overflow: visible; }
+.mg-avatar-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.mg-avatar.mg-has-photo { color: transparent; }
+.mg-tag-premium { color: var(--mg-warning); }

@@ -110,10 +110,55 @@
   // ---- chats ------------------------------------------------------------------
 
   const AVATAR_COLORS = ["#e17076", "#7bc862", "#e5ca77", "#65aadd", "#a695e7", "#ee7aae", "#6ec9cb", "#faa774"];
-  function avatar(name, id) {
+  function avatar(name, id, photo) {
     const initials = (name || "?").split(/\s+/).map((w) => [...w][0] || "").join("").slice(0, 2).toUpperCase();
-    return h("div", { class: "mg-avatar", style: `background:${AVATAR_COLORS[Math.abs(Number(id)) % AVATAR_COLORS.length]}`, text: initials });
+    const el = h("div", { class: "mg-avatar", style: `background:${AVATAR_COLORS[Math.abs(Number(id)) % AVATAR_COLORS.length]}`, text: initials });
+    if (photo) Photos.attach(el, id, photo);
+    return el;
   }
+
+  // Profile photos: downloaded by the backend (small 160px version), cached on
+  // disk by photo id, loaded lazily as avatars scroll into view, at most four
+  // downloads at a time. Initials stay visible until (and unless) a photo loads.
+  const Photos = (() => {
+    const urls = new Map();   // "chat:photo" -> Promise<url|null>
+    const queue = [];
+    let running = 0;
+    const pump = () => {
+      while (running < 4 && queue.length) {
+        const job = queue.shift();
+        running++;
+        Bridge.invoke("chat_photo", { chatId: job.id, photoId: job.photo })
+          .catch(() => null)
+          .then((u) => { running--; job.resolve(u); pump(); });
+      }
+    };
+    const get = (id, photo) => {
+      const key = `${id}:${photo}`;
+      if (!urls.has(key)) urls.set(key, new Promise((resolve) => { queue.push({ id, photo, resolve }); pump(); }));
+      return urls.get(key);
+    };
+    const load = async (el) => {
+      const url = await get(el.dataset.photoChat, el.dataset.photo);
+      if (!url || !el.isConnected) return;
+      const img = h("img", { class: "mg-avatar-img", alt: "", src: url, draggable: false });
+      img.addEventListener("load", () => el.classList.add("mg-has-photo"));
+      img.addEventListener("error", () => img.remove());
+      el.append(img);
+    };
+    const io = "IntersectionObserver" in window
+      ? new IntersectionObserver((entries) => {
+        for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); load(e.target); }
+      }, { rootMargin: "200px" })
+      : null;
+    return {
+      attach(el, id, photo) {
+        el.dataset.photoChat = String(id);
+        el.dataset.photo = String(photo);
+        if (io) io.observe(el); else load(el);
+      },
+    };
+  })();
 
   async function refreshChats() {
     try {
@@ -150,7 +195,7 @@
         onclick: () => openChat(c),
         oncontextmenu: (e) => { e.preventDefault(); chatMenu(e, c); },
       },
-      avatar(c.title, c.id),
+      avatar(c.title, c.id, c.photo),
       h("div", { class: "mg-chat-meta" },
         h("div", { class: "mg-chat-top" }, h("span", { class: "mg-chat-name", text: c.title }), h("span", { class: "mg-chat-time", text: shortTime(c.last_date) })),
         h("div", { class: "mg-chat-last", text: c.last_text || "" })),

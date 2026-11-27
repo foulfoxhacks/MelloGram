@@ -4,6 +4,7 @@
 //!
 //! You need your own `api_id` / `api_hash` from <https://my.telegram.org>;
 //! MelloGram ships none.
+#![forbid(unsafe_code)]
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -108,6 +109,10 @@ pub struct ChatSummary {
     pub presence: Option<Presence>,
     pub verified: bool,
     pub bot: bool,
+    /// Current profile photo id, as a string (it does not fit a JS number).
+    /// `None` when the chat has no photo; changes when the photo changes, so
+    /// it doubles as a cache key.
+    pub photo: Option<String>,
 }
 
 /// A user's online status as precisely as their privacy settings allow.
@@ -170,6 +175,29 @@ pub struct ChatInfo {
     pub members_hidden: bool,
     pub blocked: bool,
     pub birthday: Option<String>,
+    /// Current profile photo id (string: it does not fit a JS number).
+    pub photo: Option<String>,
+    pub premium: bool,
+    /// In your contacts / they have you in theirs too.
+    pub contact: bool,
+    pub mutual_contact: bool,
+    /// Active collectible / extra usernames besides the main one.
+    pub extra_usernames: Vec<String>,
+    /// Channel shown on the user's profile (Bot-API id).
+    pub personal_channel_id: Option<i64>,
+    pub business_location: Option<String>,
+    pub business_intro: Option<String>,
+    pub business_timezone: Option<String>,
+    pub business_open_now: Option<bool>,
+    /// Bot description ("What can this bot do?").
+    pub bot_description: Option<String>,
+    pub gifts: Option<i32>,
+    pub language: Option<String>,
+    pub calls_available: bool,
+    /// Location-based groups.
+    pub location: Option<String>,
+    pub join_requests: Option<i32>,
+    pub boosts: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -353,6 +381,7 @@ impl Telegram {
                 presence: match peer { Peer::User(u) => Some(user_presence(u)), _ => None },
                 verified: match peer { Peer::User(u) => u.verified(), _ => false },
                 bot: matches!(peer, Peer::User(u) if u.is_bot()),
+                photo: peer_photo_id(peer).map(|id| id.to_string()),
             });
         }
         Ok(out)
@@ -485,7 +514,36 @@ impl Telegram {
                 if let Some(tl::enums::Birthday::Birthday(b)) = f.birthday {
                     info.birthday = Some(match b.year { Some(y) => format!("{y:04}-{:02}-{:02}", b.month, b.day), None => format!("{:02}-{:02}", b.month, b.day) });
                 }
+                info.personal_channel_id = f.personal_channel_id.map(|id| PeerId::channel_unchecked(id).bot_api_dialog_id_unchecked());
+                if let Some(tl::enums::BusinessLocation::Location(l)) = &f.business_location {
+                    info.business_location = Some(l.address.clone()).filter(|a| !a.is_empty());
+                }
+                if let Some(tl::enums::BusinessIntro::Intro(i)) = &f.business_intro {
+                    let text = [i.title.as_str(), i.description.as_str()].iter().filter(|t| !t.is_empty()).copied().collect::<Vec<_>>().join(" — ");
+                    info.business_intro = Some(text).filter(|t| !t.is_empty());
+                }
+                if let Some(tl::enums::BusinessWorkHours::Hours(h)) = &f.business_work_hours {
+                    info.business_timezone = Some(h.timezone_id.clone());
+                    info.business_open_now = Some(h.open_now);
+                }
+                if let Some(tl::enums::BotInfo::Info(b)) = &f.bot_info {
+                    info.bot_description = b.description.clone().filter(|d| !d.is_empty());
+                }
+                info.gifts = f.stargifts_count.filter(|n| *n > 0);
+                info.calls_available = f.phone_calls_available;
                 if let Some(u) = user {
+                    info.premium = u.premium;
+                    info.contact = u.contact;
+                    info.mutual_contact = u.mutual_contact;
+                    info.language = u.lang_code.clone();
+                    info.photo = match &u.photo {
+                        Some(tl::enums::UserProfilePhoto::Photo(p)) => Some(p.photo_id.to_string()),
+                        _ => None,
+                    };
+                    info.extra_usernames = u.usernames.iter().flatten().filter_map(|n| match n {
+                        tl::enums::Username::Username(n) if n.active && Some(&n.username) != u.username.as_ref() => Some(n.username.clone()),
+                        _ => None,
+                    }).collect();
                     let first = u.first_name.clone().unwrap_or_default();
                     let last = u.last_name.clone().unwrap_or_default();
                     info.title = format!("{first} {last}").trim().to_owned();
@@ -506,7 +564,8 @@ impl Telegram {
                     _ => None,
                 };
                 let title = full.chats.iter().find_map(|c| match c { tl::enums::Chat::Chat(c) if c.id == f.id => Some(c.title.clone()), _ => None }).unwrap_or_default();
-                Ok(ChatInfo { id: chat_id, kind: "group", title, about: Some(f.about).filter(|a| !a.is_empty()), members, pinned_message_id: f.pinned_msg_id, auto_delete_seconds: f.ttl_period, invite_link: invite(&f.exported_invite), can_view_members: true, ..Default::default() })
+                let photo = match &f.chat_photo { Some(tl::enums::Photo::Photo(p)) => Some(p.id.to_string()), _ => None };
+                Ok(ChatInfo { id: chat_id, kind: "group", title, photo, about: Some(f.about).filter(|a| !a.is_empty()), members, pinned_message_id: f.pinned_msg_id, auto_delete_seconds: f.ttl_period, invite_link: invite(&f.exported_invite), can_view_members: true, ..Default::default() })
             }
             PeerKind::Channel => {
                 let tl::enums::messages::ChatFull::Full(full) = self.client.invoke(&tl::functions::channels::GetFullChannel { channel: (&peer).into() }).await?;
@@ -528,6 +587,11 @@ impl Telegram {
                     invite_link: invite(&f.exported_invite),
                     can_view_members: f.can_view_participants,
                     members_hidden: f.participants_hidden,
+                    location: match &f.location { Some(tl::enums::ChannelLocation::Location(l)) => Some(l.address.clone()), _ => None },
+                    join_requests: f.requests_pending.filter(|n| *n > 0),
+                    boosts: f.boosts_applied.filter(|n| *n > 0),
+                    gifts: f.stargifts_count.filter(|n| *n > 0),
+                    photo: match &f.chat_photo { tl::enums::Photo::Photo(p) => Some(p.id.to_string()), _ => None },
                     ..Default::default()
                 };
                 if let Some(c) = ch {
@@ -997,7 +1061,40 @@ pub enum MediaVariant {
     Thumbnail,
 }
 
+/// The id of a peer's current profile photo, if it has one.
+pub fn peer_photo_id(peer: &Peer) -> Option<i64> {
+    match peer {
+        Peer::User(u) => u.photo().map(|p| p.photo_id),
+        Peer::Group(g) => g.photo().map(|p| p.photo_id),
+        Peer::Channel(c) => c.photo().map(|p| p.photo_id),
+        _ => None,
+    }
+}
+
 impl Telegram {
+    /// Downloads a chat's profile photo (small 160px, or `big` 640px) to `dest`.
+    /// Uses the photo id from the chat list, so a changed photo gets a new file.
+    pub async fn download_profile_photo(&self, chat_id: i64, photo_id: i64, big: bool, dest: &std::path::Path) -> Result<bool> {
+        let max_bytes: u64 = if big { 4 * 1024 * 1024 } else { 512 * 1024 };
+        let peer = self.peer_ref(chat_id).await?;
+        let photo = grammers_client::media::ChatPhoto {
+            raw: tl::enums::InputFileLocation::InputPeerPhotoFileLocation(tl::types::InputPeerPhotoFileLocation {
+                big,
+                peer: peer.into(),
+                photo_id,
+            }),
+        };
+        let tmp = dest.with_extension("part");
+        self.client.download_media(&photo, &tmp).await?;
+        let len = tokio::fs::metadata(&tmp).await.map(|m| m.len()).unwrap_or(0);
+        if len == 0 || len > max_bytes {
+            let _ = tokio::fs::remove_file(&tmp).await;
+            return Ok(false);
+        }
+        tokio::fs::rename(&tmp, dest).await?;
+        Ok(true)
+    }
+
     /// Downloads a message's media (or its thumbnail) to `dest`. Refuses files
     /// larger than `max_bytes`. Writes to a temporary file and renames it, so a
     /// partial download never looks complete. Returns `false` if there is nothing to download.

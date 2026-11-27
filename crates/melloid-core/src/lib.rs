@@ -3,6 +3,7 @@
 //! Public profile hosting, OAuth verification and live presence transport are
 //! intentionally separate services. This crate defines the versioned contract
 //! shared by the client and those future services.
+#![forbid(unsafe_code)]
 
 mod model;
 mod store;

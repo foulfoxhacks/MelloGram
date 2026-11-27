@@ -1,6 +1,7 @@
 //! MelloRPC's transport-neutral wire protocol, Discord IPC framing and
 //! activity lease model. This crate deliberately contains no socket listener;
 //! transports are separate so local IPC can be tested and secured independently.
+#![forbid(unsafe_code)]
 
 use std::collections::BTreeMap;
 

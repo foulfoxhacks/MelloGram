@@ -45,10 +45,32 @@ node dev.mjs 8787            # preview the shell without Wrangler
 scripts/build-wasm.sh        # rebuild public/wasm after changing the crate
 ```
 
-Deploy with `npx wrangler deploy` once the Cloudflare account and the
-`wc.mellogram.foulfoxhacks.dev` route are configured. The Worker needs no
-secrets, database or KV namespace yet; adding one should come with the feature
-that needs it.
+### Deployment
+
+One Worker serves two custom domains (see `wrangler.toml`):
+
+| Host | Serves |
+| --- | --- |
+| `wc.mellogram.foulfoxhacks.dev` | the shell, plus same-origin `/api/*` |
+| `wc-api.mellogram.foulfoxhacks.dev` | the API only (`/api/*`); anything else is a JSON 404 |
+
+Transport and endpoint rules, all covered by `npm test`:
+
+- HTTPS only: plain HTTP `GET`/`HEAD` gets a `308` to HTTPS, writes get `403`;
+  every response sends `Strict-Transport-Security` and the CSP includes
+  `upgrade-insecure-requests`.
+- The API grants CORS to the web client origin (`PUBLIC_BASE_URL`) only,
+  with `Vary: Origin`; other origins get no CORS headers and a `403` preflight.
+  No credentials are ever accepted cross-origin.
+- Only `GET`, `HEAD` and `OPTIONS` exist; everything else is `405`.
+
+`.github/workflows/web-client.yml` tests and deploys on pushes to `main` that
+touch this folder, then smoke-tests both hostnames over TLS and checks HSTS
+and CORS. Add the repository secrets `CLOUDFLARE_API_TOKEN` (Workers Scripts
+edit + Workers Routes on the `foulfoxhacks.dev` zone) and
+`CLOUDFLARE_ACCOUNT_ID`; without them the workflow tests and skips the deploy.
+Manual deploy: `npx wrangler deploy`. The Worker needs no secrets, database or
+KV namespace yet.
 
 ## Layout
 

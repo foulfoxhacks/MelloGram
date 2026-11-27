@@ -1,5 +1,7 @@
 //! MelloGram app entry point, shared by desktop (`main.rs`) and mobile
 //! (Android/iOS load this library and call the mobile entry point).
+// No hand-written unsafe code; Tauri macro expansions are exempt.
+#![deny(unsafe_code)]
 
 mod background;
 mod commands;
@@ -78,6 +80,7 @@ pub fn run() {
             commands::chat_members,
             media::media_file,
             media::media_lottie,
+            media::chat_photo,
             media::save_media,
             media::send_location,
             media::get_media_settings,
@@ -151,8 +154,11 @@ pub fn run() {
                     api.prevent_close();
                 }
             }
-            if let tauri::WindowEvent::Focused(true) = event {
-                background::window_focused_again(window.app_handle());
+            if let tauri::WindowEvent::Focused(focused) = event {
+                background::set_mobile_focus(*focused);
+                if *focused {
+                    background::window_focused_again(window.app_handle());
+                }
             }
             if let tauri::WindowEvent::Destroyed = event {
                 if let Some(state) = window.app_handle().try_state::<Arc<state::AppState>>() {

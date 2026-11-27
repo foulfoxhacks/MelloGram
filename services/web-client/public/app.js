@@ -46,11 +46,25 @@ function failed() {
   note.textContent = "";
 }
 
+// On wc.<domain> the API lives on wc-api.<domain>; elsewhere (local dev,
+// previews) it is same-origin. The same-origin route is the fallback.
+const API_BASE = location.protocol === "https:" && location.hostname.startsWith("wc.")
+  ? `https://wc-api.${location.hostname.slice(3)}`
+  : "";
+
+async function getStatus(base) {
+  const response = await fetch(`${base}/api/status`, {
+    headers: { Accept: "application/json" },
+    credentials: "omit",
+    mode: base ? "cors" : "same-origin",
+  });
+  if (!response.ok) throw new Error(String(response.status));
+  return response.json();
+}
+
 async function refresh() {
   try {
-    const response = await fetch("/api/status", { headers: { Accept: "application/json" } });
-    if (!response.ok) throw new Error(String(response.status));
-    render(await response.json());
+    render(await getStatus(API_BASE).catch(() => (API_BASE ? getStatus("") : Promise.reject())));
   } catch {
     failed();
   }

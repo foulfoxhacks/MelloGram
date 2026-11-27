@@ -654,5 +654,14 @@ pub fn restart_app(state: S<'_>, safe_mode: bool) -> R<()> {
         std::fs::write(state.dir.join("safe-mode"), b"1").map_err(err)?;
     }
     state.shutdown();
+    // Android/iOS cannot relaunch their own process (Tauri's restart would
+    // spawn the app binary as a child process); close the app instead and
+    // let the user reopen it. Safe mode is picked up on the next launch.
+    #[cfg(mobile)]
+    {
+        state.app.exit(0);
+        Ok(())
+    }
+    #[cfg(desktop)]
     state.app.restart();
 }

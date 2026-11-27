@@ -50,6 +50,7 @@ export function status(env = {}) {
     version: VERSION,
     stage: "skeleton",
     origin: env.PUBLIC_BASE_URL || null,
+    api: env.API_BASE_URL || null,
     capabilities: capabilities(),
   };
 }

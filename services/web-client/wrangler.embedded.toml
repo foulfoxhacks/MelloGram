@@ -1,0 +1,15 @@
+# Same Worker as wrangler.toml, with the static shell bundled into the
+# script (see scripts/embed-assets.mjs) instead of Workers Static Assets.
+# Run `node scripts/embed-assets.mjs` first.
+name = "mellogram-web-client"
+main = "src/worker-embedded.js"
+compatibility_date = "2026-11-27"
+workers_dev = false
+
+routes = [
+  { pattern = "wc.mellogram.foulfoxhacks.dev", custom_domain = true },
+  { pattern = "wc-api.mellogram.foulfoxhacks.dev", custom_domain = true },
+]
+[vars]
+PUBLIC_BASE_URL = "https://wc.mellogram.foulfoxhacks.dev"
+API_BASE_URL = "https://wc-api.mellogram.foulfoxhacks.dev"
