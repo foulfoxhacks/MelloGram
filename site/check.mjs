@@ -124,7 +124,11 @@ if (!existsSync(join(DIST, "llms-full.txt"))) problems.push("llms-full.txt missi
 if (!existsSync(join(DIST, "assets", "sitemap.css"))) problems.push("CSS sitemap stylesheet missing");
 else {
   const css = readFileSync(join(DIST, "assets", "sitemap.css"), "utf8");
-  if (!css.includes("#79baff") || !css.includes("urlset") || !css.includes("/assets/logo.png")) problems.push("sitemap.css is missing MelloGram styling or XML selectors");
+  if (!css.includes("#79baff") || !css.includes("urlset") || !css.includes("/assets/logo.png") ||
+      !css.includes('@namespace url("http://www.sitemaps.org/schemas/sitemap/0.9")') ||
+      !css.includes('@namespace image url("http://www.google.com/schemas/sitemap-image/1.1")')) {
+    problems.push("sitemap.css is missing MelloGram styling, logo or XML namespace selectors");
+  }
 }
 if (!sitemap.includes('<?xml-stylesheet type="text/css" href="/assets/sitemap.css"?>')) problems.push("sitemap.xml missing CSS stylesheet reference");
 if (sitemap.includes("text/xsl") || existsSync(join(DIST, "sitemap.xsl"))) problems.push("deprecated XSL sitemap stylesheet is still present");
