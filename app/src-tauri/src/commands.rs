@@ -7,6 +7,7 @@ use std::sync::Arc;
 use mellogram_core::{CommandDef, OutgoingFile, OutgoingMessage, PluginInfo, Theme};
 use mellogram_core::settings::{GeneralSettings, NotificationSettings};
 use mellogram_telegram::{ChatSummary, LoginState, SendResult};
+use melloid_core::MelloProfile;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tauri::{Emitter, State};
@@ -73,6 +74,21 @@ pub async fn set_credentials(state: S<'_>, api_id: i32, api_hash: String) -> R<(
     }
     state.save()?;
     state.connect(api_id, api_hash).await
+}
+
+// ---- MelloID identity ------------------------------------------------------------
+
+/// Returns the locally stored MelloID profile. The profile is not published
+/// until an authenticated public-profile service is connected.
+#[tauri::command]
+pub fn get_melloid_profile(state: S<'_>) -> MelloProfile {
+    state.melloid.lock().unwrap().profile().clone()
+}
+
+/// Validates and atomically persists the editable MelloID profile.
+#[tauri::command]
+pub fn save_melloid_profile(state: S<'_>, profile: MelloProfile) -> R<()> {
+    state.melloid.lock().unwrap().save(profile).map_err(err)
 }
 
 // ---- login -----------------------------------------------------------------------
