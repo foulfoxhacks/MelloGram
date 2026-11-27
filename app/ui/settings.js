@@ -370,7 +370,22 @@
       h("div", { class: "mg-field" }, h("label", { text: "Toast duration (ms)" }),
         h("input", { type: "number", min: 1000, max: 60000, value: n.timeout_ms, onchange: (e) => { n.timeout_ms = Number(e.target.value); save(); } })),
       h("div", { class: "mg-field-row" }, h("label", { text: "Test" }), h("button", { class: "mg-btn", text: "Show a toast", onclick: () => UI.toast("Hello from MelloGram!", "success") })),
+      h("h3", { text: "Message notifications" }),
+      h("p", { class: "mg-hint", text: "Native notifications appear while MelloGram is hidden, minimised to the tray, or in the background." }),
+      nrow("desktop", "Notify about new messages", "Uses your system's notification centre."),
+      nrow("show_previews", "Show sender and message text", "Turn off to show only “New message” — useful on shared screens."),
+      nrow("dnd", "Do Not Disturb", "No message notifications at all. Also in the tray menu."),
+      nrow("notify_own", "Notify for my messages from other devices", ""),
+      nrow("quiet_hours", "Quiet hours", "Silence notifications every day between these hours."),
+      h("div", { class: "mg-toolbar" },
+        h("label", { text: "From" }), h("input", { type: "number", min: 0, max: 23, value: n.quiet_start, style: "width:80px", onchange: (e) => { n.quiet_start = Math.min(23, Math.max(0, Number(e.target.value) || 0)); save(); } }),
+        h("label", { text: "to" }), h("input", { type: "number", min: 0, max: 23, value: n.quiet_end, style: "width:80px", onchange: (e) => { n.quiet_end = Math.min(23, Math.max(0, Number(e.target.value) || 0)); save(); } }),
+        h("span", { class: "mg-hint", text: "(24-hour clock, local time)" })),
+      h("p", { class: "mg-hint", text: `${(n.muted_chats || []).length} muted chat(s). Right-click a chat → Mute notifications.` }),
     ];
+    function nrow(key, label, hint) {
+      return h("div", { class: "mg-field-row" }, h("div", {}, h("label", { text: label }), hint ? h("div", { class: "mg-hint", text: hint }) : null), sw(!!n[key], (v) => { n[key] = v; save(); }));
+    }
   }
 
   function renderGeneral() {
@@ -381,6 +396,11 @@
       h("h2", { text: "General" }),
       row("auto_check_updates", "Check for updates on launch", "Looks for new GitHub releases. Nothing else is sent."),
       row("developer_mode", "Developer mode", "Shows the Developer tab with the live stylesheet and event log."),
+      h("h3", { text: "Background" }),
+      row("close_to_tray", "Keep running in the tray when closed", "Closing the window hides MelloGram; it keeps receiving messages and notifying you. Quit from the tray icon."),
+      row("start_minimized", "Start minimised to the tray", "Opens in the background; click the tray icon to show it."),
+      row("launch_at_login", "Launch when you sign in", "Starts MelloGram (minimised) when you log in to your computer."),
+      h("p", { class: "mg-hint", text: "Tray, background and launch-at-login are available on Windows, Linux and macOS." }),
     ];
   }
 

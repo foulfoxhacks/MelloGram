@@ -1,6 +1,7 @@
 //! MelloGram app entry point, shared by desktop (`main.rs`) and mobile
 //! (Android/iOS load this library and call the mobile entry point).
 
+mod background;
 mod commands;
 mod extras;
 mod mellorpc;
@@ -20,7 +21,13 @@ pub fn run() {
         )
         .try_init();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default().plugin(tauri_plugin_notification::init());
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_autostart::init(
+        tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+        Some(vec!["--minimized"]),
+    ));
+    builder
         .setup(|app| {
             let dir = app.path().app_config_dir()?;
             let state = Arc::new(state::AppState::open(app.handle().clone(), dir)?);
@@ -29,6 +36,7 @@ pub fn run() {
             state.publish_presence();
             let rpc = state.store.lock().unwrap().settings.rpc.clone();
             mellorpc::start(Arc::clone(&state), rpc.native_enabled, rpc.discord_compat_enabled);
+            background::setup(app.handle(), &state)?;
             // Reconnect in the background if credentials are already saved.
             let connection_state = Arc::clone(&state);
             tauri::async_runtime::spawn(async move {
@@ -110,6 +118,14 @@ pub fn run() {
             extras::restart_app,
         ])
         .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if background::intercept_close(window) {
+                    api.prevent_close();
+                }
+            }
+            if let tauri::WindowEvent::Focused(true) = event {
+                background::window_focused_again(window.app_handle());
+            }
             if let tauri::WindowEvent::Destroyed = event {
                 if let Some(state) = window.app_handle().try_state::<Arc<state::AppState>>() {
                     state.shutdown();

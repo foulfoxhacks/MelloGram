@@ -88,6 +88,7 @@ pub struct AppState {
     pub plugins: Mutex<PluginManager>,
     pub themes: ThemeManager,
     pub cache: Mutex<MessageCache>,
+    pub background: crate::background::BackgroundState,
     pub tg: AsyncMutex<Option<Arc<Telegram>>>,
 }
 
@@ -133,6 +134,7 @@ impl AppState {
             plugins: Mutex::new(plugins),
             themes,
             cache: Mutex::new(MessageCache::default()),
+            background: Default::default(),
             tg: AsyncMutex::new(None),
         })
     }
@@ -206,6 +208,9 @@ impl AppState {
                     _ => {}
                 }
                 let ui = state.process_event(event);
+                if let UiEvent::NewMessage(m) = &ui {
+                    crate::background::notify_message(&state, m);
+                }
                 let _ = state.app.emit("mg://event", ui);
             }
         });

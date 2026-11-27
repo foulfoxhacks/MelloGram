@@ -9,6 +9,7 @@
 //!   Telegram library so plugins can be unit-tested without a network.
 
 pub mod appearance;
+pub mod background;
 pub mod manager;
 pub mod model;
 pub mod plugin;

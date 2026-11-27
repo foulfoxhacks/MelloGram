@@ -22,7 +22,7 @@ mellogram-plugins.workspace = true
 mellogram-telegram.workspace = true
 melloid-core.workspace = true
 mellorpc-core.workspace = true
-tauri = { version = "2", features = ["protocol-asset"] }
+tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
 serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
@@ -32,3 +32,8 @@ ureq = "2"
 sha2 = "0.10"
 getrandom = "0.2"
 base64 = "0.22"
+chrono.workspace = true
+tauri-plugin-notification = "2"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-autostart = "2"
