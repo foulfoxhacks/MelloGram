@@ -49,9 +49,51 @@ Setup installer that is signed separately. If you need both files signed
 end-to-end, sign `target/release/mellogram.exe` in the build step, before the
 bundles are produced.
 
-Remaining work after the secrets exist: verify one release by hand on each OS
-(SmartScreen, Gatekeeper `spctl -a -vv`, `apksigner verify --print-certs`) and
-record the results in `docs/RELEASING.md`.
+**Windows and Apple certificates are deliberately skipped for now.** Those two
+steps are inert without their secrets, so leaving them in place costs nothing;
+ignore them until you have the certificates.
+
+### Signing the APK on your own machine (Windows)
+
+`cargo tauri android build --apk` emits an **unsigned, universal** APK:
+
+```
+app\src-tauri\gen\android\app\build\outputs\apk\universal\release\app-universal-release-unsigned.apk
+```
+
+Aligning or signing `apk\arm64_v8a\...` fails with "No such file or directory"
+because a universal build does not create per-ABI folders. Use the helper, which
+finds the right file, aligns, signs, verifies and writes checksums:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/sign-android.ps1
+# or point it at a specific keystore / APK
+powershell -ExecutionPolicy Bypass -File scripts/sign-android.ps1 -Keystore C:\keys\mellogram.jks -Alias mellogram
+```
+
+It reads the keystore password from `MELLOGRAM_KEYSTORE_PASSWORD` or prompts for
+it, keeps it out of the command line and PowerShell history, signs the `.aab`
+with `jarsigner` when one exists, and leaves
+`dist\MelloGram-android.apk` + `dist\SHA256SUMS`.
+
+Back up the `.jks` somewhere safe and offline: losing it means nobody who
+installed the app can be updated again.
+
+### Putting the keystore into CI
+
+Once the APK above verifies, CI can sign the same way. On Windows:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("$HOME\mellogram-release.jks")) | Set-Clipboard
+```
+
+Add it as `ANDROID_KEYSTORE_BASE64`, then `ANDROID_KEYSTORE_PASSWORD`,
+`ANDROID_KEY_ALIAS` (the alias, e.g. `mellogram`) and `ANDROID_KEY_PASSWORD`.
+The Android job then signs with your key instead of the debug fallback.
+
+Remaining work after that: verify one release by hand on each OS you ship
+(`apksigner verify --print-certs`, `spctl -a -vv` if macOS signing is ever added)
+and record the results in `docs/RELEASING.md`.
 
 ## 3. Where a browser overlay secret lives
 

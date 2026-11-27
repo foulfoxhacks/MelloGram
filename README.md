@@ -178,6 +178,7 @@ scripts/release.sh local android      # .apk and .aab
 scripts/release.sh ci v0.2.0          # tag, push, wait for CI, download every package
 scripts/release.sh assets v0.2.0      # download packages for a tag that already ran
 scripts/release.sh publish v0.2.0     # create/update the release, with SHA256SUMS, from dist/release-v0.2.0
+scripts/sign-android.ps1              # Windows: align, sign and verify the local APK/AAB
 ```
 
 `ci` pushes the tag, which triggers the workflow; its `release` job already
