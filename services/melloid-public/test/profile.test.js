@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { publicProfileProjection, validateAndSanitizeProfile } from "../src/profile.js";
+import { projectVerifiedConnection, publicProfileProjection, validateAndSanitizeProfile } from "../src/profile.js";
 
 function sample() {
   return {
@@ -87,4 +87,31 @@ test("visibility flags must be real booleans to prevent hidden-field leakage", (
   const widgetProfile = sample();
   widgetProfile.widgets[0].enabled = "false";
   assert.throws(() => validateAndSanitizeProfile(widgetProfile));
+});
+
+test("verified link projection rejects malformed or hidden D1 records", () => {
+  assert.equal(projectVerifiedConnection({
+    provider: "github",
+    provider_user_id: "123",
+    username: "sample",
+    profile_url: "javascript:alert(1)",
+    verified_at: "2026-11-27T00:00:00Z",
+    visible: 1
+  }), null);
+  assert.equal(projectVerifiedConnection({
+    provider: "discord",
+    provider_user_id: "123",
+    username: "sample",
+    profile_url: "https://discord.com/users/123",
+    verified_at: "2026-11-27T00:00:00Z",
+    visible: 0
+  }), null);
+  assert.equal(projectVerifiedConnection({
+    provider: "steam",
+    provider_user_id: "123",
+    username: "sample",
+    profile_url: "https://steamcommunity.com/id/sample",
+    verified_at: "2026-11-27T00:00:00Z",
+    visible: 1
+  }), null);
 });

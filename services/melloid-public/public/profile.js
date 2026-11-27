@@ -73,6 +73,9 @@ function render(profile) {
     for (const connection of profile.connections) {
       const item = el("div", "connection");
       item.append(el("strong", "", connection.provider), el("span", "", connection.display_name));
+      if (connection.verification_issuer) {
+        item.append(el("small", "verified-label", "✓ OAuth verified"));
+      }
       const link = safeUrl(connection.profile_url);
       if (link) {
         const anchor = el("a", "", "Open ↗");

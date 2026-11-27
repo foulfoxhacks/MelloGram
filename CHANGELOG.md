@@ -1,3 +1,12 @@
+## MelloID verified connections — 2026-11-27
+
+- Added GitHub OAuth account linking (read:user) and Discord OAuth account linking (identify).
+- Bound one-time PKCE connection requests to the signed-in Telegram session.
+- Stored stable provider account IDs and public profile metadata only; provider tokens are not persisted.
+- Added per-provider visibility toggles and disconnect controls.
+- Added verified external accounts to public profiles only from owner-bound D1 records.
+- Added database uniqueness constraints to prevent one external account being linked to multiple MelloID owners.
+
 ## MelloID Public Profiles service scaffold — 2026-11-27
 
 - Added a Cloudflare Worker/D1 service with Telegram OpenID Connect login and PKCE.

@@ -106,7 +106,28 @@ export function validateAndSanitizeProfile(input) {
   return profile;
 }
 
-export function publicProfileProjection(profile) {
+export function projectVerifiedConnection(record) {
+  if (!record || !["github", "discord"].includes(record.provider)
+      || typeof record.provider_user_id !== "string"
+      || typeof record.username !== "string"
+      || typeof record.verified_at !== "string"
+      || !record.profile_url || !webUrl(record.profile_url)
+      || !record.visible) return null;
+  const isGithub = record.provider === "github";
+  return {
+    id: `oauth-${record.provider}`,
+    provider: isGithub ? "GitHub" : "Discord",
+    kind: isGithub ? "development" : "social",
+    display_name: record.display_name || record.username,
+    profile_url: record.profile_url,
+    avatar_url: record.avatar_url || null,
+    verification_issuer: `${record.provider}-oauth`,
+    verified_at: record.verified_at,
+    visible: true,
+  };
+}
+
+export function publicProfileProjection(profile, verifiedConnections = []) {
   if (!profile || profile.visibility === "private") return null;
   const output = {
     schema_version: profile.schema_version,
@@ -121,7 +142,11 @@ export function publicProfileProjection(profile) {
     profile_effect: profile.profile_effect,
     visibility: profile.visibility,
     bio_sections: (profile.bio_sections || []).filter((item) => item.visible),
-    connections: (profile.connections || []).filter((item) => item.visible),
+    connections: [
+      ...(profile.connections || []).filter((item) => item.visible
+        && !verifiedConnections.some((trusted) => trusted.provider === String(item.provider || "").toLowerCase())),
+      ...verifiedConnections.map(projectVerifiedConnection).filter(Boolean),
+    ],
     badges: (profile.badges || []).filter((item) => item.visible),
     widgets: (profile.widgets || []).filter((item) => item.enabled).sort((a, b) => a.position - b.position),
     show_presence: false,
