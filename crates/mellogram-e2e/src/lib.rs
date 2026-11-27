@@ -746,6 +746,12 @@ impl E2eState {
     }
 }
 
+/// True when `text` is an armored overlay message (`mg-e2e:v1:`). The chat
+/// list uses it to avoid showing ciphertext as the last message.
+pub fn is_overlay_text(text: &str) -> bool {
+    is_armored(text)
+}
+
 fn overlay_badge(message: &mut IncomingMessage, trusted: bool, own: bool) {
     let label = if trusted { "🔒" } else { "🔓" };
     let tooltip = if own {

@@ -184,8 +184,14 @@ pub async fn logout(state: S<'_>) -> R<()> {
 
 #[tauri::command]
 pub async fn list_chats(state: S<'_>, limit: Option<usize>) -> R<Vec<ChatSummary>> {
-    let chats = state.telegram().await?.dialogs(limit.unwrap_or(200)).await.map_err(err)?;
+    let mut chats = state.telegram().await?.dialogs(limit.unwrap_or(200)).await.map_err(err)?;
     let limit = limit.unwrap_or(200);
+    // Never show an overlay ciphertext as the chat's last message.
+    for chat in &mut chats {
+        if chat.last_text.as_deref().is_some_and(mellogram_e2e::is_overlay_text) {
+            chat.last_text = Some("🔒 Encrypted message".into());
+        }
+    }
     let complete = chats.len() < limit;
     let lost = state.background.update_known_chats(&chats, complete);
     for (chat_id, title) in lost {
