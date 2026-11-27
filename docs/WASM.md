@@ -39,8 +39,29 @@ WebAssembly?** It does.
 - **Group sender keys and the app envelopes** (`mg-e2e-groupkey:v1:` and
   friends). Those live in `mellogram-e2e`, which is desktop glue; moving the
   envelope logic into a shared crate is the next step, not a protocol change.
-- **UI.** The web client advertises the overlay as unavailable until this is
-  wired and tested end to end.
+- **Chat UI.** The overlay is wired into the web shell as an in-memory demo, not
+  into messaging: no conversation uses it until persistence is decided.
+
+## How it is wired into the web client
+
+The browser bundle is committed, so deploying the web client needs no Rust
+toolchain:
+
+```bash
+scripts/build-wasm.sh     # rebuilds services/web-client/public/wasm from the crate
+```
+
+- `services/web-client/public/wasm/mellogram_overlay.{js,_bg.wasm}` — the
+  wasm-bindgen `web` target output (about 380 KB total).
+- The shell loads it only when the reader presses **Run the protocol**, so the
+  page start costs nothing.
+- The Worker's CSP allows `'wasm-unsafe-eval'` for scripts and nothing else; the
+  wasm file is served as `application/wasm`.
+- Chat ids cross the boundary as JavaScript numbers; the binding rejects
+  fractional, non-finite or unsafe values instead of rounding them.
+- Tests: four native Rust tests, five Node tests that load the committed wasm
+  and run a whole pairwise exchange, so the bundle cannot drift from the crate
+  unnoticed.
 
 ## Why this is enough for a spike
 

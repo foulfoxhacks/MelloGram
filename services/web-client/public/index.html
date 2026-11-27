@@ -35,6 +35,25 @@
         <p class="muted" id="status-note"></p>
       </section>
 
+      <section class="panel" aria-labelledby="overlay-heading">
+        <div class="panel-head">
+          <h2 id="overlay-heading">Overlay in the browser</h2>
+          <span class="muted">in memory only</span>
+        </div>
+        <p class="muted">
+          The same Rust protocol the desktop app uses, compiled to WebAssembly: key
+          generation, a 60-digit safety number and a pairwise round trip. Nothing is
+          saved, and no chat is touched.
+        </p>
+        <button class="action" id="overlay-run" type="button">Run the protocol</button>
+        <dl class="result" id="overlay-out" hidden>
+          <div><dt>Safety number</dt><dd id="overlay-safety"></dd></div>
+          <div><dt>Ciphertext</dt><dd id="overlay-cipher"></dd></div>
+          <div><dt>Round trip</dt><dd id="overlay-roundtrip"></dd></div>
+        </dl>
+        <p class="muted" id="overlay-note" role="status"></p>
+      </section>
+
       <section class="panel" aria-labelledby="next-heading">
         <h2 id="next-heading">What comes next</h2>
         <ol class="roadmap">

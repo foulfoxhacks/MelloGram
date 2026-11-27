@@ -61,3 +61,45 @@ document.addEventListener("visibilitychange", () => {
 });
 
 refresh();
+
+// ---- overlay spike ---------------------------------------------------------
+
+const overlayRun = document.getElementById("overlay-run");
+const overlayOut = document.getElementById("overlay-out");
+const overlayNote = document.getElementById("overlay-note");
+const overlayField = (id) => document.getElementById(id);
+
+// Runs one full pairwise exchange with two throwaway identities. Everything is
+// in memory: no secret is stored, and leaving the page throws it away.
+async function runOverlay() {
+  overlayRun.disabled = true;
+  overlayNote.textContent = "Loading the WebAssembly module…";
+  try {
+    const { default: init, WasmIdentity, WasmSession, accept } = await import("./wasm/mellogram_overlay.js");
+    await init();
+    const alice = WasmIdentity.generate();
+    const bob = WasmIdentity.generate();
+    const chat = 424242;
+
+    const outbound = WasmSession.start(alice, bob.bundle(), chat);
+    const cipher = outbound.encrypt("hello from the browser", chat);
+    const accepted = JSON.parse(accept(bob, cipher, chat));
+    const state = Uint8Array.from(atob(accepted.state), (c) => c.charCodeAt(0));
+    const inbox = WasmSession.fromState(state);
+    outbound.decrypt(inbox.encrypt("read you loud and clear", chat), chat);
+
+    overlayField("overlay-safety").textContent = alice.safetyNumber(bob.bundle());
+    overlayField("overlay-cipher").textContent = `${cipher.slice(0, 64)}…`;
+    overlayField("overlay-roundtrip").textContent = accepted.plaintext;
+    overlayOut.hidden = false;
+    overlayNote.textContent = outbound.awaitingReply()
+      ? "The handshake did not complete — the reply was not accepted."
+      : "Both sides agree on the safety number, and the message plus its reply decrypted.";
+  } catch (e) {
+    overlayNote.textContent = `The overlay module did not load: ${e}`;
+  } finally {
+    overlayRun.disabled = false;
+  }
+}
+
+overlayRun?.addEventListener("click", runOverlay);

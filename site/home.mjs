@@ -77,7 +77,7 @@ export function homeBody(c) {
     ${tile(c, "macOS", ".dmg, universal", "macos", "/download/")}
     ${tile(c, "Linux", ".deb · .rpm · AppImage", "linux", "/download/")}
     ${tile(c, "Android", ".apk · .aab", "android", "/download/")}
-    ${tile(c, "Web", "early shell", "web", "https://wc.mellogram.foulfoxhacks.dev")}
+    ${tile(c, "Web", "early shell", "web", c.WEB)}
   </ul>
 </section>
 

@@ -145,6 +145,9 @@ export function pages(c) {
     <li class="card" id="${id}"><h3>MelloGram for ${name}</h3><p>${req}</p>
       <ul class="dl-list">${c.downloads[id].map(([label, link, note]) => `<li><a class="btn${label === c.downloads[id][0][0] ? "" : " btn-ghost"}" href="${link}" rel="noopener" data-os="${id}">Download ${esc(label)}</a><span class="muted small">${esc(note)}</span></li>`).join("")}</ul>
     </li>`).join("")}
+    <li class="card" id="web"><h3>MelloGram for the web</h3><p>Nothing to install.</p>
+      <ul class="dl-list"><li><a class="btn btn-ghost" href="${c.WEB}" rel="noopener">Open the web client</a><span class="muted small">A preview of the browser shell: it shows what works today and what does not. Telegram sign-in is not wired up yet, so keep using the desktop app for real chats.</span></li></ul>
+    </li>
   </ul>
   <p class="muted">All files come from the <a href="${c.REPO}/releases/latest" rel="noopener">latest GitHub release</a>, built automatically from the public source code. Older versions and checksums are on the <a href="${c.REPO}/releases" rel="noopener">releases page</a>.</p>
 </section>

@@ -28,16 +28,24 @@ const types = {
   ".svg": "image/svg+xml",
 };
 
-async function asset(request) {
-  const path = new URL(request.url).pathname;
-  const file = normalize(join(root, path === "/" ? "index.html" : path));
-  if (!file.startsWith(root)) return new Response("not found", { status: 404 });
+// Cloudflare's asset layer resolves page URLs to their directory index; this
+// shim does the same so /download/ behaves here exactly as it does in workerd.
+async function read(path) {
+  const file = normalize(join(root, path));
+  if (!file.startsWith(root)) return null;
   try {
-    const body = await readFile(file);
-    return new Response(body, { headers: { "Content-Type": types[extname(file)] || "application/octet-stream" } });
+    return { file, body: await readFile(file) };
   } catch {
-    return new Response("not found", { status: 404 });
+    return null;
   }
+}
+
+async function asset(request) {
+  const path = new URL(request.url).pathname === "/" ? "/index.html" : new URL(request.url).pathname;
+  const hit = await read(path.endsWith("/") ? `${path}index.html` : path)
+    || (extname(path) ? null : await read(`${path}/index.html`));
+  if (!hit) return new Response("not found", { status: 404 });
+  return new Response(hit.body, { headers: { "Content-Type": types[extname(hit.file)] || "application/octet-stream" } });
 }
 
 const env = { ASSETS: { fetch: asset } };

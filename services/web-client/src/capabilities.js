@@ -30,10 +30,16 @@ export function capabilities() {
       detail: "Needs the sign-in handshake first. Nothing is stored server-side until then.",
     },
     {
+      id: "overlay-wasm",
+      label: "Overlay protocol in the browser",
+      ready: true,
+      detail: "The Rust protocol runs as WebAssembly: identities, safety numbers and pairwise sessions, in memory only.",
+    },
+    {
       id: "overlay",
-      label: "End-to-end overlay",
+      label: "Overlay in chats",
       ready: false,
-      detail: "The overlay is Rust (X3DH + Double Ratchet); the browser build needs it compiled to WebAssembly.",
+      detail: "Deciding where secrets live in the browser comes first; nothing is persisted or wired into messaging yet.",
     },
   ];
 }

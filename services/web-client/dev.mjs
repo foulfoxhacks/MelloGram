@@ -21,6 +21,7 @@ const types = {
   ".js": "text/javascript; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
+  ".wasm": "application/wasm",
   ".ico": "image/x-icon",
 };
 
