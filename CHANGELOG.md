@@ -1,3 +1,11 @@
+## MelloID and MelloRPC foundation — 2026-11-27
+
+- Added MelloID Studio with structured bios, profile appearance, visibility, connection cards and a live preview.
+- Added portable JSON and static public HTML profile exports; the HTML export omits hidden profile elements.
+- Added MelloRPC protocol types, native JSON framing, Discord IPC packet decoding, Rich Presence translation and bounded activity leases.
+- Added Rust tests for identity validation, local persistence, RPC framing, Discord translation and lease expiry.
+- Added frontend JavaScript syntax validation to CI.
+
 # Changelog
 
 ## 0.1.0 — first preview
