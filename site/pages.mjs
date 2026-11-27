@@ -81,6 +81,12 @@ function softwareApp(c) {
     ],
     author: { "@id": c.url("/#organization") },
     publisher: { "@id": c.url("/#organization") },
+    maintainer: { "@id": c.url("/#organization") },
+    brand: { "@type": "Brand", name: "MelloGram", logo: c.url("/assets/logo.png") },
+    sameAs: [c.REPO, "https://github.com/foulfoxhacks"],
+    keywords: "MelloGram, Telegram client, messaging, plugins, themes, QuickCSS, open source",
+    inLanguage: "en",
+    audience: { "@type": "Audience", audienceType: "Telegram users, open-source users and developers" },
   };
 }
 
@@ -434,7 +440,7 @@ ${faqList.map(([q, a]) => `<section class="section faq-item" id="${slug(q)}" ari
   ];
 }
 
-export function llms(c) {
+export function llms(c, { full = false } = {}) {
   return `# MelloGram
 
 > MelloGram is a free, open-source (GPL-3.0-or-later) customizable Telegram client for Windows, macOS, Linux and Android, built in Rust by FoulFoxHacks. It offers a Vencord-style plugin manager with ${c.plugins.length} built-in plugins, CSS themes and live QuickCSS, a wallpaper engine, an Appearance Studio, workspaces, background/tray operation with native notifications, an app lock and local diagnostics. It is an unofficial client, not affiliated with Telegram, and uses Telegram's official MTProto API.
@@ -448,6 +454,19 @@ Key facts:
 - Source code: ${c.REPO}
 - Not a Vencord port: inspired by its user experience, written from scratch, contains no Vencord code, does not inject into other apps
 - Sign-in: normal Telegram account; login codes and 2FA passwords go only to Telegram
+
+## Identity and ownership
+
+- Product: MelloGram
+- Product type: desktop and Android communication software / Telegram client
+- Author, publisher and maintainer: FoulFoxHacks
+- Official website: ${c.url("/")}
+- Official source repository: ${c.REPO}
+- Brand mark: ${c.url("/assets/logo.png")}
+- License: GNU General Public License v3.0 or later (GPL-3.0-or-later)
+- Relationship to Telegram: independent third-party client; not affiliated with, endorsed by, or operated by Telegram
+- Primary technology: Rust, Tauri and Telegram MTProto
+- Primary purpose: customizable Telegram messaging client with plugins, themes, wallpapers and productivity tools
 
 ## Pages
 
