@@ -19,6 +19,37 @@
   const clone = (value) => JSON.parse(JSON.stringify(value));
   const categories = ["social", "gaming", "media", "creative", "development", "community", "website", "other"];
   const visibilityOptions = ["public", "unlisted", "private"];
+  const profileThemes = [
+    { value: "midnight", label: "Midnight" },
+    { value: "ocean", label: "Ocean" },
+    { value: "aurora", label: "Aurora" },
+    { value: "ember", label: "Ember" },
+    { value: "rose", label: "Rose" },
+    { value: "mint", label: "Mint" },
+  ];
+  const avatarFrames = [
+    { value: "none", label: "No frame" },
+    { value: "glow", label: "Soft glow" },
+    { value: "neon", label: "Neon ring" },
+    { value: "orbit", label: "Orbit" },
+    { value: "paw", label: "Paw print" },
+  ];
+  const profileEffects = [
+    { value: "none", label: "No effect" },
+    { value: "aurora", label: "Aurora wash" },
+    { value: "stars", label: "Starfield" },
+    { value: "pawprints", label: "Paw trail" },
+    { value: "glow", label: "Ambient glow" },
+  ];
+  const widgetKinds = [
+    { value: "games", label: "Games" },
+    { value: "music", label: "Music" },
+    { value: "projects", label: "Projects" },
+    { value: "communities", label: "Communities" },
+    { value: "activity", label: "Activity" },
+    { value: "about", label: "About" },
+    { value: "custom_link", label: "Custom link" },
+  ];
 
   function label(text, input, hint) {
     return h("label", { class: "mg-field melloid-field" },
@@ -49,27 +80,54 @@
     next.headline = $("melloid-headline").value.trim();
     next.visibility = $("melloid-visibility").value;
     next.accent_color = safeColor($("melloid-accent").value);
+    next.profile_theme = $("melloid-profile-theme").value;
+    next.avatar_frame = $("melloid-avatar-frame").value;
+    next.profile_effect = $("melloid-profile-effect").value;
     next.avatar_url = $("melloid-avatar").value.trim() || null;
     next.banner_url = $("melloid-banner").value.trim() || null;
     next.show_presence = $("melloid-presence").checked;
     next.presence = next.show_presence ? activePresence : null;
+    next.widgets = [...document.querySelectorAll(".melloid-widget-row")].map((row, index) => ({
+      id: row.dataset.id || `widget-${index + 1}`,
+      kind: row.querySelector("[data-widget-kind]").value,
+      title: row.querySelector("[data-widget-title]").value.trim()
+        || widgetKinds.find((item) => item.value === row.querySelector("[data-widget-kind]").value)?.label || "Widget",
+      enabled: row.querySelector("[data-widget-enabled]").checked,
+      position: index,
+      config: {
+        items: row.querySelector("[data-widget-items]").value.split(/\r?\n/)
+          .map((item) => item.trim()).filter(Boolean).slice(0, 20),
+        url: row.querySelector("[data-widget-url]").value.trim() || null,
+      },
+    }));
     next.bio_sections = [...document.querySelectorAll(".melloid-bio-row")].map((row, index) => ({
       id: row.dataset.id || `bio-${index + 1}`,
       heading: row.querySelector("[data-bio-heading]").value,
       body: row.querySelector("[data-bio-body]").value,
       visible: row.querySelector("[data-bio-visible]").checked,
     }));
-    next.connections = [...document.querySelectorAll(".melloid-connection-row")].map((row, index) => ({
-      id: row.dataset.id || `connection-${index + 1}`,
-      provider: row.querySelector("[data-connection-provider]").value.trim(),
-      kind: row.querySelector("[data-connection-kind]").value,
-      display_name: row.querySelector("[data-connection-name]").value.trim(),
-      profile_url: row.querySelector("[data-connection-url]").value.trim() || null,
-      verification_issuer: null,
-      verified_at: null,
-      visible: row.querySelector("[data-connection-visible]").checked,
-    }));
-    next.badges = [...document.querySelectorAll(".melloid-badge-row")].map((row, index) => ({
+    next.connections = [...document.querySelectorAll(".melloid-connection-row")].map((row, index) => {
+      const id = row.dataset.id || `connection-${index + 1}`;
+      const provider = row.querySelector("[data-connection-provider]").value.trim();
+      const displayName = row.querySelector("[data-connection-name]").value.trim();
+      const profileUrl = row.querySelector("[data-connection-url]").value.trim() || null;
+      const previous = (profile.connections || []).find((connection) =>
+        connection.id === id && connection.provider === provider
+          && connection.display_name === displayName && connection.profile_url === profileUrl);
+      return {
+        id,
+        provider,
+        kind: row.querySelector("[data-connection-kind]").value,
+        display_name: displayName,
+        profile_url: profileUrl,
+        verification_issuer: previous?.verification_issuer || null,
+        verified_at: previous?.verified_at || null,
+        visible: row.querySelector("[data-connection-visible]").checked,
+      };
+    });
+    const trustedBadges = (profile.badges || []).filter((badge) =>
+      badge.server_issued || badge.category !== "collectible");
+    const collectibleBadges = [...document.querySelectorAll(".melloid-badge-row")].map((row, index) => ({
       id: row.dataset.id || `collectible-${index + 1}`,
       issuer: "self",
       title: row.querySelector("[data-badge-title]").value.trim(),
@@ -79,6 +137,7 @@
       visible: row.querySelector("[data-badge-visible]").checked,
       server_issued: false,
     }));
+    next.badges = [...trustedBadges, ...collectibleBadges];
     return next;
   }
 
@@ -91,12 +150,28 @@
     const connections = (data.connections || []).filter((connection) => connection.visible);
     const activity = data.show_presence && data.presence ? data.presence : null;
     const badges = (data.badges || []).filter((badge) => badge.visible);
-    const card = h("article", { class: "melloid-preview-card", style: `--melloid-accent:${accent}` },
+    const widgets = (data.widgets || []).filter((widget) => widget.enabled)
+      .sort((a, b) => a.position - b.position);
+    const widgetNodes = widgets.map((widget) => {
+      const items = Array.isArray(widget.config?.items) ? widget.config.items.filter((item) => typeof item === "string") : [];
+      const url = safeUrl(widget.config?.url);
+      const title = widget.title || widgetKinds.find((kind) => kind.value === widget.kind)?.label || "Widget";
+      return h("section", { class: "melloid-preview-section melloid-widget-preview" },
+        h("h3", { text: title }),
+        items.length ? h("div", { class: "melloid-widget-items" },
+          ...items.map((item) => h("span", { class: "melloid-widget-item", text: item })))
+          : url ? h("a", { href: url, target: "_blank", rel: "noopener noreferrer", text: "Open link ↗" })
+            : h("p", { class: "mg-muted", text: "This widget is ready for content." }));
+    });
+    const theme = profileThemes.some((item) => item.value === data.profile_theme) ? data.profile_theme : "midnight";
+    const frame = avatarFrames.some((item) => item.value === data.avatar_frame) ? data.avatar_frame : "none";
+    const effect = profileEffects.some((item) => item.value === data.profile_effect) ? data.profile_effect : "none";
+    const card = h("article", { class: `melloid-preview-card melloid-theme-${theme} melloid-effect-${effect}`, style: `--melloid-accent:${accent}` },
       h("div", { class: "melloid-preview-banner" },
         bannerUrl ? h("img", { src: bannerUrl, alt: "Profile banner" }) : h("span", { text: "MelloID" })),
       h("div", { class: "melloid-preview-identity" },
-        avatarUrl ? h("img", { class: "melloid-preview-avatar", src: avatarUrl, alt: "Avatar" })
-          : h("div", { class: "melloid-preview-avatar melloid-preview-initials", text: initials }),
+        avatarUrl ? h("img", { class: `melloid-preview-avatar melloid-frame-${frame}`, src: avatarUrl, alt: "Avatar" })
+          : h("div", { class: `melloid-preview-avatar melloid-preview-initials melloid-frame-${frame}`, text: initials }),
         h("div", { class: "melloid-preview-name" },
           h("h2", { text: data.display_name || "Your name" }),
           h("div", { class: "melloid-preview-slug", text: `@${data.slug || "your-melloid"}` }),
@@ -114,6 +189,7 @@
         ...visibleSections.map((section) => h("section", { class: "melloid-preview-section" },
           h("h3", { text: section.heading || "About" }),
           h("p", { text: section.body || "Add something about yourself…" }))),
+        ...widgetNodes,
         h("section", { class: "melloid-preview-section" },
           h("h3", { text: "Connections" }),
           connections.length ? h("div", { class: "melloid-preview-connections" },
@@ -145,11 +221,29 @@
       label("Headline", input("melloid-headline", profile.headline, "text", { maxlength: 120, placeholder: "A short line about you" })),
       label("Profile visibility", select("melloid-visibility", profile.visibility, visibilityOptions.map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }))), "This is your intended audience setting. Publishing is not available until MelloID hosting is deployed."),
       label("Accent color", input("melloid-accent", profile.accent_color, "color", { class: "melloid-color-input" })),
+      label("Profile theme", select("melloid-profile-theme", profile.profile_theme || "midnight", profileThemes), "Choose a built-in color treatment."),
+      label("Avatar frame", select("melloid-avatar-frame", profile.avatar_frame || "none", avatarFrames)),
+      label("Profile effect", select("melloid-profile-effect", profile.profile_effect || "none", profileEffects), "Visual-only effect, no custom scripts or CSS."),
       label("Avatar image URL", input("melloid-avatar", profile.avatar_url || "", "url", { placeholder: "https://…" })),
       label("Banner image URL", input("melloid-banner", profile.banner_url || "", "url", { placeholder: "https://…" })),
       h("label", { class: "mg-field-row melloid-presence-toggle" },
         h("span", {}, h("b", { text: "Show activity presence" }), h("small", { class: "mg-hint", text: "Lets your profile display supported MelloGram activity." })),
         h("input", { id: "melloid-presence", type: "checkbox", class: "mg-switch", checked: profile.show_presence })),
+      h("div", { class: "melloid-section-title" }, h("h2", { text: "Profile widgets" }), h("p", { class: "mg-muted", text: "Arrange reusable blocks for games, music, projects, communities, activity, and links." })),
+      h("div", { id: "melloid-widget-list", class: "melloid-editor-list" }),
+      h("div", { class: "mg-toolbar melloid-add-widget" },
+        select("melloid-new-widget-type", "games", widgetKinds),
+        h("button", { class: "mg-btn", type: "button", text: "+ Add widget", onclick: () => {
+          profile = currentDraft();
+          if (profile.widgets.length >= 24) {
+            UI.toast("You can add up to 24 profile widgets.", "warning");
+            return;
+          }
+          const kind = $("melloid-new-widget-type").value;
+          const title = widgetKinds.find((item) => item.value === kind)?.label || "Widget";
+          profile.widgets.push({ id: `widget-${Date.now()}`, kind, title, enabled: true, position: profile.widgets.length, config: { items: [], url: null } });
+          renderEditor();
+        }})),
       h("div", { class: "melloid-section-title" }, h("h2", { text: "Bio Studio" }), h("p", { class: "mg-muted", text: "Create separate sections instead of one oversized biography." })),
       h("div", { id: "melloid-bio-list", class: "melloid-editor-list" }),
       h("button", { class: "mg-btn", type: "button", text: "+ Add bio section", onclick: () => {
@@ -177,6 +271,43 @@
         renderEditor();
       }}),
     );
+
+    profile.widgets = [...(profile.widgets || [])].sort((a, b) => a.position - b.position);
+    const widgetList = $("melloid-widget-list");
+    for (const [index, widget] of profile.widgets.entries()) {
+      const kind = h("select", { "data-widget-kind": "" },
+        ...widgetKinds.map((item) => h("option", { value: item.value, text: item.label })));
+      kind.value = widget.kind || "about";
+      const config = widget.config || {};
+      const actions = h("div", { class: "mg-toolbar melloid-widget-actions" },
+        h("button", { class: "mg-icon-btn", type: "button", text: "↑", title: "Move widget up", disabled: index === 0, onclick: () => {
+          profile = currentDraft();
+          [profile.widgets[index - 1], profile.widgets[index]] = [profile.widgets[index], profile.widgets[index - 1]];
+          profile.widgets.forEach((item, position) => { item.position = position; });
+          renderEditor();
+        }}),
+        h("button", { class: "mg-icon-btn", type: "button", text: "↓", title: "Move widget down", disabled: index === profile.widgets.length - 1, onclick: () => {
+          profile = currentDraft();
+          [profile.widgets[index + 1], profile.widgets[index]] = [profile.widgets[index], profile.widgets[index + 1]];
+          profile.widgets.forEach((item, position) => { item.position = position; });
+          renderEditor();
+        }}),
+        h("button", { class: "mg-icon-btn mg-danger", type: "button", text: "Remove", onclick: () => {
+          profile = currentDraft();
+          profile.widgets.splice(index, 1);
+          profile.widgets.forEach((item, position) => { item.position = position; });
+          renderEditor();
+        }}));
+      widgetList.append(h("div", { class: "melloid-list-card melloid-widget-row", "data-id": widget.id },
+        h("div", { class: "melloid-row-head" }, h("b", { text: `Widget ${index + 1}` }), actions),
+        kind,
+        h("input", { "data-widget-title": "", value: widget.title || "", maxlength: 48, placeholder: "Widget title" }),
+        h("textarea", { "data-widget-items": "", rows: 3, maxlength: 2400, placeholder: "One item per line (up to 20)", text: Array.isArray(config.items) ? config.items.join("\n") : "" }),
+        h("input", { "data-widget-url": "", value: config.url || "", placeholder: "Optional link (https://…)" }),
+        h("label", { class: "melloid-inline-check" },
+          h("input", { "data-widget-enabled": "", type: "checkbox", checked: widget.enabled }), " Show on profile")));
+    }
+    if (!profile.widgets.length) widgetList.append(h("p", { class: "mg-muted", text: "No widgets added. Add one to build your profile layout." }));
 
     const bioList = $("melloid-bio-list");
     for (const [index, section] of profile.bio_sections.entries()) {
@@ -265,9 +396,21 @@
     const activity = data.show_presence && data.presence
       ? `<section><h2>Activity</h2><p>${escapeHtml(data.presence.application)} · ${escapeHtml(data.presence.activity)}</p></section>`
       : "";
+    const widgets = (data.widgets || []).filter((widget) => widget.enabled).sort((a, b) => a.position - b.position)
+      .map((widget) => {
+        const title = escapeHtml(widget.title || "Widget");
+        const items = Array.isArray(widget.config?.items) ? widget.config.items.filter((item) => typeof item === "string") : [];
+        const itemMarkup = items.length ? `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : "";
+        const href = safeUrl(widget.config?.url);
+        const linkMarkup = href ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">Open link ↗</a>` : "";
+        return `<section><h2>${title}</h2>${itemMarkup}${linkMarkup}</section>`;
+      }).join("");
+    const theme = profileThemes.some((item) => item.value === data.profile_theme) ? data.profile_theme : "midnight";
+    const frame = avatarFrames.some((item) => item.value === data.avatar_frame) ? data.avatar_frame : "none";
+    const effect = profileEffects.some((item) => item.value === data.profile_effect) ? data.profile_effect : "none";
     const avatarMarkup = avatar
-      ? `<img class="avatar" src="${escapeHtml(avatar)}" alt="Profile avatar">`
-      : `<div class="avatar initials">${escapeHtml((data.display_name || "M").split(/\s+/).slice(0, 2).map((part) => part[0] || "").join("").toUpperCase())}</div>`;
+      ? `<img class="avatar frame-${frame}" src="${escapeHtml(avatar)}" alt="Profile avatar">`
+      : `<div class="avatar initials frame-${frame}">${escapeHtml((data.display_name || "M").split(/\s+/).slice(0, 2).map((part) => part[0] || "").join("").toUpperCase())}</div>`;
     const bannerMarkup = banner
       ? '<div class="banner"><img src="' + escapeHtml(banner) + '" alt="Profile banner"></div>'
       : '<div class="banner"></div>';
@@ -282,6 +425,9 @@ main{max-width:760px;margin:auto;background:#1a1d2b;border:1px solid #303449;bor
 .banner{height:190px;background:linear-gradient(120deg,var(--accent),#171a29);background-size:cover;background-position:center}.banner img{width:100%;height:100%;object-fit:cover}
 .identity{padding:0 28px 18px}.avatar{width:112px;height:112px;object-fit:cover;border:5px solid #1a1d2b;border-radius:28px;margin-top:-54px;background:var(--accent)}
 .initials{display:grid;place-items:center;font-size:34px;font-weight:800;color:white}
+.theme-ocean{background:linear-gradient(145deg,#142f47,#19273c)}.theme-aurora{background:linear-gradient(145deg,#1b2747,#321d42)}.theme-ember{background:linear-gradient(145deg,#3a241d,#241b2e)}.theme-rose{background:linear-gradient(145deg,#382139,#241b30)}.theme-mint{background:linear-gradient(145deg,#19382f,#1d2b34)}
+.frame-glow{box-shadow:0 0 22px var(--accent)}.frame-neon{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent),0 0 18px var(--accent)}.frame-orbit{border-radius:50%;outline:2px dashed var(--accent);outline-offset:4px}.frame-paw{border-radius:48%;border:5px dotted var(--accent)}
+.effect-glow .banner{filter:saturate(1.25) brightness(1.08)}.effect-aurora .banner,.effect-stars .banner{position:relative}.effect-aurora .banner:after{content:"";position:absolute;inset:0;background:linear-gradient(120deg,#35bdb155,#8d52bc55,#d46e8055);mix-blend-mode:screen;pointer-events:none}.effect-stars .banner:after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 20% 25%,#fff9 0 2px,transparent 3px),radial-gradient(circle at 68% 30%,#fff9 0 1px,transparent 2px),radial-gradient(circle at 84% 72%,#fff8 0 1px,transparent 2px);pointer-events:none}.effect-pawprints .banner{position:relative}.effect-pawprints .banner:after{content:"🐾";position:absolute;right:18px;bottom:12px;font-size:30px;opacity:.75;pointer-events:none}
 h1{margin:10px 0 0;font-size:30px}.slug{color:#aeb4c9;font-family:ui-monospace,monospace}.headline{color:#c4c9d9}
 .content{padding:0 28px 30px}section{border-top:1px solid #303449;padding:18px 0}h2{font-size:16px;color:var(--accent);margin:0 0 9px}p{white-space:pre-wrap;line-height:1.65;color:#c8ccda;margin:0;overflow-wrap:anywhere}
 ul{list-style:none;padding:0;margin:0;display:grid;gap:8px}li{display:grid;grid-template-columns:1fr auto;gap:3px 12px;padding:12px;background:#24283a;border-radius:12px}li span{color:#aeb4c9;font-size:14px}li a{grid-column:2;grid-row:1/3;align-self:center;color:var(--accent);text-decoration:none}
@@ -289,9 +435,9 @@ ul{list-style:none;padding:0;margin:0;display:grid;gap:8px}li{display:grid;grid-
 footer{padding:16px 28px;border-top:1px solid #303449;color:#858da6;font-size:12px}
 @media(max-width:520px){body{padding:10px}.banner{height:130px}.identity,.content{padding-left:18px;padding-right:18px}h1{font-size:24px}}
 </style></head>
-<body><main>${bannerMarkup}<div class="identity">${avatarMarkup}<h1>${escapeHtml(data.display_name)}</h1>
+<body><main class="theme-${theme} effect-${effect}">${bannerMarkup}<div class="identity">${avatarMarkup}<h1>${escapeHtml(data.display_name)}</h1>
 <div class="slug">@${escapeHtml(data.slug)}</div><p class="headline">${escapeHtml(data.headline)}</p></div>
-<div class="content">${sections}${activity}
+<div class="content">${sections}${widgets}${activity}
 <section><h2>Connections</h2>${connections ? `<ul>${connections}</ul>` : "<p>No public connections.</p>"}</section>
 <section><h2>Badges</h2><div class="badges">${badges || "<p>No public badges yet.</p>"}</div></section></div>
 <footer>Published as a static MelloID export · Profile owner controls the information included.</footer></main></body></html>`;

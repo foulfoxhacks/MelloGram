@@ -441,3 +441,45 @@ input:focus, textarea:focus, select:focus { border-color: var(--mg-accent); }
 .melloid-trusted-badges { background: color-mix(in srgb, var(--mg-surface) 86%, var(--mg-accent) 8%); }
 .melloid-trusted-badge { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 0; border-top: 1px solid var(--mg-border); }
 .melloid-trusted-badge small { color: var(--mg-muted); font-size: .75rem; }
+
+
+/* MelloID modular profile widgets */
+.melloid-add-widget { margin: 8px 0 14px; align-items: center; }
+.melloid-add-widget select { min-width: 150px; }
+.melloid-widget-row { position: relative; }
+.melloid-widget-actions { margin: 0; gap: 4px; }
+.melloid-widget-actions .mg-icon-btn { min-width: 28px; min-height: 28px; }
+.melloid-widget-preview { overflow-wrap: anywhere; }
+.melloid-widget-items { display: flex; flex-wrap: wrap; gap: 6px; }
+.melloid-widget-item { display: inline-flex; align-items: center; padding: 5px 9px; border-radius: 9px; background: var(--mg-surface); border: 1px solid var(--mg-border); font-size: .83rem; color: var(--mg-muted); }
+
+
+/* MelloID profile themes, avatar frames and decorative effects */
+.melloid-preview-card.melloid-theme-ocean { background: linear-gradient(145deg, #142f47, #19273c); }
+.melloid-preview-card.melloid-theme-aurora { background: linear-gradient(145deg, #1b2747, #321d42); }
+.melloid-preview-card.melloid-theme-ember { background: linear-gradient(145deg, #3a241d, #241b2e); }
+.melloid-preview-card.melloid-theme-rose { background: linear-gradient(145deg, #382139, #241b30); }
+.melloid-preview-card.melloid-theme-mint { background: linear-gradient(145deg, #19382f, #1d2b34); }
+.melloid-preview-avatar.melloid-frame-glow { box-shadow: 0 0 22px var(--melloid-accent); }
+.melloid-preview-avatar.melloid-frame-neon { border-color: var(--melloid-accent); box-shadow: 0 0 0 2px var(--melloid-accent), 0 0 18px var(--melloid-accent); }
+.melloid-preview-avatar.melloid-frame-orbit { border-radius: 50%; outline: 2px dashed var(--melloid-accent); outline-offset: 4px; }
+.melloid-preview-avatar.melloid-frame-paw { border-radius: 48%; border: 5px dotted var(--melloid-accent); }
+.melloid-effect-glow .melloid-preview-banner { filter: saturate(1.25) brightness(1.08); }
+.melloid-effect-aurora .melloid-preview-banner { background-image: linear-gradient(120deg, #35bdb155, #8d52bc55, #d46e8055); }
+.melloid-effect-stars .melloid-preview-banner { background-image: radial-gradient(circle at 20% 25%, #fff8 0 2px, transparent 3px), radial-gradient(circle at 68% 30%, #fff8 0 1px, transparent 2px), linear-gradient(120deg, var(--melloid-accent), #171a29); }
+.melloid-effect-pawprints .melloid-preview-banner { position: relative; }
+.melloid-effect-pawprints .melloid-preview-banner::after { content: "🐾"; position: absolute; right: 18px; bottom: 12px; font-size: 30px; opacity: .75; }
+
+.melloid-effect-aurora .melloid-preview-banner,
+.melloid-effect-stars .melloid-preview-banner { position: relative; }
+.melloid-effect-aurora .melloid-preview-banner::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(120deg, #35bdb155, #8d52bc55, #d46e8055);
+  mix-blend-mode: screen;
+}
+.melloid-effect-stars .melloid-preview-banner::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(circle at 20% 25%, #fff9 0 2px, transparent 3px),
+    radial-gradient(circle at 68% 30%, #fff9 0 1px, transparent 2px),
+    radial-gradient(circle at 84% 72%, #fff8 0 1px, transparent 2px);
+}

@@ -170,6 +170,9 @@ pub struct MelloProfile {
     pub avatar_url: Option<String>,
     pub banner_url: Option<String>,
     pub accent_color: String,
+    pub profile_theme: String,
+    pub avatar_frame: String,
+    pub profile_effect: String,
     pub visibility: ProfileVisibility,
     pub bio_sections: Vec<BioSection>,
     pub connections: Vec<ConnectionRecord>,
@@ -193,6 +196,9 @@ impl Default for MelloProfile {
             avatar_url: None,
             banner_url: None,
             accent_color: "#35bdb1".into(),
+            profile_theme: "midnight".into(),
+            avatar_frame: "none".into(),
+            profile_effect: "none".into(),
             visibility: ProfileVisibility::Public,
             bio_sections: vec![BioSection::default()],
             connections: Vec::new(),
@@ -221,6 +227,15 @@ impl MelloProfile {
         if self.display_name.trim().is_empty() || self.display_name.chars().count() > 64 {
             return Err("display name must contain 1-64 characters".into());
         }
+        if !["midnight", "ocean", "aurora", "ember", "rose", "mint"].contains(&self.profile_theme.as_str()) {
+            return Err("unsupported profile theme".into());
+        }
+        if !["none", "glow", "neon", "orbit", "paw"].contains(&self.avatar_frame.as_str()) {
+            return Err("unsupported avatar frame".into());
+        }
+        if !["none", "aurora", "stars", "pawprints", "glow"].contains(&self.profile_effect.as_str()) {
+            return Err("unsupported profile effect".into());
+        }
         if self.headline.chars().count() > 120 {
             return Err("headline must be 120 characters or fewer".into());
         }
@@ -241,6 +256,27 @@ impl MelloProfile {
             if badge.title.trim().is_empty() || badge.title.chars().count() > 48
                 || badge.description.chars().count() > 160 {
                 return Err("badge titles must be 1-48 characters and descriptions 160 characters or fewer".into());
+            }
+        }
+        for widget in &self.widgets {
+            if widget.title.trim().is_empty() || widget.title.chars().count() > 48 {
+                return Err("widget titles must contain 1-48 characters".into());
+            }
+            let Some(config) = widget.config.as_object() else {
+                return Err("widget configuration must be a JSON object".into());
+            };
+            if let Some(items) = config.get("items") {
+                let Some(items) = items.as_array() else {
+                    return Err("widget items must be a list".into());
+                };
+                if items.len() > 20 || items.iter().any(|item| item.as_str().map_or(true, |text| text.chars().count() > 120)) {
+                    return Err("widgets support up to 20 text items of 120 characters each".into());
+                }
+            }
+            if let Some(url) = config.get("url").and_then(serde_json::Value::as_str) {
+                if !url.is_empty() && !(url.starts_with("https://") || url.starts_with("http://")) {
+                    return Err("widget URLs must use HTTP or HTTPS".into());
+                }
             }
         }
         for connection in &self.connections {
@@ -276,6 +312,17 @@ mod tests {
         assert!(p.validate().is_err());
     }
     #[test]
+    fn profile_appearance_uses_only_known_presets() {
+        let mut p = MelloProfile::default();
+        p.profile_theme = "url-javascript".into();
+        assert!(p.validate().is_err());
+        p.profile_theme = "ocean".into();
+        p.avatar_frame = "neon".into();
+        p.profile_effect = "stars".into();
+        assert!(p.validate().is_ok());
+    }
+
+    #[test]
     fn rejects_empty_or_oversized_badge_labels() {
         let mut p = MelloProfile::default();
         p.badges.push(BadgeRecord {
@@ -287,6 +334,17 @@ mod tests {
         p.badges[0].title = "Personal collectible".into();
         p.badges[0].description = "x".repeat(161);
         assert!(p.validate().is_err());
+    }
+
+    #[test]
+    fn widget_config_is_bounded_and_uses_safe_urls() {
+        let mut p = MelloProfile::default();
+        p.widgets[0].config = serde_json::json!({ "items": ["x".repeat(121)] });
+        assert!(p.validate().is_err());
+        p.widgets[0].config = serde_json::json!({ "items": ["Game one"], "url": "javascript:alert(1)" });
+        assert!(p.validate().is_err());
+        p.widgets[0].config = serde_json::json!({ "items": ["Game one"], "url": "https://example.com" });
+        assert!(p.validate().is_ok());
     }
 
     #[test]

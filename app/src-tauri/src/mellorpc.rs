@@ -226,25 +226,39 @@ where
     });
     if send_discord_json(&mut stream, &ready).await.is_err() { return; }
 
-    let mut last_activity: Option<PresenceActivity> = None;
-    loop {
-        let packet_bytes = match tokio::time::timeout(Duration::from_secs(60), read_packet(&mut stream, 8)).await {
-            Err(_) => {
-                if let Some(activity) = last_activity.clone() {
-                    let result = state.rpc_presence.lock().unwrap().set(
-                        registry_key.clone(),
-                        ActivitySource::DiscordCompatibility,
-                        activity,
-                        MAX_LEASE_SECONDS,
-                        now_ms(),
-                    );
-                    if result.is_ok() { refresh_presence(&state); }
+    let current_activity = Arc::new(std::sync::Mutex::new(None::<PresenceActivity>));
+    let renew_activity = Arc::clone(&current_activity);
+    let renew_state = Arc::clone(&state);
+    let renew_key = registry_key.clone();
+    let (stop_renewal, mut stop_rx) = tokio::sync::oneshot::channel::<()>();
+    let renewal_task = tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(60));
+        interval.tick().await; // Do not renew before the first activity update.
+        loop {
+            tokio::select! {
+                _ = &mut stop_rx => break,
+                _ = interval.tick() => {
+                    let activity = renew_activity.lock().unwrap().clone();
+                    if let Some(activity) = activity {
+                        let result = renew_state.rpc_presence.lock().unwrap().set(
+                            renew_key.clone(),
+                            ActivitySource::DiscordCompatibility,
+                            activity,
+                            MAX_LEASE_SECONDS,
+                            now_ms(),
+                        );
+                        if result.is_ok() { refresh_presence(&renew_state); }
+                    }
                 }
-                continue;
             }
-            Ok(Ok(Some(packet))) => packet,
-            Ok(Ok(None)) => break,
-            Ok(Err(error)) => {
+        }
+    });
+
+    loop {
+        let packet_bytes = match read_packet(&mut stream, 8).await {
+            Ok(Some(packet)) => packet,
+            Ok(None) => break,
+            Err(error) => {
                 tracing::debug!("Discord IPC read failed: {error}");
                 break;
             }
@@ -296,7 +310,7 @@ where
                         );
                         match result {
                             Ok(()) => {
-                                last_activity = Some(activity);
+                                *current_activity.lock().unwrap() = Some(activity);
                                 refresh_presence(&state);
                                 if send_discord_json(&mut stream, &json!({
                                     "cmd": command, "data": null, "nonce": nonce,
@@ -312,7 +326,7 @@ where
                         }
                     }
                     Ok(None) => {
-                        last_activity = None;
+                        *current_activity.lock().unwrap() = None;
                         state.rpc_presence.lock().unwrap().clear(&registry_key);
                         refresh_presence(&state);
                         if send_discord_json(&mut stream, &json!({
@@ -330,6 +344,8 @@ where
             }
         }
     }
+    let _ = stop_renewal.send(());
+    let _ = renewal_task.await;
     state.rpc_presence.lock().unwrap().clear(&registry_key);
     refresh_presence(&state);
 }

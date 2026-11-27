@@ -1,3 +1,16 @@
+## MelloID profile appearance presets — 2026-11-27
+
+- Added six built-in profile themes, five avatar frame styles, and five profile effects.
+- Added allowlisted appearance validation so exported profiles cannot inject arbitrary classes or scripts.
+- Included selected theme/frame/effect presets in live preview and static HTML exports.
+
+## MelloID modular profile widgets — 2026-11-27
+
+- Added reorderable Games, Music, Projects, Communities, Activity, About and Custom Link widgets.
+- Added per-widget visibility, bounded item content and safe HTTP(S) links.
+- Included enabled widgets in static public profile exports.
+- Added validation tests for widget item limits and URL schemes.
+
 ## MelloID collectible badges and native RPC example — 2026-11-27
 
 - Added up to 24 self-curated collectible badges with bounded titles/descriptions and per-badge visibility.
