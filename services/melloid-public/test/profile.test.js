@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { projectVerifiedConnection, publicProfileProjection, validateAndSanitizeProfile } from "../src/profile.js";
+import { publicProfileProjection, validateAndSanitizeProfile } from "../src/profile.js";
 
 function sample() {
   return {
@@ -89,29 +89,32 @@ test("visibility flags must be real booleans to prevent hidden-field leakage", (
   assert.throws(() => validateAndSanitizeProfile(widgetProfile));
 });
 
-test("verified link projection rejects malformed or hidden D1 records", () => {
-  assert.equal(projectVerifiedConnection({
-    provider: "github",
-    provider_user_id: "123",
-    username: "sample",
-    profile_url: "javascript:alert(1)",
-    verified_at: "2026-11-27T00:00:00Z",
-    visible: 1
-  }), null);
-  assert.equal(projectVerifiedConnection({
-    provider: "discord",
-    provider_user_id: "123",
-    username: "sample",
-    profile_url: "https://discord.com/users/123",
-    verified_at: "2026-11-27T00:00:00Z",
-    visible: 0
-  }), null);
-  assert.equal(projectVerifiedConnection({
-    provider: "steam",
-    provider_user_id: "123",
-    username: "sample",
-    profile_url: "https://steamcommunity.com/id/sample",
-    verified_at: "2026-11-27T00:00:00Z",
-    visible: 1
-  }), null);
+test("GitHub identity normalization only accepts github.com profile URLs", () => {
+  const identity = normalizeProviderIdentity("github", {
+    id: 12345,
+    login: "sammydev",
+    name: "Sammy Dev",
+    html_url: "https://github.com/sammydev",
+    avatar_url: "https://avatars.githubusercontent.com/u/12345"
+  });
+  assert.equal(identity.provider_user_id, "12345");
+  assert.equal(identity.username, "sammydev");
+  assert.equal(identity.profile_url, "https://github.com/sammydev");
+  assert.equal(identity.avatar_url, "https://avatars.githubusercontent.com/u/12345");
+  assert.throws(() => normalizeProviderIdentity("github", {
+    id: 12345, login: "sammydev", html_url: "https://evil.example/sammydev"
+  }));
+});
+
+test("Discord identity normalization derives the profile URL from the stable account ID", () => {
+  const identity = normalizeProviderIdentity("discord", {
+    id: "123456789012345678",
+    username: "mello",
+    global_name: "Mello Fox",
+    avatar: "a_123abc"
+  });
+  assert.equal(identity.profile_url, "https://discord.com/users/123456789012345678");
+  assert.equal(identity.display_name, "Mello Fox");
+  assert.equal(identity.avatar_url, "https://cdn.discordapp.com/avatars/123456789012345678/a_123abc.png?size=128");
+  assert.throws(() => normalizeProviderIdentity("discord", { id: "bad", username: "mello" }));
 });

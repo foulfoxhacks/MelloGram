@@ -1,5 +1,6 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { publicProfileProjection, validateAndSanitizeProfile } from "./profile.js";
+import { normalizeProviderIdentity } from "./connections.js";
 
 const TELEGRAM_ISSUER = "https://oauth.telegram.org";
 const TELEGRAM_JWKS = createRemoteJWKSet(new URL("https://oauth.telegram.org/.well-known/jwks.json"));
@@ -317,23 +318,7 @@ async function fetchConnectedIdentity(provider, accessToken) {
       },
     });
     if (!response.ok) throw new Error("GitHub did not return the authorized account profile.");
-    const user = await response.json();
-    if (!Number.isSafeInteger(user.id) || typeof user.login !== "string" || !user.login) {
-      throw new Error("GitHub returned an invalid account identity.");
-    }
-    const profileUrl = new URL(user.html_url);
-    if (profileUrl.protocol !== "https:" || profileUrl.hostname !== "github.com") {
-      throw new Error("GitHub returned an unexpected profile URL.");
-    }
-    const avatarUrl = typeof user.avatar_url === "string" ? new URL(user.avatar_url) : null;
-    return {
-      provider_user_id: String(user.id),
-      username: user.login.slice(0, 80),
-      display_name: (typeof user.name === "string" && user.name.trim() ? user.name : user.login).slice(0, 80),
-      profile_url: profileUrl.toString(),
-      avatar_url: avatarUrl && avatarUrl.protocol === "https:" && avatarUrl.hostname === "avatars.githubusercontent.com"
-        ? avatarUrl.toString() : null,
-    };
+    return normalizeProviderIdentity("github", await response.json());
   }
 
   if (provider === "discord") {
@@ -341,19 +326,7 @@ async function fetchConnectedIdentity(provider, accessToken) {
       headers: { "Authorization": `Bearer ${accessToken}` },
     });
     if (!response.ok) throw new Error("Discord did not return the authorized account profile.");
-    const user = await response.json();
-    if (typeof user.id !== "string" || !/^\d{5,24}$/.test(user.id) || typeof user.username !== "string" || !user.username) {
-      throw new Error("Discord returned an invalid account identity.");
-    }
-    const avatarUrl = typeof user.avatar === "string"
-      ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128` : null;
-    return {
-      provider_user_id: user.id,
-      username: user.username.slice(0, 80),
-      display_name: (typeof user.global_name === "string" && user.global_name.trim() ? user.global_name : user.username).slice(0, 80),
-      profile_url: `https://discord.com/users/${user.id}`,
-      avatar_url: avatarUrl,
-    };
+    return normalizeProviderIdentity("discord", await response.json());
   }
   throw new Error("Unsupported account provider.");
 }
