@@ -4,6 +4,7 @@ members = [
     "crates/mellogram-core",
     "crates/mellogram-plugins",
     "crates/mellogram-telegram",
+    "crates/melloid-core",
     "app/src-tauri",
 ]
 
@@ -18,6 +19,7 @@ rust-version = "1.80"
 mellogram-core = { path = "crates/mellogram-core" }
 mellogram-plugins = { path = "crates/mellogram-plugins" }
 mellogram-telegram = { path = "crates/mellogram-telegram" }
+melloid-core = { path = "crates/melloid-core" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
