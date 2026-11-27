@@ -1,0 +1,18 @@
+/**
+ * @name Paper
+ * @author MelloGram
+ * @version 1.0.0
+ * @description Warm, low-contrast light theme.
+ */
+:root {
+  --mg-bg: #f7f3ea;
+  --mg-bg-2: #efe9dc;
+  --mg-surface: #ffffff;
+  --mg-text: #2b2620;
+  --mg-muted: #7a7064;
+  --mg-accent: #c8643b;
+  --mg-border: #ded5c4;
+  --mg-bubble-in: #ffffff;
+  --mg-bubble-out: #f6dccd;
+  --mg-bubble-out-text: #2b2620;
+}

@@ -1,0 +1,12 @@
+/**
+ * @name Compact
+ * @author MelloGram
+ * @version 1.0.0
+ * @description Tighter spacing and smaller avatars. Combine with any colour theme.
+ */
+:root {
+  --mg-density: 0.7;
+  --mg-avatar: 32px;
+  --mg-font-size: 13px;
+}
+.mg-message { margin-block: 1px; }

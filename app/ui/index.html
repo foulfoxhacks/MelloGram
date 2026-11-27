@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MelloGram</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Themes, plugin CSS and QuickCSS are composed by the backend and land here. -->
+  <style id="mg-user-css"></style>
+</head>
+<body>
+  <div id="app" class="mg-app">
+    <header class="mg-titlebar">
+      <div class="mg-brand"><img src="logo.png" alt=""><span>MelloGram</span></div>
+      <button class="mg-workspace-chip" id="workspace-chip" title="Switch workspace" hidden></button>
+      <div class="mg-header-buttons" id="header-buttons"></div>
+      <button class="mg-icon-btn" id="open-palette" title="Command palette (Ctrl+P)">⌘</button>
+      <button class="mg-icon-btn" id="open-settings" title="Settings (Ctrl+,)">⚙</button>
+    </header>
+
+    <aside class="mg-sidebar">
+      <input class="mg-search" id="chat-search" type="search" placeholder="Search chats">
+      <ul class="mg-chat-list" id="chat-list"></ul>
+    </aside>
+
+    <main class="mg-main">
+      <div class="mg-empty" id="empty-state">
+        <img src="logo.png" alt="">
+        <p>Select a chat to start messaging</p>
+      </div>
+      <section class="mg-chat" id="chat-view" hidden>
+        <div class="mg-chat-header">
+          <button class="mg-icon-btn mg-back" id="chat-back" title="Back to chats">←</button>
+          <div>
+            <div class="mg-chat-title" id="chat-title"></div>
+            <div class="mg-chat-sub" id="chat-sub"></div>
+          </div>
+        </div>
+        <div class="mg-messages" id="messages"></div>
+        <div class="mg-composer">
+          <div class="mg-reply-bar" id="reply-bar" hidden>
+            <span id="reply-text"></span><button class="mg-icon-btn" id="reply-cancel" title="Cancel reply">✕</button>
+          </div>
+          <div class="mg-attachments" id="attachments" hidden></div>
+          <div class="mg-composer-row">
+            <div class="mg-composer-buttons" id="composer-buttons"></div>
+            <textarea id="composer" rows="1" placeholder="Write a message… (/ for commands)"></textarea>
+            <button class="mg-send" id="send" title="Send (Enter)">➤</button>
+          </div>
+          <div class="mg-command-popup" id="command-popup" hidden></div>
+          <div class="mg-composer-footer" id="composer-footer"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Login -->
+  <div class="mg-overlay" id="login" hidden>
+    <form class="mg-card mg-login" id="login-form">
+      <img src="logo.png" alt="" class="mg-login-logo">
+      <h1>Welcome to MelloGram</h1>
+      <p class="mg-muted" id="login-help"></p>
+      <div id="login-fields"></div>
+      <p class="mg-error" id="login-error" hidden></p>
+      <button class="mg-btn mg-primary" type="submit" id="login-submit">Continue</button>
+    </form>
+  </div>
+
+  <!-- Settings -->
+  <div class="mg-overlay" id="settings" hidden>
+    <div class="mg-card mg-settings">
+      <nav class="mg-settings-nav" id="settings-nav"></nav>
+      <div class="mg-settings-body">
+        <button class="mg-icon-btn mg-close" id="close-settings" title="Close (Esc)">✕</button>
+        <div id="settings-page"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mg-banner" id="banner" hidden></div>
+
+  <!-- Command palette -->
+  <div class="mg-overlay mg-palette-overlay" id="palette" hidden>
+    <div class="mg-card mg-palette">
+      <input type="search" id="palette-input" placeholder="Type a command, chat, plugin or setting…" autocomplete="off">
+      <div class="mg-palette-list" id="palette-list"></div>
+    </div>
+  </div>
+
+  <!-- App lock -->
+  <div class="mg-lock" id="lock" hidden>
+    <form class="mg-lock-card" id="lock-form">
+      <img src="logo.png" alt="">
+      <h2>MelloGram is locked</h2>
+      <input type="password" id="lock-pin" placeholder="PIN" autocomplete="off" inputmode="text">
+      <p class="mg-error" id="lock-error" hidden></p>
+      <button class="mg-btn mg-primary" type="submit">Unlock</button>
+    </form>
+  </div>
+
+  <div class="mg-context-menu" id="context-menu" hidden></div>
+  <div class="mg-toasts" id="toasts"></div>
+
+  <script src="mg.js"></script>
+  <script src="settings.js"></script>
+  <script src="studio.js"></script>
+  <script src="app.js"></script>
+  <script src="extras.js"></script>
+</body>
+</html>

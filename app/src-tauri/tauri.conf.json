@@ -1,0 +1,86 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "MelloGram",
+  "version": "0.1.0",
+  "identifier": "app.mellogram.desktop",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "MelloGram",
+        "width": 1200,
+        "height": 780,
+        "minWidth": 760,
+        "minHeight": 500
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis",
+      "msi",
+      "deb",
+      "rpm",
+      "appimage"
+    ],
+    "category": "SocialNetworking",
+    "shortDescription": "Customisable Telegram client",
+    "longDescription": "MelloGram is a Telegram desktop client with a plugin manager, themes and QuickCSS.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0"
+        ]
+      }
+    },
+    "publisher": "MelloGram",
+    "copyright": "MelloGram contributors \u00b7 GPL-3.0-or-later",
+    "homepage": "https://github.com/foulfoxhacks/MelloGram",
+    "license": "GPL-3.0-or-later",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "both",
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "icons/nsis-header.bmp",
+        "sidebarImage": "icons/nsis-sidebar.bmp",
+        "displayLanguageSelector": false,
+        "languages": [
+          "English"
+        ],
+        "startMenuFolder": "MelloGram",
+        "compression": "lzma"
+      },
+      "wix": {
+        "language": "en-US",
+        "upgradeCode": "6f1d3b0e-6c8a-4f7e-9d2b-5a4e2c9b7d11"
+      }
+    },
+    "android": {
+      "minSdkVersion": 24,
+      "versionCode": 1
+    },
+    "iOS": {
+      "minimumSystemVersion": "14.0"
+    }
+  }
+}

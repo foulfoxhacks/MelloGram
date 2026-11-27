@@ -1,0 +1,17 @@
+/**
+ * @name Midnight Mello
+ * @author MelloGram
+ * @version 1.0.0
+ * @description Deep navy with soft lavender accents.
+ */
+:root {
+  --mg-bg: #0f1222;
+  --mg-bg-2: #151933;
+  --mg-surface: #1c2142;
+  --mg-text: #e6e8ff;
+  --mg-muted: #8f95c4;
+  --mg-accent: #a594ff;
+  --mg-border: #262c55;
+  --mg-bubble-in: #1f2550;
+  --mg-bubble-out: #4a3fa8;
+}

@@ -1,0 +1,12 @@
+[package]
+name = "mellogram-plugins"
+description = "Built-in MelloGram plugins"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+mellogram-core.workspace = true
+serde_json.workspace = true
+regex.workspace = true
+url.workspace = true

@@ -1,0 +1,9 @@
+/target/
+**/target/
+**/gen/schemas
+*.session
+/app/src-tauri/gen/android
+/app/src-tauri/gen/apple
+.env
+.env.*
+!.env.example
