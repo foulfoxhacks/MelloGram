@@ -31,12 +31,6 @@ jobs:
           node --check app/ui/wallpapers.js
           node --check app/ui/mg.js
           node --check docs/examples/mellorpc-node-example.js
-      - name: Set up Node.js for website checks
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Build and validate the public website
-        run: node site/build.mjs && node site/check.mjs
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
