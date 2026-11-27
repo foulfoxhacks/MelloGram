@@ -120,6 +120,13 @@ const robots = existsSync(join(DIST, "robots.txt")) ? readFileSync(join(DIST, "r
 if (!robots.includes(`Sitemap: ${SITE}/sitemap.xml`)) problems.push("robots.txt: missing Sitemap line");
 if (/Disallow:\s*\/\s*$/m.test(robots)) problems.push("robots.txt: disallows everything");
 if (!existsSync(join(DIST, "llms.txt"))) problems.push("llms.txt missing");
+if (!existsSync(join(DIST, "llms-full.txt"))) problems.push("llms-full.txt missing");
+if (!existsSync(join(DIST, "sitemap.xsl"))) problems.push("sitemap.xsl missing");
+else {
+  const xsl = readFileSync(join(DIST, "sitemap.xsl"), "utf8");
+  if (!xsl.includes("/assets/logo.png")) problems.push("sitemap.xsl does not use the MelloGram logo");
+}
+if (!sitemap.includes('<?xml-stylesheet type="text/xsl" href="/sitemap.xsl"?>')) problems.push("sitemap.xml missing branded XSL stylesheet reference");
 if (sitemapLocs.some((l) => l.includes("404"))) problems.push("sitemap lists the 404 page");
 for (const loc of sitemapLocs) {
   if (!loc.startsWith(SITE)) problems.push(`sitemap loc outside site: ${loc}`);
