@@ -186,7 +186,11 @@
       while (running < 4 && queue.length) {
         const job = queue.shift();
         running++;
-        Bridge.invoke("chat_photo", { chatId: job.id, photoId: job.photo })
+        // The 640px photo, not the 160px one: it is the same file the info
+        // panel shows, it is cached on disk by photo id, and the browser
+        // downscales it for the 42px avatar. The small variant was the one
+        // that came back unusable, leaving initials over every chat.
+        Bridge.invoke("chat_photo", { chatId: job.id, photoId: job.photo, big: true })
           .catch(() => null)
           .then((u) => { running--; job.resolve(u); pump(); });
       }
