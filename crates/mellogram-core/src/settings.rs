@@ -193,11 +193,25 @@ pub struct TelegramSettings {
     pub api_hash: Option<String>,
 }
 
-// Built-in application credentials. These are client application identifiers,
-// not a user's Telegram login/session token. Optional build environment values
-// can override them for development or alternate distributions.
-const BUILTIN_TELEGRAM_API_ID: i32 = 30886269;
-const BUILTIN_TELEGRAM_API_HASH: &str = "957f1de9d7ccb6e6639fec6ef79ad217";
+// Built-in application credentials, read from the one file both clients share
+// (`config/telegram-app.json`). These are client application identifiers, not a
+// user's Telegram login/session token. Optional build environment values can
+// override them for development or alternate distributions.
+const SHARED_TELEGRAM_APP: &str = include_str!("../../../config/telegram-app.json");
+
+#[derive(Debug, Deserialize)]
+struct SharedTelegramApp {
+    api_id: i32,
+    api_hash: String,
+}
+
+fn shared_telegram_app() -> &'static SharedTelegramApp {
+    static APP: std::sync::OnceLock<SharedTelegramApp> = std::sync::OnceLock::new();
+    APP.get_or_init(|| {
+        serde_json::from_str(SHARED_TELEGRAM_APP)
+            .expect("config/telegram-app.json must contain a valid api_id and api_hash")
+    })
+}
 
 impl TelegramSettings {
     /// A settings file written by an older build, a hand edit or a failed write
@@ -219,15 +233,16 @@ impl TelegramSettings {
 
 impl Default for TelegramSettings {
     fn default() -> Self {
+        let shared = shared_telegram_app();
         let api_id = option_env!("MELLOGRAM_TELEGRAM_API_ID")
             .and_then(|value| value.parse::<i32>().ok())
             .filter(|value| *value > 0)
-            .or(Some(BUILTIN_TELEGRAM_API_ID));
+            .or(Some(shared.api_id));
         let api_hash = option_env!("MELLOGRAM_TELEGRAM_API_HASH")
             .map(str::trim)
             .filter(|value| value.len() == 32 && value.chars().all(|c| c.is_ascii_hexdigit()))
             .map(str::to_owned)
-            .or_else(|| Some(BUILTIN_TELEGRAM_API_HASH.to_owned()));
+            .or_else(|| Some(shared.api_hash.clone()));
         Self { api_id, api_hash }
     }
 }

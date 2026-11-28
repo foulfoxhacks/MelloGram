@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import worker, { withSecurityHeaders } from "../src/worker.js";
 import { capabilities } from "../src/capabilities.js";
+import sharedApp from "../../../config/telegram-app.json" with { type: "json" };
 
 const shell = () =>
   new Response("<!doctype html><title>MelloGram Web</title>", {
@@ -137,8 +138,7 @@ test("the Telegram beta is on by default, can be disabled, and validates overrid
     worker.fetch(new Request(`https://wc.example.com${path}`, init), env(overrides));
   // Nothing configured: the deployment uses MelloGram's own public application.
   const builtin = await (await fetch("/api/telegram-config", {})).json();
-  assert.equal(builtin.apiId, 30886269);
-  assert.match(builtin.apiHash, /^[a-f\d]{32}$/);
+  assert.deepEqual(builtin, { apiId: sharedApp.api_id, apiHash: sharedApp.api_hash });
   for (const off of ["false", "FALSE", "0", "off"]) {
     const disabled = { TELEGRAM_WEB_BETA: off };
     assert.equal((await fetch("/api/telegram-config", disabled)).status, 404, off);

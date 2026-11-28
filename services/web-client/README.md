@@ -6,12 +6,18 @@
 
 MelloGram Web is a Telegram client served by a Cloudflare Worker. It signs in
 to an existing Telegram account with QR or phone, keeps the session in the
-browser, lists recent chats and groups, pages history, sends text and
-downloads small files. It also serves the MTProto relay and an in-memory
+browser, and opens a two-pane console — conversation list with unread badges,
+message threads and a composer — with paged history and small downloads. It also serves the MTProto relay and an in-memory
 overlay demo. Sign-in can be switched off per deployment with
 `TELEGRAM_WEB_BETA=false`.
 
 ## Telegram beta
+
+The Telegram application identifiers are read from `config/telegram-app.json`
+at the repository root, the same file the desktop app compiles in, so the two
+clients cannot drift apart. They are public application identifiers, not an
+account credential, and the Worker can override them with `TELEGRAM_API_ID`
+and `TELEGRAM_API_HASH`.
 
 The browser uses [mtcute](https://github.com/mtcute/mtcute) for MTProto key
 exchange, encrypted RPCs, QR token refresh, data centre migration and two-step

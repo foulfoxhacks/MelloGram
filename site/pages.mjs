@@ -146,7 +146,7 @@ export function pages(c) {
       <ul class="dl-list">${c.downloads[id].map(([label, link, note]) => `<li><a class="btn${label === c.downloads[id][0][0] ? "" : " btn-ghost"}" href="${link}" rel="noopener" data-os="${id}">Download ${esc(label)}</a><span class="muted small">${esc(note)}</span></li>`).join("")}</ul>
     </li>`).join("")}
     <li class="card" id="web"><h3>MelloGram for the web</h3><p>Nothing to install.</p>
-      <ul class="dl-list"><li><a class="btn btn-ghost" href="${c.esc(c.WEB)}" rel="noopener">Open the web client</a><span class="muted small">A browser preview with optional beta sign-in. Availability depends on the deployment; desktop and Android apps are also available.</span></li></ul>
+      <ul class="dl-list"><li><a class="btn btn-ghost" href="${c.esc(c.WEB)}" rel="noopener">Open the web client</a><span class="muted small">Sign in with a QR code or your phone number, read your recent chats and send messages. The beta keeps the session in your browser; channels, topics and large files stay in the desktop and Android apps.</span></li></ul>
     </li>
   </ul>
   <p class="muted">All files come from the <a href="${c.REPO}/releases/latest" rel="noopener">latest GitHub release</a>, built automatically from the public source code. Older versions and checksums are on the <a href="${c.REPO}/releases" rel="noopener">releases page</a>.</p>
