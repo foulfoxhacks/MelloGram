@@ -42,8 +42,35 @@
 
   // ---- login ----------------------------------------------------------------
 
+  // Telegram only accepts E.164 (+<country><subscriber>, digits and no
+  // punctuation). Phone keyboards and people add spaces, dashes, brackets and
+  // a leading 00, and the request then comes back as PHONE_NUMBER_INVALID with
+  // no code sent. Clean the value up here so a number typed the way the
+  // placeholder shows it still works.
+  function normalizePhone(raw) {
+    let text = String(raw ?? "").replace(/[\s().\-]/g, "");
+    if (text.startsWith("00")) text = "+" + text.slice(2);
+    if (!text.startsWith("+")) text = "+" + text;
+    return text;
+  }
+  const PHONE = /^\+[1-9]\d{6,14}$/;
+
+  // A long-lived MTProto request (a blocked network, a dead proxy, Telegram
+  // holding the connection open) would otherwise leave the button disabled and
+  // the screen exactly as it was, which reads as "nothing happened".
+  const LOGIN_DEADLINE_MS = 45000;
+  function withDeadline(promise, message) {
+    let timer;
+    return Promise.race([
+      promise.finally(() => clearTimeout(timer)),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), LOGIN_DEADLINE_MS); }),
+    ]);
+  }
+  const UNREACHABLE = "Telegram did not answer within 45 seconds. Check the connection (Settings → Network & Tunnels if you use a proxy) and try again — a login code can still arrive in the meantime.";
+
   const loginSteps = {
     credentials: {
+      busy: "Connecting…",
       help: "MelloGram talks to Telegram with your own API credentials. Create them at my.telegram.org → API development tools.",
       fields: () => [
         field("API ID", h("input", { type: "number", name: "api_id", required: true, autocomplete: "off" })),
@@ -55,19 +82,29 @@
       },
     },
     "need-phone": {
-      help: "Enter your phone number in international format.",
-      fields: () => [field("Phone number", h("input", { type: "tel", name: "phone", placeholder: "+1 555 123 4567", required: true }))],
-      submit: (f) => Bridge.invoke("request_code", { phone: f.phone.value }),
+      busy: "Sending the code…",
+      help: "Enter your phone number in international format, with the country code.",
+      fields: () => [field("Phone number", h("input", { type: "tel", name: "phone", placeholder: "+1 555 123 4567", autocomplete: "tel", required: true }))],
+      submit: (f) => {
+        const phone = normalizePhone(f.phone.value);
+        if (!PHONE.test(phone)) {
+          throw new Error("That is not a complete international number. Include the country code, for example +1 555 123 4567 or +44 20 7946 0018.");
+        }
+        f.phone.value = phone;
+        return withDeadline(Bridge.invoke("request_code", { phone }), UNREACHABLE);
+      },
     },
     "need-code": {
-      help: (s) => `We sent a code to your Telegram app${s.phone ? ` for ${s.phone}` : ""}.`,
+      busy: "Signing in…",
+      help: (s) => `We sent a code to your Telegram app${s.phone ? ` for ${s.phone}` : ""}. If no other device is signed in, it arrives by SMS.`,
       fields: () => [field("Login code", h("input", { type: "text", name: "code", inputmode: "numeric", required: true, autocomplete: "one-time-code" }))],
-      submit: (f) => Bridge.invoke("submit_code", { code: f.code.value }),
+      submit: (f) => withDeadline(Bridge.invoke("submit_code", { code: f.code.value }), UNREACHABLE),
     },
     "need-password": {
+      busy: "Signing in…",
       help: (s) => `This account has two-step verification.${s.hint ? ` Hint: ${s.hint}` : ""}`,
       fields: () => [field("Password", h("input", { type: "password", name: "password", required: true }))],
-      submit: (f) => Bridge.invoke("submit_password", { password: f.password.value }),
+      submit: (f) => withDeadline(Bridge.invoke("submit_password", { password: f.password.value }), UNREACHABLE),
     },
   };
 
@@ -91,14 +128,21 @@
   $("login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const btn = $("login-submit");
+    const step = loginSteps[loginStep?.key];
+    const label = btn.textContent;
     btn.disabled = true;
+    // Say what is happening: a disabled button with an unchanged screen is
+    // indistinguishable from a request that was never sent.
+    btn.textContent = step?.busy || "Working…";
+    $("login-error").hidden = true;
     try {
-      showLogin(await loginSteps[loginStep.key].submit(e.target.elements));
+      showLogin(await step.submit(e.target.elements));
     } catch (err) {
-      $("login-error").textContent = String(err);
+      $("login-error").textContent = String(err?.message || err);
       $("login-error").hidden = false;
     } finally {
       btn.disabled = false;
+      btn.textContent = label;
     }
   });
 
