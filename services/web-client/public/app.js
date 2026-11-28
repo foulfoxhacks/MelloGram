@@ -5,7 +5,6 @@
 
 const list = document.getElementById("capabilities");
 const version = document.getElementById("version");
-const stage = document.getElementById("stage");
 const note = document.getElementById("status-note");
 
 function row(item) {
@@ -33,7 +32,6 @@ function row(item) {
 function render(data) {
   list.replaceChildren(...data.capabilities.map(row));
   version.textContent = `v${data.version} · ${data.capabilities.filter((item) => item.ready).length} of ${data.capabilities.length} ready`;
-  if (data.stage) stage.textContent = data.stage;
   note.textContent = "This list is served by the Worker at /api/status, not written into the page.";
 }
 

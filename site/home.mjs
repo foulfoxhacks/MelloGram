@@ -1,54 +1,14 @@
-// Homepage body. Structure follows telegram.org — tagline hero, per-platform
-// download tiles, a "Why <product>?" grid, spotlight sections and a closing
-// call to action — rendered in MelloGram's dark purple palette with MelloGram's
-// own copy. All claims describe shipped behaviour; the comparison table is
-// checked against Telegram's public documentation.
+// Homepage content using MelloGram branding and shipped app previews.
 
 const ICON = {
-  windows:
-    '<path d="M3 5.5 10.5 4.4v7.1H3Zm8.5-1.3L21 3v8.5h-9.5ZM3 12.5h7.5v7.1L3 18.5Zm8.5 0H21V21l-9.5-1.3Z"/>',
-  macos:
-    '<rect x="3" y="4" width="18" height="12.5" rx="1.8"/><path d="M2 19.5h20"/><path d="M9.5 16.5h5"/>',
-  linux:
-    '<rect x="3" y="4" width="18" height="15" rx="2"/><path d="m7 9 3 3-3 3"/><path d="M12.5 15H17"/>',
-  android:
-    '<rect x="6.5" y="2.5" width="11" height="19" rx="2.4"/><path d="M10.5 5.5h3"/><circle cx="12" cy="18" r="1"/>',
-  web:
-    '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 2.4 4 5.5 4 9s-1.4 6.6-4 9c-2.6-2.4-4-5.5-4-9s1.4-6.6 4-9Z"/>',
+  desktop: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M12 17v4M8 21h8"/>',
+  android: '<rect x="6.5" y="2.5" width="11" height="19" rx="2.4"/><path d="M10.5 5.5h3M11.5 18h1"/>',
+  arrow: '<path d="M4 12h15m-6-6 6 6-6 6"/>',
 };
 
 const icon = (name) =>
   `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">${ICON[name]}</svg>`;
 
-const tile = (c, name, meta, glyph, path) => `
-    <li>
-      <a class="tg-tile" href="${c.href(path)}">
-        ${icon(glyph)}
-        <span class="tg-tile-name">${name}</span>
-        <span class="tg-tile-meta">${meta}</span>
-      </a>
-    </li>`;
-
-const why = (title, text) => `
-    <li class="tg-why-card">
-      <h3>${title}</h3>
-      <p>${text}</p>
-    </li>`;
-
-const COMPARE = [
-  ["Where it runs", "Windows, macOS, Linux, Android, iOS and web", "Windows, macOS, Linux and Android; a browser shell is in progress"],
-  ["License", "GPL-3.0", "GPL-3.0-or-later, built from the public repository"],
-  ["Plugin system", "None", "{PLUGINS} built-in plugins, each declaring its permissions"],
-  ["Themes", "Cloud themes and a palette editor", "CSS themes, theme variables and live QuickCSS"],
-  ["Chat backgrounds", "Cloud wallpapers and gradients", "Images, gradients, patterns and animated scenes with blur, dim and parallax"],
-  ["Saved setups", "Not available", "Workspaces that switch plugins, theme, CSS and appearance together"],
-  ["End-to-end messaging", "Secret Chats: one-to-one, mobile only", "MelloGram overlay: one-to-one and groups, opt-in per chat"],
-  ["Group end-to-end", "Not available", "Sender keys, rotated when a member leaves or is removed"],
-  ["Built with", "C++ (tdesktop)", "Rust and Tauri"],
-];
-
-// Feature icons for the "Why MelloGram?" grid, drawn as simple line icons
-// inside round badges, the way telegram.org presents its features.
 const WHY_ICON = {
   simple: '<path d="M5 12h14M12 5v14"/>',
   private: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
@@ -70,31 +30,52 @@ const whyItem = (key, title, text) => `
 export function homeBody(c) {
   const { href, img, plugins } = c;
   return `
-<section class="tgo-hero">
-  <div class="tgo-hero-logo">
-    ${img("logo.png", "MelloGram fox-paw and paper-plane mascot logo", "MelloGram logo", { eager: true, cls: "cute-logo" })}
-  </div>
-  <h1>MelloGram</h1>
-  <p class="tgo-tagline">a customizable era of messaging</p>
-  <p class="tgo-sub">Your Telegram account, your chats, your look. Free, open source and written in Rust.</p>
-</section>
+<div class="tgo-intro">
+  <svg class="tgo-signal" viewBox="0 0 300 240" fill="none" aria-hidden="true" focusable="false">
+    <ellipse cx="145" cy="120" rx="130" ry="48" transform="rotate(-30 145 120)" />
+    <ellipse cx="145" cy="120" rx="130" ry="68" transform="rotate(26 145 120)" />
+    <circle cx="78" cy="168" r="4" />
+    <path d="M232 43v18m-9-9h18M65 57v12m-6-6h12M240 171v10m-5-5h10" />
+  </svg>
+  <section class="tgo-hero" aria-labelledby="home-title">
+    ${img("logo.png", "MelloGram fox-paw and paper-plane mascot logo", "MelloGram logo", { eager: true, cls: "tgo-logo" })}
+    <h1 id="home-title">MelloGram</h1>
+    <p class="tgo-tagline">Your chats. Your colors.</p>
+    <p class="tgo-sub">An independent Telegram client with themes, plugins, and room to make it yours.</p>
+  </section>
+  <aside class="tgo-highlights" aria-labelledby="highlights-title">
+    <h2 id="highlights-title">Explore MelloGram</h2>
+    <ul>
+      <li><a href="${href("/themes/")}">Themes &amp; wallpapers</a><span>Make it yours</span></li>
+      <li><a href="${href("/plugins/")}">Built-in plugins</a><span>Pick what works for you</span></li>
+      <li><a href="${c.esc(c.WEB)}">MelloGram Web <span aria-hidden="true">↗</span></a><span>Preview · sign-in unavailable</span></li>
+    </ul>
+  </aside>
+</div>
 
-<section class="tgo-apps" aria-label="Get MelloGram">
-  <a class="tgo-app" href="${href("/download/")}#android" data-os="android">
-    <span class="tgo-app-title">MelloGram for <strong>Android</strong></span>
-    ${img("screenshot-android.webp", "MelloGram on an Android phone, showing the chat list with filter chips and bottom navigation", "MelloGram for Android", { eager: true, cls: "tgo-app-shot tgo-app-phone" })}
+<section class="tgo-apps" aria-labelledby="apps-title">
+  <h2 id="apps-title">Get MelloGram</h2>
+  <a class="tgo-app tgo-android" href="${href("/download/")}#android">
+    <div class="tgo-app-visual">
+      ${img("screenshot-android.webp", "MelloGram chat list on Android", "MelloGram for Android", { cls: "tgo-app-shot tgo-app-phone" })}
+    </div>
+    <span class="tgo-app-title">
+      <span>${icon("android")} <strong>Android</strong></span>
+      ${icon("arrow")}
+    </span>
+    <span class="tgo-app-platforms">Download the Android app</span>
   </a>
-  <a class="tgo-app" href="${href("/download/")}">
-    <span class="tgo-app-title">MelloGram for <strong>Desktop</strong></span>
-    ${img("screenshot-chat.webp", "MelloGram desktop chat window with custom colours and a paw-print wallpaper", "MelloGram for Desktop", { eager: true, cls: "tgo-app-shot" })}
+  <a class="tgo-app tgo-desktop" href="${href("/download/")}">
+    <div class="tgo-app-visual">
+      ${img("screenshot-chat.webp", "MelloGram desktop chat with custom colors and a paw-print wallpaper", "MelloGram for Desktop", { cls: "tgo-app-shot" })}
+    </div>
+    <span class="tgo-app-title">
+      <span>${icon("desktop")} <strong>Desktop</strong></span>
+      ${icon("arrow")}
+    </span>
+    <span class="tgo-app-platforms">Windows, macOS &amp; Linux</span>
   </a>
 </section>
-<nav class="tgo-more-apps" aria-label="Other platforms">
-  <a href="${href("/download/")}#windows">MelloGram for <strong>Windows</strong></a>
-  <a href="${href("/download/")}#macos">MelloGram for <strong>macOS</strong></a>
-  <a href="${href("/download/")}#linux">MelloGram for <strong>Linux</strong></a>
-  <a href="${c.WEB}" rel="noopener">MelloGram <strong>Web</strong></a>
-</nav>
 
 <section class="tgo-why" aria-labelledby="why-title">
   <h2 id="why-title">Why MelloGram?</h2>

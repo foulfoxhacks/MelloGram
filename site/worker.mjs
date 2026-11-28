@@ -5,7 +5,7 @@
 // page requests, and method handling. Nothing is rendered here, so the static
 // build stays the single source of truth.
 
-const CSP = [
+export const DOCUMENT_CSP = [
   "default-src 'self'",
   "img-src 'self' data:",
   "style-src 'self'",
@@ -13,8 +13,9 @@ const CSP = [
   "connect-src 'self'",
   "base-uri 'none'",
   "form-action 'none'",
-  "frame-ancestors 'none'",
 ].join("; ");
+
+const CSP = `${DOCUMENT_CSP}; frame-ancestors 'none'`;
 
 export function cacheControl(pathname) {
   if (pathname.startsWith("/assets/")) {
