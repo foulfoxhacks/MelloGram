@@ -48,7 +48,7 @@ export function homeBody(c) {
     <ul>
       <li><a href="${href("/themes/")}">Themes &amp; wallpapers</a><span>Make it yours</span></li>
       <li><a href="${href("/plugins/")}">Built-in plugins</a><span>Pick what works for you</span></li>
-      <li><a href="${c.esc(c.WEB)}">MelloGram Web <span aria-hidden="true">↗</span></a><span>Preview · sign-in unavailable</span></li>
+      <li><a href="${c.esc(c.WEB)}">MelloGram Web <span aria-hidden="true">↗</span></a><span>Browser preview · optional beta</span></li>
     </ul>
   </aside>
 </div>

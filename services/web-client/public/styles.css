@@ -222,3 +222,48 @@ h2 { font-size: 1.18rem; font-weight: 750; }
 .page-footer { text-align: center; border-top: 1px solid var(--line); padding-top: 12px; color: var(--muted); font-size: .8rem; }
 .page-footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px 15px; }
 .page-footer p { margin: 8px 0 0; }
+
+/* Sign-in and chat controls use the browser client's existing state and IDs. */
+.stack { display: grid; gap: .65rem; }
+.stack > p { margin: 0; }
+.signin-options { margin: 14px 0; }
+button.primary { width: 100%; border: 0; font: inherit; cursor: pointer; }
+.secondary, .tg-btn-ghost {
+  padding: 9px 12px;
+  border: 1px solid #cfc0e5;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.secondary:hover:not(:disabled), .tg-btn-ghost:hover:not(:disabled) { background: var(--tint); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+#signin-cancel { margin-top: 12px; }
+#signin-form { margin-top: 14px; text-align: left; }
+.stack input, .stack select, .stack textarea {
+  width: 100%; min-width: 0; padding: .65rem;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--bg); color: var(--text); font: inherit;
+}
+#qr-code { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+.app-link, .official-link { display: inline-block; margin-top: 13px; font-size: .85rem; font-weight: 650; }
+.app-link { display: block; }
+.chat-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+.chat-actions button, .chat-messages button { font-size: .85rem; padding: .35rem .6rem; }
+.chat-messages { display: grid; gap: .5rem; padding: 0; list-style: none; }
+.chat-messages li { border: 1px solid var(--line); padding: .6rem .75rem; border-radius: 8px; }
+.chat-messages p { white-space: pre-wrap; overflow-wrap: anywhere; margin: .2rem 0; }
+.capabilities li[data-ready="beta"] .mark { background: #b27816; border-color: #b27816; }
+
+/* Keep the existing dark client palette after sign-in. */
+body:has(#chats-panel:not([hidden])) {
+  color-scheme: dark;
+  --bg: #10101a; --panel: #1b1b2d; --line: #3e3a56;
+  --text: #f4f2ff; --muted: #c0bed2; --accent: #c1b2ff;
+  --accent-hover: #d5caff; --tint: #26233b;
+}
+body:has(#chats-panel:not([hidden])) .primary { background: #7250c7; color: #fff; }
+body:has(#chats-panel:not([hidden])) .secondary,
+body:has(#chats-panel:not([hidden])) .tg-btn-ghost { border-color: #696282; }

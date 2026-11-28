@@ -2,14 +2,26 @@
   "name": "mellogram-web-client",
   "private": true,
   "type": "module",
-  "version": "0.1.0",
-  "engines": { "node": ">=20" },
+  "version": "0.2.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "build": "node scripts/build-browser.mjs",
+    "preview": "node dev.mjs",
+    "check": "node --check src/worker.js && node --check src/capabilities.js && node --check public/app.js && node --check public/signin.js && node --check public/chats.js && npm test && npm run build"
   },
   "devDependencies": {
+    "esbuild": "^0.25.0",
     "wrangler": "^4.0.0"
+  },
+  "dependencies": {
+    "@fuman/net": "0.0.23",
+    "@mtcute/wasm": "0.32.8",
+    "@mtcute/web": "0.32.8",
+    "qrcode-generator": "2.0.4"
   }
 }

@@ -33,8 +33,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Test routing, headers, CORS and HTTPS handling
-        run: npm test
+      - run: npm ci --no-audit --no-fund
+      - name: Test and build the web client
+        run: npm run check
+      - name: Validate the Worker deployment bundle
+        run: npx --no-install wrangler deploy --dry-run
       - name: Check deploy credentials
         id: creds
         env:
@@ -52,7 +55,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx --yes wrangler@4 deploy
+        run: npm run deploy
       # A brand-new custom domain can take a while to get its certificate. TLS
       # handshake failures (curl exit 35/60) are reported as warnings, not
       # failures; a reachable endpoint answering with an error still fails.
@@ -61,7 +64,7 @@ jobs:
         id: smoke
         run: |
           tls_pending=0
-          for url in https://wc.mellogram.foulfoxhacks.dev/api/health https://wc-api.mellogram.foulfoxhacks.dev/api/status; do
+          for url in https://wc.mellogram.foulfoxhacks.dev/api/health https://wc-api.mellogram.foulfoxhacks.dev/api/status https://wc.mellogram.foulfoxhacks.dev/generated/mtcute.wasm; do
             ok=0
             for i in 1 2 3 4 5 6; do
               code=0; curl -fsS --proto '=https' --tlsv1.2 -o /dev/null "$url" || code=$?
@@ -118,12 +121,16 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes wrangler@4 deploy
       - name: Smoke-test over HTTPS
+        id: melloid-smoke
         if: steps.creds.outputs.ready == 'true'
         run: |
           for i in 1 2 3 4 5 6; do
             code=0; curl -fsS --proto '=https' --tlsv1.2 -o /dev/null https://id.mellogram.foulfoxhacks.dev/ || code=$?
-            if [ "$code" = 0 ]; then echo "MelloID answers"; exit 0; fi
+            if [ "$code" = 0 ]; then echo "MelloID answers"; echo "reachable=true" >> "$GITHUB_OUTPUT"; exit 0; fi
             if [ "$code" != 35 ] && [ "$code" != 60 ] && [ "$code" != 6 ] && [ "$code" != 7 ]; then echo "::error::MelloID failed (curl $code)"; exit 1; fi
             sleep 20
           done
           echo "::warning::MelloID has no certificate or DNS yet; Cloudflare is still issuing it"
+      - name: Smoke-test MelloID sign-in entry point
+        if: steps.melloid-smoke.outputs.reachable == 'true'
+        run: node scripts/smoke-signin.mjs https://id.mellogram.foulfoxhacks.dev

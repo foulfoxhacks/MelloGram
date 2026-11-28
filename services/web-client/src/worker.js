@@ -1,12 +1,11 @@
 // MelloGram web client: serves the static shell and a small JSON API.
 //
-// This is a skeleton, and it says so: no Telegram session, no message storage
-// and no overlay until the browser build can host them honestly. The Worker is
-// here so the shell, the deployment target and the security headers are real
-// from the start.
+// The Worker serves the shell and relays opaque MTProto traffic. The browser
+// owns Telegram sign-in and the session; message data is not stored here.
 
 import { errorJson, json, status } from "./capabilities.js";
 import { relayFetch } from "./relay.js";
+import { telegramConfig } from "./telegram-config.js";
 
 // Two hosts, one Worker:
 //   wc.mellogram.foulfoxhacks.dev      the shell (and /api/* for same-origin use)
@@ -24,6 +23,7 @@ const csp = (apiOrigin) => [
   "script-src 'self' 'wasm-unsafe-eval'",
   // The relay is a WebSocket; the page may only open it on our own API host.
   `connect-src 'self'${apiOrigin ? ` ${apiOrigin} ${apiOrigin.replace(/^http/, "ws")}` : ""}`,
+  "object-src 'none'",
   "base-uri 'none'",
   "form-action 'none'",
   "frame-ancestors 'none'",
@@ -106,13 +106,26 @@ export default {
     // socket itself, so it is returned unwrapped: copying the response into a
     // new one would drop the WebSocket.
     const relay = url.pathname.match(/^\/relay\/dc\/([^/]+)$/);
-    if (relay) return relayFetch(request, env, relay[1]);
+    if (relay) {
+      const response = await relayFetch(request, env, relay[1]);
+      return response.status === 101 ? response : done(response);
+    }
+
+    // Keep application settings on the web host; account credentials are never
+    // submitted to the Worker as HTTP form data.
+    if (url.pathname === "/api/telegram-config" && !isApiHost(url, env)) {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return done(json({ error: "method not allowed" }, 405, { Allow: "GET, HEAD" }));
+      }
+      const config = telegramConfig(env);
+      return done(config ? json(config) : errorJson("Telegram beta is disabled", 404));
+    }
 
     if (isApiHost(url, env)) {
-      if (url.pathname === "/" || url.pathname === "") {
+      if ((url.pathname === "/" || url.pathname === "") && ["GET", "HEAD"].includes(request.method)) {
         return done(cors(request, json({ service: "mellogram-web-client-api", endpoints: ["/api/health", "/api/status"] }), env));
       }
-      if (!url.pathname.startsWith("/api/")) return done(errorJson("no such endpoint", 404));
+      if (!url.pathname.startsWith("/api/") && url.pathname !== "/") return done(errorJson("no such endpoint", 404));
       return done(cors(request, await api(request, url, env), env));
     }
 

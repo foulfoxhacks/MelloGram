@@ -1,10 +1,11 @@
 # Same Worker as wrangler.toml, with the static shell bundled into the
 # script (see scripts/embed-assets.mjs) instead of Workers Static Assets.
-# Run `node scripts/embed-assets.mjs` first.
+# Wrangler builds the browser bundle and embeds the static assets.
 name = "mellogram-web-client"
 main = "src/worker-embedded.js"
 compatibility_date = "2026-11-27"
 workers_dev = false
+keep_vars = true
 
 routes = [
   { pattern = "wc.mellogram.foulfoxhacks.dev", custom_domain = true },
@@ -13,3 +14,15 @@ routes = [
 [vars]
 PUBLIC_BASE_URL = "https://wc.mellogram.foulfoxhacks.dev"
 API_BASE_URL = "https://wc-api.mellogram.foulfoxhacks.dev"
+
+[build]
+command = "npm run build && node scripts/embed-assets.mjs"
+
+# Shared across the two hostnames, per Cloudflare location.
+[[ratelimits]]
+name = "RELAY_RATE_LIMIT"
+namespace_id = "20261127"
+
+[ratelimits.simple]
+limit = 30
+period = 60

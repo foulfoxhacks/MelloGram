@@ -126,3 +126,32 @@ test("plain HTTP is upgraded and HSTS is always sent", async () => {
   assert.match(page.headers.get("strict-transport-security"), /max-age=\d+/);
   assert.match(page.headers.get("content-security-policy"), /upgrade-insecure-requests/);
 });
+
+test("the Telegram beta requires explicit opt-in and valid application settings", async () => {
+  const configured = {
+    TELEGRAM_API_ID: "1234",
+    TELEGRAM_API_HASH: "a".repeat(32),
+    TELEGRAM_WEB_BETA: "true",
+  };
+  const fetch = (path, overrides, init) =>
+    worker.fetch(new Request(`https://wc.example.com${path}`, init), env(overrides));
+  for (const bad of [
+    {},
+    { ...configured, TELEGRAM_WEB_BETA: "false" },
+    { ...configured, TELEGRAM_API_ID: "2147483648" },
+    { ...configured, TELEGRAM_API_HASH: "invalid" },
+  ]) {
+    assert.equal((await fetch("/api/telegram-config", bad)).status, 404);
+    assert.equal((await (await fetch("/api/status", bad)).json()).telegramBeta, false);
+  }
+  const response = await fetch("/api/telegram-config", configured);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await response.json(), { apiId: 1234, apiHash: "a".repeat(32) });
+  const status = await (await fetch("/api/status", configured)).json();
+  assert.equal(status.stage, "beta");
+  assert.equal(status.telegramBeta, true);
+  assert.equal(status.capabilities.find(({ id }) => id === "login").beta, true);
+  assert.equal(status.capabilities.find(({ id }) => id === "overlay").ready, false);
+  assert.equal((await fetch("/api/telegram-config", configured, { method: "POST" })).status, 405);
+  assert.equal((await worker.fetch(new Request("https://wc-api.mellogram.foulfoxhacks.dev/api/telegram-config"), env(configured))).status, 404);
+});
