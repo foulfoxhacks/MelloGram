@@ -213,6 +213,23 @@ test("worker: HTTPS redirect, HSTS and unconfigured sign-in", async () => {
   assert.match(page.headers.get("strict-transport-security"), /max-age=/);
 });
 
+test("pages are fetched from their exact asset path, never a self-redirect", async () => {
+  // Workers Static Assets answers /dashboard.html with a 307 to /dashboard when
+  // extension handling is on, and /dashboard routes straight back here.
+  const { default: worker } = await import("../src/worker.js");
+  const seen = [];
+  const env = {
+    PUBLIC_BASE_URL: "https://id.example.com",
+    DB: null,
+    ASSETS: { fetch: async (request) => { seen.push(new URL(request.url).pathname); return new Response("<!doctype html>", { headers: { "Content-Type": "text/html" } }); } },
+  };
+  for (const [path, asset] of [["/", "/index.html"], ["/dashboard", "/dashboard.html"], ["/@/someone", "/profile.html"]]) {
+    const response = await worker.fetch(new Request("https://id.example.com" + path), env);
+    assert.equal(response.status, 200);
+    assert.equal(seen.at(-1), asset, `GET ${path}`);
+  }
+});
+
 test("badge lookup ids are validated, de-duplicated and capped", async () => {
   const { parseBadgeIds } = await import("../src/worker.js");
   assert.deepEqual(parseBadgeIds("12, 12,abc,0,-5,99999999999999999,34"), ["12", "34"]);

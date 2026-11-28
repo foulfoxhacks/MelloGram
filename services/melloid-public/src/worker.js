@@ -783,6 +783,10 @@ export default {
       }
       if (path.startsWith("/@/") && request.method === "GET") return setSecurityHeaders(await staticAsset("/profile.html", request, env));
       if (path === "/dashboard" || path === "/dashboard/") return setSecurityHeaders(await staticAsset("/dashboard.html", request, env));
+      // The asset layer serves files by their exact path (html_handling = none),
+      // so the home page is named explicitly instead of relying on extension
+      // mapping that would rewrite it.
+      if (path === "/" || path === "/index.html") return setSecurityHeaders(await staticAsset("/index.html", request, env));
       return setSecurityHeaders(await env.ASSETS.fetch(request));
     } catch (error) {
       console.error("MelloID Worker error", error);
