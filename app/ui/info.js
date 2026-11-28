@@ -101,6 +101,12 @@
   });
 
   const row = (label, value) => (value == null || value === "" ? null : h("div", { class: "mg-info-row" }, h("span", { class: "mg-muted", text: label }), h("span", { text: String(value) })));
+  // A titled group of blocks. Returns null when it would be empty, so callers
+  // can list it with the rest and filter once.
+  const section = (title, ...children) => {
+    const kids = children.flat().filter((c) => c != null && c !== false);
+    return kids.length ? h("section", { class: "mg-info-section" }, h("h4", { text: title }), ...kids) : null;
+  };
   const plural = (n, unit) => `${n} ${unit}${n === 1 ? "" : "s"}`;
   const dur = (s) => (s >= 86400 ? plural(Math.round(s / 86400), "day") : s >= 3600 ? plural(Math.round(s / 3600), "hour") : s >= 60 ? plural(Math.round(s / 60), "minute") : plural(s, "second"));
 
@@ -128,7 +134,15 @@
       Bridge.invoke("chat_photo", { chatId: chat.id, photoId: info.photo, big: true }).then((url) => {
         if (!url || !avatar.isConnected) return;
         const img = h("img", { class: "mg-avatar-img", alt: "", src: url, draggable: false });
-        img.addEventListener("load", () => { avatar.querySelector(".mg-avatar-img:not(:last-child)")?.remove(); avatar.classList.add("mg-has-photo"); });
+        img.addEventListener("load", () => {
+          // Drop every earlier image (the list's small one, or a previous
+          // panel photo), not just the first, so two photos can never overlap.
+          for (const old of avatar.querySelectorAll(".mg-avatar-img")) if (old !== img) old.remove();
+          avatar.classList.add("mg-has-photo");
+        });
+        // A big photo that fails to decode must not leave a hole: the list's
+        // small photo (or the initials) stays underneath.
+        img.addEventListener("error", () => img.remove());
         avatar.append(img);
         avatar.classList.add("mg-clickable");
         avatar.title = "Open photo";
@@ -138,7 +152,7 @@
     const link = info.username ? `https://t.me/${info.username}` : info.invite_link;
 
     const members = h("div", { class: "mg-info-members" });
-    panel.replaceChildren(
+    panel.replaceChildren(...[
       closeBtn(),
       h("div", { class: "mg-info-head" }, avatar,
         h("h3", { text: info.title || chat.title }),
@@ -151,10 +165,11 @@
           info.scam ? h("span", { class: "mg-tag mg-tag-bad", text: "Flagged as scam/fake" }) : null,
           info.blocked ? h("span", { class: "mg-tag mg-tag-bad", text: "Blocked" }) : null),
         panelPresence),
-      info.about ? h("p", { class: "mg-info-about", text: info.about }) : null,
-      info.bot_description ? h("p", { class: "mg-info-about", text: info.bot_description }) : null,
-      info.business_intro ? h("p", { class: "mg-info-about", text: info.business_intro }) : null,
-      h("div", { class: "mg-info-rows" },
+      section("About",
+        info.about ? h("p", { class: "mg-info-about", text: info.about }) : null,
+        info.bot_description ? h("p", { class: "mg-info-about", text: info.bot_description }) : null,
+        info.business_intro ? h("p", { class: "mg-info-about", text: info.business_intro }) : null),
+      section("Details", h("div", { class: "mg-info-rows" },
         row("Username", info.username ? `@${info.username}` : null),
         row("Phone", info.phone ? `+${info.phone}` : null),
         row("Also known as", info.extra_usernames?.length ? info.extra_usernames.map((u) => `@${u}`).join(", ") : null),
@@ -174,14 +189,15 @@
         row("Groups in common", info.common_chats),
         row("Slow mode", info.slow_mode_seconds ? dur(info.slow_mode_seconds) : null),
         row("Auto-delete", info.auto_delete_seconds ? dur(info.auto_delete_seconds) : null),
-        row("ID", chat.id)),
+        row("ID", chat.id))),
       h("div", { class: "mg-toolbar" },
         link ? h("button", { class: "mg-btn", text: "Copy link", onclick: () => navigator.clipboard.writeText(link).then(() => UI.toast("Link copied", "success")) }) : null,
         h("button", { class: "mg-btn", text: "Copy ID", onclick: () => navigator.clipboard.writeText(String(chat.id)).then(() => UI.toast("ID copied", "success")) }),
         info.personal_channel_id ? h("button", { class: "mg-btn", text: "Personal channel", onclick: () => App().openChatById(info.personal_channel_id).catch((e) => UI.toast(String(e), "info")) }) : null,
         info.pinned_message_id ? h("button", { class: "mg-btn", text: "Pinned message", onclick: () => App().jumpTo(info.pinned_message_id) }) : null,
         info.linked_chat_id ? h("button", { class: "mg-btn", text: info.kind === "channel" ? "Discussion group" : "Linked channel", onclick: () => App().openChatById(info.linked_chat_id).catch((e) => UI.toast(String(e), "info")) }) : null),
-      members);
+      members,
+    ].filter(Boolean));
 
     if (info.kind !== "user") {
       if (info.members_hidden && !info.can_view_members) {
