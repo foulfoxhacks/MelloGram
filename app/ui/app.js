@@ -104,6 +104,11 @@
 
   async function onReady(me) {
     document.title = `MelloGram — ${me.name}`;
+    // "Check for updates on launch" (Settings → General): one request to
+    // GitHub's public releases API, nothing about this install is sent.
+    Bridge.invoke("get_settings").then((s) => s?.general?.auto_check_updates && Bridge.invoke("check_for_update"))
+      .then((u) => { if (u?.update_available) UI.toast(`MelloGram ${u.name || u.tag} is available — Settings → About & Updates`, "info"); })
+      .catch(() => {});
     await refreshChats();
   }
 

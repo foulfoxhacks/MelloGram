@@ -28,12 +28,59 @@ pub fn app_info(state: S<'_>) -> Value {
     json!({
         "name": "MelloGram",
         "version": env!("CARGO_PKG_VERSION"),
+        "build": current_build(),
         "platform": std::env::consts::OS,
         "arch": std::env::consts::ARCH,
         "config_dir": state.dir,
         "themes_dir": state.themes.dir(),
         "changelog": include_str!("../../../CHANGELOG.md"),
     })
+}
+
+/// CI build number baked in at compile time (0 for local builds).
+pub fn current_build() -> u64 {
+    option_env!("MELLOGRAM_BUILD").and_then(|b| b.parse().ok()).unwrap_or(0)
+}
+
+/// `build-141` → 141; `v0.2.0` and anything else → None.
+pub fn parse_build_tag(tag: &str) -> Option<u64> {
+    tag.strip_prefix("build-")?.parse().ok()
+}
+
+/// Asks GitHub for the latest MelloGram release. Only the public releases
+/// endpoint is contacted; nothing about this install is sent.
+#[tauri::command]
+pub async fn check_for_update(state: S<'_>) -> R<Value> {
+    const HOST: &str = "api.github.com";
+    let body = tauri::async_runtime::spawn_blocking(|| -> R<String> {
+        let agent = ureq::AgentBuilder::new().try_proxy_from_env(true).timeout(std::time::Duration::from_secs(15)).build();
+        let resp = agent
+            .get("https://api.github.com/repos/foulfoxhacks/MelloGram/releases/latest")
+            .set("User-Agent", "MelloGram-update-check")
+            .set("Accept", "application/vnd.github+json")
+            .call()
+            .map_err(err)?;
+        let mut text = String::new();
+        resp.into_reader().take(512 * 1024).read_to_string(&mut text).map_err(err)?;
+        Ok(text)
+    })
+    .await
+    .map_err(err)??;
+    state.traffic.record("in", "https", HOST, body.len() as u64, "update check");
+    let release: Value = serde_json::from_str(&body).map_err(|_| "GitHub sent an unexpected reply".to_string())?;
+    let tag = release.get("tag_name").and_then(Value::as_str).unwrap_or_default().to_owned();
+    let latest = parse_build_tag(&tag);
+    let current = current_build();
+    let url = release.get("html_url").and_then(Value::as_str).filter(|u| u.starts_with("https://github.com/foulfoxhacks/MelloGram/")).unwrap_or("https://github.com/foulfoxhacks/MelloGram/releases/latest");
+    Ok(json!({
+        "current": current,
+        "latest": latest,
+        "tag": tag,
+        "name": release.get("name").and_then(Value::as_str),
+        "url": url,
+        // Local builds (0) never claim to be outdated.
+        "update_available": current > 0 && latest.is_some_and(|l| l > current),
+    }))
 }
 
 #[tauri::command]
@@ -332,7 +379,14 @@ pub async fn send_message(state: S<'_>, request: SendRequest) -> R<SendOutcome> 
 
 #[cfg(test)]
 mod schedule_tests {
-    use super::validate_schedule;
+    use super::{parse_build_tag, validate_schedule};
+
+    #[test]
+    fn build_tags() {
+        assert_eq!(parse_build_tag("build-141"), Some(141));
+        assert_eq!(parse_build_tag("v0.2.0"), None);
+        assert_eq!(parse_build_tag("build-x"), None);
+    }
 
     #[test]
     fn schedule_window() {

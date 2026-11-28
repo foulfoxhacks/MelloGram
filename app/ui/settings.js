@@ -461,8 +461,19 @@
   async function renderAbout() {
     const info = await Bridge.invoke("app_info");
     const changelog = h("pre", { class: "mg-raw", text: info.changelog });
+    const result = h("p", { class: "mg-muted", role: "status" });
+    const check = async () => {
+      result.textContent = "Checking…";
+      try {
+        const u = await Bridge.invoke("check_for_update");
+        result.replaceChildren(u.update_available
+          ? h("span", {}, `${u.name || u.tag} is available. `, h("a", { href: u.url, target: "_blank", rel: "noopener noreferrer", text: "Download it from GitHub" }))
+          : document.createTextNode(info.build ? `You're up to date (build ${info.build}; latest ${u.tag || "unknown"}).` : `This is a local build. Latest release: ${u.tag || "unknown"}.`));
+      } catch (e) { result.textContent = `Could not check: ${e}`; }
+    };
     return [
-      h("h2", { text: `MelloGram ${info.version}` }),
+      h("h2", { text: `MelloGram ${info.version}${info.build ? ` (build ${info.build})` : ""}` }),
+      h("div", { class: "mg-toolbar" }, h("button", { class: "mg-btn", text: "Check for updates", onclick: check })), result,
       h("p", { class: "mg-muted", text: `${info.platform} / ${info.arch} · config: ${info.config_dir}` }),
       h("p", { class: "mg-muted", text: "MelloGram is an unofficial Telegram client. It is not affiliated with Telegram." }),
       h("h3", { text: "Changelog" }), changelog,

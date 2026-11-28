@@ -90,6 +90,7 @@ pub fn run() {
             activity::wakatime_set_key,
             activity::wakatime_heartbeat,
             activity::melloid_badges,
+            commands::check_for_update,
             media::save_media,
             media::send_location,
             media::get_media_settings,
