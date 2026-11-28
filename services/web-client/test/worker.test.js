@@ -31,7 +31,7 @@ test("health and status answer JSON with security headers", async () => {
   const status = await call("/api/status");
   const body = await status.json();
   assert.equal(body.service, "mellogram-web-client");
-  assert.equal(body.stage, "skeleton");
+  assert.equal(body.stage, "transport");
   assert.equal(body.origin, "https://wc.example.com");
   assert.equal(body.capabilities.length, capabilities().length);
 });
