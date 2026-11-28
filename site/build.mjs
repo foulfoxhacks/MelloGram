@@ -8,15 +8,20 @@
 //
 // SITE_URL sets the public origin + base path (default: https://mellogram.foulfoxhacks.dev).
 
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync, statSync } from "node:fs";
+import { appendFileSync, cpSync, mkdirSync, readFileSync, rmSync, writeFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pages } from "./pages.mjs";
+import { DOCUMENT_CSP } from "./worker.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SITE = (process.env.SITE_URL || "https://mellogram.foulfoxhacks.dev").replace(/\/+$/, "");
 // The browser client lives on its own host; it is a preview of the shell.
-const WEB = (process.env.WEB_URL || "https://wc.mellogram.foulfoxhacks.dev").replace(/\/+$/, "");
+const webUrl = new URL(process.env.WEB_URL || "https://wc.mellogram.foulfoxhacks.dev");
+if (!["https:", "http:"].includes(webUrl.protocol) || webUrl.username || webUrl.password) {
+  throw new Error("WEB_URL must be an HTTP(S) URL without credentials");
+}
+const WEB = webUrl.href.replace(/\/+$/, "");
 const BASE = new URL(SITE + "/").pathname; // e.g. "/MelloGram/"
 const OUT = join(here, "dist");
 const REPO = "https://github.com/foulfoxhacks/MelloGram";
@@ -108,13 +113,15 @@ function layout(page, body) {
     dateModified: today,
   }, breadcrumbs(page), ...(page.jsonld ? page.jsonld(ctx) : [])].filter(Boolean);
 
-  const nav = NAV.map(([p, label]) => `<li><a href="${href(p)}"${p === page.path ? ' aria-current="page"' : ""}>${label}</a></li>`).join("");
+  const isHome = page.path === "/";
+  const nav = (isHome ? [["/", "Home"], ...NAV] : NAV).map(([p, label]) => `<li><a href="${href(p)}"${p === page.path ? ' aria-current="page"' : ""}>${label}</a></li>`).join("");
   const crumbs = page.path === "/" ? "" : `<nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="${href("/")}">Home</a></li><li aria-current="page">${esc(page.crumb || page.h1)}</li></ol></nav>`;
 
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
+${isHome ? `<meta http-equiv="Content-Security-Policy" content="${esc(DOCUMENT_CSP)}">` : ""}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(description)}">
@@ -123,8 +130,8 @@ function layout(page, body) {
 <link rel="alternate" hreflang="x-default" href="${url(page.path)}">
 <meta name="robots" content="${page.noindex ? "noindex, follow" : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"}">
 <meta name="author" content="FoulFoxHacks">\n<meta name="publisher" content="FoulFoxHacks">\n<meta name="application-name" content="MelloGram">\n<meta name="keywords" content="MelloGram, Telegram client, customizable Telegram, Telegram plugins, Telegram themes, QuickCSS, FoulFoxHacks, open source messaging client">
-<meta name="theme-color" content="#17161f">
-<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="${isHome ? "#faf9fe" : "#17161f"}">
+<meta name="color-scheme" content="${isHome ? "light" : "dark light"}">
 <meta property="og:type" content="${page.path === "/" ? "website" : "article"}">
 <meta property="og:site_name" content="MelloGram">
 <meta property="og:title" content="${esc(page.ogTitle || title)}">
@@ -147,14 +154,16 @@ function layout(page, body) {
 <link rel="stylesheet" href="${asset("site.css")}">\n<link rel="sitemap" type="application/xml" title="MelloGram XML Sitemap" href="${href("/sitemap.xml")}">
 <script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@graph": graph })}</script>
 </head>
-<body>
+<body${isHome ? ' class="home-page"' : ""}>
 <a class="skip" href="#main">Skip to content</a>
 <header class="site-header">
   <a class="brand" href="${href("/")}">${img("logo.png", "MelloGram fox-paw and paper-plane logo", "MelloGram home", { eager: page.path === "/" })}<span>MelloGram</span></a>
   <nav aria-label="Main"><ul>${nav}</ul></nav>
   <div class="header-actions">
     <a class="header-github" href="${REPO}" rel="noopener">GitHub <span aria-hidden="true">↗</span></a>
-    <a class="btn btn-small" href="${href("/download/")}">Download</a>
+    ${isHome
+      ? `<a class="btn btn-small" href="${esc(WEB)}">Web preview <span aria-hidden="true">↗</span></a>`
+      : `<a class="btn btn-small" href="${href("/download/")}">Download</a>`}
   </div>
 </header>
 <main id="main">
@@ -174,7 +183,7 @@ ${body}
     <nav aria-label="Platforms"><p class="footer-title">Platforms</p><ul>
       <li><a href="${DL("MelloGram-Setup-x64.exe")}" rel="noopener">Windows</a></li><li><a href="${DL("MelloGram-macos-universal.dmg")}" rel="noopener">macOS</a></li>
       <li><a href="${DL("MelloGram-linux-amd64.deb")}" rel="noopener">Linux</a></li><li><a href="${DL("MelloGram-android.apk")}" rel="noopener">Android</a></li>
-      <li><a href="${WEB}" rel="noopener">Web client</a></li></ul></nav>
+      <li><a href="${esc(WEB)}" rel="noopener">Web client</a></li></ul></nav>
     <nav aria-label="Project"><p class="footer-title">Project</p><ul>
       <li><a href="${href("/developers/")}">Developers</a></li><li><a href="${href("/privacy/")}">Privacy</a></li>
       <li><a href="${REPO}" rel="noopener">Source code on GitHub</a></li><li><a href="${REPO}/releases" rel="noopener">Releases &amp; changelog</a></li></ul></nav>
@@ -202,6 +211,14 @@ const ctx = { url, href, asset, img, esc, plugins, wallpapers, version, REPO, SI
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(join(OUT, "assets"), { recursive: true });
 cpSync(join(here, "src/assets"), join(OUT, "assets"), { recursive: true });
+// Preset CSS comes from the repository's wallpaper catalog. Keep it in the
+// stylesheet so previews work with the Worker's no-inline-style policy.
+const swatchCss = wallpapers.map((wallpaper, index) => {
+  const css = (wallpaper.css || "").replace(/inset:[^;]+;/, "");
+  if (/[{}]|\/\*/.test(css)) throw new Error(`invalid wallpaper CSS for ${wallpaper.name}`);
+  return `.swatches li:nth-child(${index + 1}) .swatch { ${css} }`;
+}).join("\n");
+appendFileSync(join(OUT, "assets/site.css"), `\n${swatchCss}\n`);
 for (const f of ["logo.png", "og-image.png", "icon-512.png", ...readFileSync(join(here, "src/assets/.images"), "utf8").split(/\r?\n/).map((s) => s.trim()).filter(Boolean)]) {
   const d = dimensions(join(here, "src/assets", f));
   if (!d) throw new Error(`cannot read dimensions of ${f}`);

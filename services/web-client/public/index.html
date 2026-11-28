@@ -3,25 +3,31 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#faf9fe" />
     <title>MelloGram Web</title>
-    <meta name="description" content="The browser client for MelloGram, powered by the Telegram API." />
+    <meta name="description" content="MelloGram in your browser, with optional Telegram sign-in and chat beta." />
+    <link rel="icon" href="/mark.png" type="image/png" />
     <link rel="stylesheet" href="/styles.css" />
     <script src="/app.js" type="module"></script>
   </head>
   <body>
-    <main class="page tg-login">
-      <header class="tg-login-head">
-        <img class="tg-login-logo" src="/mark.png" alt="" width="128" height="128">
-        <h1>MelloGram <span class="web">Web</span></h1>
-        <p class="lede">MelloGram uses the Telegram API to connect to your account.</p>
-        <span class="badge" id="stage">transport</span>
+    <header class="topbar">
+      <a class="home-link" href="https://mellogram.foulfoxhacks.dev/"><img src="/mark.png" alt="" width="24" height="24"> MelloGram home</a>
+      <span class="badge">Web · <span id="stage">checking</span></span>
+    </header>
+    <main class="page">
+      <header class="signin-head">
+        <div class="signin-mark"><img src="/mark.png" alt="" width="96" height="96"></div>
+        <h1>MelloGram Web</h1>
+        <p class="lede">Your chats, in the browser.</p>
       </header>
 
-      <section class="tg-login-card" id="signin" aria-labelledby="signin-heading">
-        <h2 id="signin-heading" class="sr-only">Sign in to Telegram</h2>
-        <div class="stack" id="signin-options">
-          <button class="tg-btn" id="signin-qr" type="button" disabled>Log in by QR code</button>
-          <button class="tg-btn tg-btn-ghost" id="signin-phone" type="button" disabled>Log in by phone number</button>
+      <section class="signin" id="signin" aria-labelledby="signin-heading">
+        <h2 id="signin-heading">Sign in to MelloGram</h2>
+        <p class="muted">Connect with your Telegram account.</p>
+        <div class="stack signin-options" id="signin-options">
+          <button class="primary" id="signin-qr" type="button" disabled>Log in by QR code</button>
+          <button class="secondary" id="signin-phone" type="button" disabled>Log in by phone number</button>
         </div>
         <div id="qr-panel" hidden>
           <p>In Telegram, open Settings → Devices → Link Desktop Device and scan this code.</p>
@@ -30,11 +36,12 @@
         <form class="stack" id="signin-form" hidden>
           <label id="signin-label" for="signin-value"></label>
           <input id="signin-value" required maxlength="256" />
-          <button id="signin-submit" type="submit">Continue</button>
+          <button class="primary" id="signin-submit" type="submit">Continue</button>
         </form>
-        <button class="tg-btn-ghost" id="signin-cancel" type="button" hidden>Cancel sign-in</button>
-        <p class="muted small" id="signin-note" role="status">Checking sign-in availability…</p>
-        <p class="muted small">You can also use <a href="https://mellogram.foulfoxhacks.dev/download/">MelloGram desktop or Android</a>.</p>
+        <button class="secondary" id="signin-cancel" type="button" hidden>Cancel sign-in</button>
+        <p class="muted" id="signin-note" role="status">Checking sign-in availability…</p>
+        <a class="app-link" href="https://mellogram.foulfoxhacks.dev/download/">Get the MelloGram app <span aria-hidden="true">→</span></a>
+        <a class="official-link" href="https://web.telegram.org/" rel="noreferrer">Open official Telegram Web <span aria-hidden="true">↗</span></a>
       </section>
 
       <section class="panel stack" id="chats-panel" aria-labelledby="chats-heading" hidden>
@@ -60,45 +67,43 @@
         </form>
       </section>
 
-      <section class="panel" aria-labelledby="status-heading">
-        <div class="panel-head">
-          <h2 id="status-heading">What works today</h2>
-          <span class="muted" id="version"></span>
-        </div>
-        <ul class="capabilities" id="capabilities">
-          <li class="muted">Loading status…</li>
-        </ul>
-        <p class="muted" id="status-note"></p>
-      </section>
+      <details class="preview-details">
+        <summary>Technical preview details</summary>
+        <section class="panel" aria-labelledby="status-heading">
+          <div class="panel-head">
+            <h2 id="status-heading">What works today</h2>
+            <span class="muted" id="version"></span>
+          </div>
+          <ul class="capabilities" id="capabilities">
+            <li class="muted">Loading status…</li>
+          </ul>
+          <p class="muted" id="status-note"></p>
+        </section>
 
-      <section class="panel" aria-labelledby="overlay-heading">
-        <div class="panel-head">
-          <h2 id="overlay-heading">End-to-end overlay demo</h2>
-          <span class="muted">in memory only</span>
-        </div>
-        <p class="muted">
-          The same Rust protocol the desktop app uses, compiled to WebAssembly: key
-          generation, a 60-digit safety number and a pairwise round trip. Nothing is
-          saved, and no chat is touched.
-        </p>
-        <button class="action" id="overlay-run" type="button">Run the protocol</button>
-        <dl class="result" id="overlay-out" hidden>
-          <div><dt>Safety number</dt><dd id="overlay-safety"></dd></div>
-          <div><dt>Ciphertext</dt><dd id="overlay-cipher"></dd></div>
-          <div><dt>Round trip</dt><dd id="overlay-roundtrip"></dd></div>
-        </dl>
-        <p class="muted" id="overlay-note" role="status"></p>
-      </section>
+        <section class="panel" aria-labelledby="overlay-heading">
+          <div class="panel-head">
+            <h2 id="overlay-heading">End-to-end overlay demo</h2>
+            <span class="muted">In memory only</span>
+          </div>
+          <p class="muted">Try the Rust overlay protocol in WebAssembly. The demo creates two temporary identities, shows their safety number and sends a sample message and reply. It does not use your account or chats.</p>
+          <button class="action" id="overlay-run" type="button">Run the protocol</button>
+          <dl class="result" id="overlay-out" hidden>
+            <div><dt>Safety number</dt><dd id="overlay-safety"></dd></div>
+            <div><dt>Ciphertext</dt><dd id="overlay-cipher"></dd></div>
+            <div><dt>Round trip</dt><dd id="overlay-roundtrip"></dd></div>
+          </dl>
+          <p class="muted" id="overlay-note" role="status"></p>
+        </section>
+      </details>
 
-      <footer class="tg-foot">
+      <footer class="page-footer">
         <nav aria-label="MelloGram">
-          <a href="https://mellogram.foulfoxhacks.dev/">Home</a>
-          <a href="https://mellogram.foulfoxhacks.dev/download/">Download</a>
-          <a href="https://mellogram.foulfoxhacks.dev/plugins/">Plugins</a>
+          <a href="https://mellogram.foulfoxhacks.dev/faq/">Help &amp; FAQ</a>
+          <a href="https://mellogram.foulfoxhacks.dev/privacy/">Privacy</a>
           <a href="https://id.mellogram.foulfoxhacks.dev/">MelloID</a>
           <a href="https://github.com/foulfoxhacks/MelloGram" rel="noopener">GitHub</a>
         </nav>
-        <p class="muted small">MelloGram is an independent client and is not affiliated with Telegram.</p>
+        <p>MelloGram is an independent client and is not affiliated with Telegram.</p>
       </footer>
     </main>
   </body>

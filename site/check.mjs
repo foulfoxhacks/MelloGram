@@ -37,6 +37,9 @@ for (const file of pages) {
 
   if (!/<html lang="en">/.test(html)) fail(rel, "missing <html lang>");
   if (!/<meta name="viewport"/.test(html)) fail(rel, "missing viewport");
+  // The Worker policy forbids inline styles; catch content that would silently
+  // render differently when the static site is served through that Worker.
+  if (/<[a-z][^>]*\sstyle\s*=/i.test(html)) fail(rel, "inline style blocked by the Worker CSP");
 
   const title = (html.match(/<title>([^<]*)<\/title>/) || [])[1];
   if (!title) fail(rel, "missing <title>");
