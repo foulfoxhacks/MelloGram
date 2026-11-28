@@ -138,8 +138,11 @@
     try {
       showLogin(await step.submit(e.target.elements));
     } catch (err) {
-      $("login-error").textContent = String(err?.message || err);
-      $("login-error").hidden = false;
+      const line = $("login-error");
+      line.textContent = String(err?.message || err);
+      line.hidden = false;
+      // On a phone the keyboard can push this below the fold; show it.
+      line.scrollIntoView?.({ block: "nearest" });
     } finally {
       btn.disabled = false;
       btn.textContent = label;
