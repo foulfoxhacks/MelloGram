@@ -18,10 +18,16 @@ export function capabilities() {
       detail: "This page, /api/health and /api/status.",
     },
     {
+      id: "relay",
+      label: "MTProto transport relay",
+      ready: true,
+      detail: "The Worker pipes the page's MTProto bytes to a fixed Telegram data centre over TCP (/relay/dc/1-5). No client-chosen host or port, own origin only, byte and time limits.",
+    },
+    {
       id: "login",
       label: "Telegram sign-in",
       ready: false,
-      detail: "Needs a QR-code login handshake in the browser; the desktop app owns account login today.",
+      detail: "The transport is in place; the key exchange, QR login and message encryption are the next step. The desktop app owns account login today.",
     },
     {
       id: "messaging",
@@ -48,7 +54,7 @@ export function status(env = {}) {
   return {
     service: SERVICE,
     version: VERSION,
-    stage: "skeleton",
+    stage: "transport",
     origin: env.PUBLIC_BASE_URL || null,
     api: env.API_BASE_URL || null,
     capabilities: capabilities(),

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>MelloGram Web</title>
-    <meta name="description" content="The browser client for MelloGram. Early skeleton." />
+    <meta name="description" content="The browser client for MelloGram. Telegram transport in place; sign-in in progress." />
     <link rel="stylesheet" href="/styles.css" />
     <script src="/app.js" defer></script>
   </head>
@@ -14,14 +14,14 @@
         <img class="tg-login-logo" src="/mark.png" alt="" width="128" height="128">
         <h1>MelloGram <span class="web">Web</span></h1>
         <p class="lede">Your chats, in the browser. Sign-in is being built: until it ships, this page shows exactly what works today.</p>
-        <span class="badge" id="stage">skeleton</span>
+        <span class="badge" id="stage">transport</span>
       </header>
 
       <section class="tg-login-card" aria-labelledby="signin-heading">
         <h2 id="signin-heading" class="sr-only">Sign in</h2>
         <button class="tg-btn" type="button" disabled aria-describedby="signin-note">Log in by QR code</button>
         <button class="tg-btn tg-btn-ghost" type="button" disabled aria-describedby="signin-note">Log in by phone number</button>
-        <p class="muted small" id="signin-note">Coming soon. When it arrives, your code and password go straight to Telegram and never reach this server. Until then, use <a href="https://mellogram.foulfoxhacks.dev/download/">MelloGram desktop or Android</a>.</p>
+        <p class="muted small" id="signin-note">Sign-in is not finished. The page can already reach Telegram through this server's relay, but the login handshake on top of it is still being built; when it lands, your code and password go straight to Telegram and never reach this server. Until then, use <a href="https://mellogram.foulfoxhacks.dev/download/">MelloGram desktop or Android</a>.</p>
       </section>
 
       <section class="panel" aria-labelledby="status-heading">

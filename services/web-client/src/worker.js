@@ -6,6 +6,7 @@
 // from the start.
 
 import { errorJson, json, status } from "./capabilities.js";
+import { relayFetch } from "./relay.js";
 
 // Two hosts, one Worker:
 //   wc.mellogram.foulfoxhacks.dev      the shell (and /api/* for same-origin use)
@@ -21,7 +22,8 @@ const csp = (apiOrigin) => [
   "img-src 'self' data:",
   "style-src 'self'",
   "script-src 'self' 'wasm-unsafe-eval'",
-  `connect-src 'self'${apiOrigin ? ` ${apiOrigin}` : ""}`,
+  // The relay is a WebSocket; the page may only open it on our own API host.
+  `connect-src 'self'${apiOrigin ? ` ${apiOrigin} ${apiOrigin.replace(/^http/, "ws")}` : ""}`,
   "base-uri 'none'",
   "form-action 'none'",
   "frame-ancestors 'none'",
@@ -99,6 +101,12 @@ export default {
       url.protocol = "https:";
       return done(new Response(null, { status: 308, headers: { Location: url.toString() } }));
     }
+
+    // MTProto transport relay: /relay/dc/<1-5>. A 101 upgrade carries the
+    // socket itself, so it is returned unwrapped: copying the response into a
+    // new one would drop the WebSocket.
+    const relay = url.pathname.match(/^\/relay\/dc\/([^/]+)$/);
+    if (relay) return relayFetch(request, env, relay[1]);
 
     if (isApiHost(url, env)) {
       if (url.pathname === "/" || url.pathname === "") {
