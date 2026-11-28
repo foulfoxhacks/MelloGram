@@ -141,6 +141,15 @@ impl AppState {
             plugins.init(&store.settings);
         }
         tracing::info!("config directory: {}", dir.display());
+        // The first question every login report asks: are the API credentials
+        // there, and is a session already saved? Flags only, never the values.
+        let telegram = &store.settings.telegram;
+        tracing::info!(
+            "telegram: api_id {}, api_hash {}, session {}",
+            if matches!(telegram.api_id, Some(id) if id > 0) { "set" } else { "missing" },
+            if telegram.api_hash.as_deref().map_or(false, |h| h.len() == 32) { "set" } else { "missing" },
+            if dir.join("telegram.session").exists() { "present" } else { "absent" },
+        );
         let secrets = crate::secrets::Secrets::new(&dir);
         Ok(Self {
             app,

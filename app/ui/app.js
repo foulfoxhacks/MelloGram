@@ -59,13 +59,18 @@
   // holding the connection open) would otherwise leave the button disabled and
   // the screen exactly as it was, which reads as "nothing happened".
   const LOGIN_DEADLINE_MS = 45000;
-  function withDeadline(promise, message) {
+  function withDeadline(promise, message, ms = LOGIN_DEADLINE_MS) {
     let timer;
     return Promise.race([
       promise.finally(() => clearTimeout(timer)),
-      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), LOGIN_DEADLINE_MS); }),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); }),
     ]);
   }
+
+  // A TCP connect to Telegram that never completes would otherwise keep the
+  // login panel from being drawn at all, which looks like a frozen app.
+  const BOOT_CONNECT_MS = 15000;
+  const BOOT_STALL = "MelloGram is still waiting for Telegram after 15 seconds. Check the connection, then try again.";
   const UNREACHABLE = "Telegram did not answer within 45 seconds. Check the connection (Settings → Network & Tunnels if you use a proxy) and try again — a login code can still arrive in the meantime.";
 
   const loginSteps = {
@@ -108,7 +113,7 @@
       busy: "Reconnecting…",
       help: (s) => `MelloGram has no Telegram connection yet${s && s.reason ? `: ${s.reason}` : ""}. Check the connection (or Settings → Network & Tunnels if you use a proxy), then try again.`,
       fields: () => [],
-      submit: () => Bridge.invoke("login_state"),
+      submit: () => withDeadline(Bridge.invoke("login_state"), BOOT_STALL, BOOT_CONNECT_MS),
     },
     "need-password": {
       busy: "Signing in…",
@@ -687,7 +692,7 @@
     let failure = null;
     for (let i = 0; i < 20 && hasSavedCredentials; i++) {
       try {
-        login = await Bridge.invoke("login_state");
+        login = await withDeadline(Bridge.invoke("login_state"), BOOT_STALL, BOOT_CONNECT_MS);
       } catch (e) {
         failure = String(e?.message || e);
       }
