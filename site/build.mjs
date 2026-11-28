@@ -130,8 +130,8 @@ ${isHome ? `<meta http-equiv="Content-Security-Policy" content="${esc(DOCUMENT_C
 <link rel="alternate" hreflang="x-default" href="${url(page.path)}">
 <meta name="robots" content="${page.noindex ? "noindex, follow" : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"}">
 <meta name="author" content="FoulFoxHacks">\n<meta name="publisher" content="FoulFoxHacks">\n<meta name="application-name" content="MelloGram">\n<meta name="keywords" content="MelloGram, Telegram client, customizable Telegram, Telegram plugins, Telegram themes, QuickCSS, FoulFoxHacks, open source messaging client">
-<meta name="theme-color" content="${isHome ? "#faf9fe" : "#17161f"}">
-<meta name="color-scheme" content="${isHome ? "light" : "dark light"}">
+<meta name="theme-color" content="#faf9fe">
+<meta name="color-scheme" content="light">
 <meta property="og:type" content="${page.path === "/" ? "website" : "article"}">
 <meta property="og:site_name" content="MelloGram">
 <meta property="og:title" content="${esc(page.ogTitle || title)}">
@@ -154,7 +154,7 @@ ${isHome ? `<meta http-equiv="Content-Security-Policy" content="${esc(DOCUMENT_C
 <link rel="stylesheet" href="${asset("site.css")}">\n<link rel="sitemap" type="application/xml" title="MelloGram XML Sitemap" href="${href("/sitemap.xml")}">
 <script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@graph": graph })}</script>
 </head>
-<body${isHome ? ' class="home-page"' : ""}>
+<body class="site-light">
 <a class="skip" href="#main">Skip to content</a>
 <header class="site-header">
   <a class="brand" href="${href("/")}">${img("logo.png", "MelloGram fox-paw and paper-plane logo", "MelloGram home", { eager: page.path === "/" })}<span>MelloGram</span></a>
@@ -168,6 +168,7 @@ ${isHome ? `<meta http-equiv="Content-Security-Policy" content="${esc(DOCUMENT_C
 </header>
 <main id="main">
 ${crumbs}
+${page.path === "/" ? "" : `<div class="page-mark" aria-hidden="true">${img("logo.png", "MelloGram logo", "MelloGram", {})}</div>`}
 ${body}
 </main>
 <footer class="site-footer">
@@ -283,8 +284,8 @@ writeFileSync(join(OUT, "site.webmanifest"), JSON.stringify({
   description: "The customizable Telegram client.",
   start_url: BASE,
   display: "browser",
-  background_color: "#17161f",
-  theme_color: "#17161f",
+  background_color: "#faf9fe",
+  theme_color: "#faf9fe",
   icons: [
     { src: asset("icon-192.png"), sizes: "192x192", type: "image/png" },
     { src: asset("icon-512.png"), sizes: "512x512", type: "image/png" },

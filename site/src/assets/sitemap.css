@@ -4,9 +4,9 @@
 @namespace image url("http://www.google.com/schemas/sitemap-image/1.1");
 
 :root {
-  color-scheme: dark;
-  background: #10101a;
-  color: #f4f2ff;
+  color-scheme: light;
+  background: #faf9fe;
+  color: #211832;
   font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 urlset {
@@ -17,8 +17,8 @@ urlset {
   margin: 0 auto;
   padding: 54px 24px 80px;
   background:
-    radial-gradient(ellipse at 50% 0, rgba(111,91,235,.22), transparent 58%),
-    #10101a;
+    radial-gradient(ellipse at 50% 0, #f0e9ff, transparent 58%),
+    #faf9fe;
 }
 urlset::before {
   content: "MelloGram  /  XML Sitemap";
@@ -27,7 +27,7 @@ urlset::before {
   margin: 0 0 8px;
   padding-left: 58px;
   background: url("/assets/logo.png") no-repeat left center / 44px 44px;
-  color: #c9c0ff;
+  color: #211832;
   font-size: clamp(2rem, 5vw, 3.3rem);
   font-weight: 850;
   letter-spacing: -.055em;
@@ -36,51 +36,57 @@ urlset::after {
   content: "Official search-engine index · FoulFoxHacks";
   display: block;
   margin: 0 0 30px;
-  color: #aaa8c3;
+  color: #5e5571;
   font-size: .95rem;
 }
 url {
   display: block;
   margin: 12px 0;
   padding: 17px 20px;
-  border: 1px solid #2c2b45;
-  border-radius: 13px;
-  background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.012));
+  border: 1px solid #e3dcef;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 10px 26px #261a510d;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+url:hover {
+  border-color: #79baff;
+  box-shadow: 0 14px 32px #261a511a;
 }
 loc {
   display: block;
-  color: #a99aff;
+  color: #6135be;
   font-size: 1.04rem;
   font-weight: 700;
   overflow-wrap: anywhere;
 }
 loc::before {
   content: "PAGE  ";
-  color: #79baff;
+  color: #5235a5;
   font: 700 .68rem/1.6 ui-monospace, monospace;
   letter-spacing: .1em;
 }
 lastmod, changefreq, priority {
   display: inline-block;
   margin: 10px 16px 0 0;
-  color: #aaa8c3;
+  color: #5e5571;
   font-size: .82rem;
 }
-lastmod::before { content: "Updated: "; color: #77748f; }
-changefreq::before { content: "Frequency: "; color: #77748f; }
-priority::before { content: "Priority: "; color: #77748f; }
+lastmod::before { content: "Updated: "; color: #8b81a6; }
+changefreq::before { content: "Frequency: "; color: #8b81a6; }
+priority::before { content: "Priority: "; color: #8b81a6; }
 image|image {
   display: block;
   margin-top: 10px;
-  color: #85829f;
+  color: #6b6287;
   font-size: .8rem;
 }
 image|loc {
   display: block;
   overflow-wrap: anywhere;
 }
-image|loc::before { content: "Image: "; color: #77748f; }
-image|title { display: block; color: #aaa8c3; }
+image|loc::before { content: "Image: "; color: #8b81a6; }
+image|title { display: block; color: #5e5571; }
 @media (max-width: 600px) {
   urlset { padding: 34px 14px 55px; }
   url { padding: 14px; }

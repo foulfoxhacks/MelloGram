@@ -270,7 +270,7 @@ thead th{background:var(--surface-2)}
 }
 
 /* Homepage: light lavender canvas, centered masthead and platform previews. */
-.home-page {
+.site-light {
   color-scheme: light;
   --bg: #faf9fe;
   --surface: #fff;
@@ -281,21 +281,21 @@ thead th{background:var(--surface-2)}
   --border: #e3dcef;
   background: radial-gradient(ellipse 45% 23rem at 50% 5rem, #f0e9ff, transparent), var(--bg);
 }
-.home-page a:not(.btn, .skip, .brand) { color: var(--accent); }
-.home-page .site-header {
+.site-light a:not(.btn, .skip, .brand) { color: var(--accent); }
+.site-light .site-header {
   min-height: 64px;
   background: rgba(250, 249, 254, .96);
   border-color: var(--border);
 }
-.home-page .brand { color: var(--text); }
-.home-page .brand img { width: 32px; height: 32px; filter: none; }
-.home-page .site-header nav a { display: inline-block; padding: 8px 0; color: var(--muted); }
-.home-page .site-header nav a:hover,
-.home-page .site-header nav a[aria-current=page] { color: var(--accent); }
-.home-page .site-header nav a[aria-current=page] { box-shadow: inset 0 -2px var(--accent); }
-.home-page .btn { color: #fff; background: #6135be; box-shadow: none; }
-.home-page .btn:hover { background: #522aab; filter: none; }
-.home-page .skip { color: #fff; }
+.site-light .brand { color: var(--text); }
+.site-light .brand img { width: 32px; height: 32px; filter: none; }
+.site-light .site-header nav a { display: inline-block; padding: 8px 0; color: var(--muted); }
+.site-light .site-header nav a:hover,
+.site-light .site-header nav a[aria-current=page] { color: var(--accent); }
+.site-light .site-header nav a[aria-current=page] { box-shadow: inset 0 -2px var(--accent); }
+.site-light .btn { color: #fff; background: #6135be; box-shadow: none; }
+.site-light .btn:hover { background: #522aab; filter: none; }
+.site-light .skip { color: #fff; }
 .tgo-intro {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
@@ -361,17 +361,17 @@ thead th{background:var(--surface-2)}
   .tgo-app:hover .tgo-app-shot { transform: scale(1.03); }
 }
 @media (max-width: 970px) {
-  .home-page .header-github { display: none; }
+  .site-light .header-github { display: none; }
 }
 @media (max-width: 900px) {
   .tgo-intro { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
   .tgo-signal { display: none; }
 }
 @media (max-width: 840px) {
-  .home-page .site-header { position: relative; flex-wrap: wrap; gap: 0 14px; padding: 8px 16px 0; }
-  .home-page .site-header nav { order: 3; flex-basis: 100%; }
-  .home-page .site-header nav ul { justify-content: flex-start; flex-wrap: wrap; gap: 0 14px; }
-  .home-page .site-header nav a { font-size: .82rem; }
+  .site-light .site-header { position: relative; flex-wrap: wrap; gap: 0 14px; padding: 8px 16px 0; }
+  .site-light .site-header nav { order: 3; flex-basis: 100%; }
+  .site-light .site-header nav ul { justify-content: flex-start; flex-wrap: wrap; gap: 0 14px; }
+  .site-light .site-header nav a { font-size: .82rem; }
 }
 @media (max-width: 620px) {
   .tgo-intro { grid-template-columns: minmax(0, 1fr); gap: 26px; }
@@ -404,7 +404,69 @@ thead th{background:var(--surface-2)}
 .tgo-about{max-width:760px;margin:clamp(56px,8vw,90px) auto 0;text-align:center}
 .tgo-about h2{font-size:clamp(1.6rem,3vw,2rem)}
 .tgo-about p{color:var(--muted);line-height:1.75}
-.home-page .site-footer { background: #f1ebfc; border-color: var(--border); }
-.home-page .site-footer p { color: var(--muted); }
-.home-page .site-footer .footer-brand,
-.home-page .site-footer .footer-title { color: var(--text); }
+.site-light .site-footer { background: #f1ebfc; border-color: var(--border); }
+.site-light .site-footer p { color: var(--muted); }
+.site-light .site-footer .footer-brand,
+.site-light .site-footer .footer-title { color: var(--text); }
+
+/* ---- One light theme for the whole site ------------------------------------
+   The homepage's lavender canvas is MelloGram's theme, so every page uses it:
+   the same palette, a centred hero and rounded white cards. These rules sit last
+   on purpose, so no subpage falls back to the old dark palette. */
+:root{
+  color-scheme:light;
+  --bg:#faf9fe;--bg-2:#f4eefc;--surface:#fff;--surface-2:#f2ebff;
+  --text:#211832;--muted:#5e5571;--accent:#6135be;--accent-2:#5235a5;
+  --border:#e3dcef;
+}
+
+/* Subpage hero: the homepage masthead, one size down. */
+.site-light .page-head{padding:clamp(34px,4.5vw,58px) 0 clamp(22px,3vw,34px);text-align:center}
+.site-light .page-head h1{max-width:22ch;margin:0 auto 14px;font-size:clamp(2.3rem,5vw,3.4rem);letter-spacing:-.045em}
+.site-light .page-head .lead{max-width:62ch;margin:0 auto;color:var(--muted);font-size:clamp(1rem,1.5vw,1.12rem);line-height:1.75}
+.site-light .crumbs ol{justify-content:center;padding-top:22px;color:var(--muted)}
+.site-light .crumbs li+li:before{color:#b3a8cc}
+.site-light .page-mark{display:flex;justify-content:center;margin:clamp(12px,2vw,20px) auto 0}
+.site-light .page-mark img{width:clamp(54px,7vw,68px);border-radius:50%;box-shadow:0 10px 26px #6942bd33}
+
+/* Sections: an accent rule above every heading, the way the homepage marks
+   each block. */
+.site-light .section{padding:clamp(44px,5.4vw,62px) 0;border-top:1px solid var(--border)}
+.site-light .section h2{font-size:clamp(1.55rem,3vw,2.15rem);letter-spacing:-.035em}
+.site-light .section h2::before{content:"";display:block;width:38px;height:3px;margin:0 0 14px;border-radius:999px;background:linear-gradient(90deg,var(--accent),#9a7dff)}
+.site-light .lead{color:var(--muted)}
+.site-light .eyebrow{color:var(--accent)}
+
+/* Cards, plugins, FAQs and tables: white, rounded and softly shadowed, with the
+   same hover lift as the homepage tiles. */
+.site-light .card,.site-light .plugin,.site-light .faq-item,.site-light .faq,.site-light .table-wrap{
+  border:1px solid var(--border);border-radius:20px;background:var(--surface);box-shadow:0 10px 30px #261a510d}
+.site-light .card,.site-light .plugin{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.site-light .card:hover,.site-light .plugin:hover{border-color:#c8b6f4;box-shadow:0 18px 38px #261a511a;transform:translateY(-2px)}
+.site-light .card.recommended{border-color:var(--accent);box-shadow:0 0 0 1px #6135be2e,0 14px 34px #261a511a}
+.site-light .plugin{padding:20px 21px}
+.site-light .section.faq-item{padding:24px 26px;margin:14px 0;border-radius:20px}
+
+/* Screenshots get the homepage's lavender frame. */
+.site-light .wide{border:1px solid var(--border);border-radius:20px;box-shadow:0 18px 44px #261a511f}
+.site-light .split figure{padding:8px;border:1px solid var(--border);border-radius:22px;background:linear-gradient(145deg,#f3ecff,#ebf0ff 60%,#fff)}
+.site-light .split figure img{border:0;border-radius:15px;box-shadow:0 10px 24px #261a5114}
+
+/* Tables, code and tags in the same palette. */
+.site-light thead th{background:#f5efff;color:var(--text)}
+.site-light th,.site-light td{border-top:1px solid var(--border)}
+.site-light caption{color:var(--muted)}
+.site-light pre{background:#f7f3ff;border-color:var(--border);color:#3b2f5c}
+.site-light :not(pre)>code{background:#f1eaff;color:#4b3182}
+.site-light .toc a{background:var(--surface);border-color:var(--border);color:var(--accent)}
+.site-light .toc a:hover{background:#f4eeff;border-color:var(--accent)}
+.site-light .tag{background:#f4eeff;border-color:var(--border);color:var(--muted)}
+.site-light .tag.on{background:#e9f9f1;border-color:#bfe6d3;color:#17815a}
+.site-light .tag.perm{background:#f1eaff;border-color:#dccdff;color:var(--accent)}
+.site-light .ticks li:before{color:#17815a}
+.site-light .swatches .swatch{border-color:var(--border);box-shadow:0 6px 16px #261a510f}
+
+@media(max-width:700px){
+  .site-light .page-head h1{font-size:clamp(2rem,8vw,2.7rem)}
+  .site-light .page-mark img{width:52px}
+}
