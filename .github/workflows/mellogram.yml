@@ -373,7 +373,10 @@ jobs:
           node --check public/index.js
           node --check public/dashboard.js
           node --check public/profile.js
-      - name: Test profile validation and public projection
+      - name: Install the Worker's dependencies
+        working-directory: services/melloid-public
+        run: npm ci --no-audit --no-fund
+      - name: Test profile validation, public projection and HTTPS handling
         working-directory: services/melloid-public
         run: node --test test/*.test.js
 
