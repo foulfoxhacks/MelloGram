@@ -232,6 +232,21 @@ pub struct SendRequest {
     silent: bool,
     #[serde(default)]
     attachments: Vec<String>,
+    /// Deliver later (unix seconds): a Telegram scheduled message.
+    #[serde(default)]
+    schedule_at: Option<i64>,
+}
+
+/// Telegram accepts scheduled messages up to 365 days ahead; anything in the
+/// past (or within the next 10 seconds) is refused rather than sent now.
+pub fn validate_schedule(at: i64, now: i64) -> Result<i64, String> {
+    if at < now + 10 {
+        return Err("Pick a time in the future.".into());
+    }
+    if at > now + 365 * 24 * 3600 {
+        return Err("Telegram only schedules up to a year ahead.".into());
+    }
+    Ok(at)
 }
 
 #[derive(Debug, Serialize)]
@@ -240,6 +255,8 @@ pub enum SendOutcome {
     Sent(SendResult),
     /// A plugin consumed or cancelled the message.
     Cancelled { reason: Option<String> },
+    /// Queued on Telegram's servers for delivery at `at`; not in the chat yet.
+    Scheduled { at: i64 },
 }
 
 #[tauri::command]
@@ -247,6 +264,10 @@ pub async fn send_message(state: S<'_>, request: SendRequest) -> R<SendOutcome> 
     let mut msg = OutgoingMessage::text(request.chat_id, request.text);
     msg.reply_to = request.reply_to;
     msg.silent = request.silent;
+    if let Some(at) = request.schedule_at {
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
+        msg.schedule_at = Some(validate_schedule(at, now)?);
+    }
     msg.attachments = request
         .attachments
         .into_iter()
@@ -283,7 +304,10 @@ pub async fn send_message(state: S<'_>, request: SendRequest) -> R<SendOutcome> 
         msg.link_preview = false;
         encrypted_plaintext = Some(plain);
     }
+    let scheduled = msg.schedule_at;
+    let out_bytes = msg.text.len() as u64 + msg.attachments.iter().filter_map(|a| std::fs::metadata(&a.path).ok()).map(|m| m.len()).sum::<u64>();
     let sent = tg.send(&msg).await;
+    state.traffic.record("out", "telegram", "messages.sendMessage", out_bytes, if scheduled.is_some() { "scheduled message" } else { "message" });
     if sent.is_err() {
         crate::state::Counters::bump(&state.counters.send_failures);
     }
@@ -299,8 +323,25 @@ pub async fn send_message(state: S<'_>, request: SendRequest) -> R<SendOutcome> 
             tooltip: Some("Sent with the MelloGram end-to-end overlay".into()),
         });
     }
+    if let Some(at) = scheduled {
+        return Ok(SendOutcome::Scheduled { at });
+    }
     state.decorate(std::slice::from_mut(&mut result.message));
     Ok(SendOutcome::Sent(result))
+}
+
+#[cfg(test)]
+mod schedule_tests {
+    use super::validate_schedule;
+
+    #[test]
+    fn schedule_window() {
+        let now = 1_000_000;
+        assert!(validate_schedule(now - 5, now).is_err());
+        assert!(validate_schedule(now + 5, now).is_err());
+        assert_eq!(validate_schedule(now + 3600, now), Ok(now + 3600));
+        assert!(validate_schedule(now + 366 * 24 * 3600, now).is_err());
+    }
 }
 
 /// Called by the composer while typing; plugins may veto the broadcast.
@@ -442,6 +483,7 @@ pub async fn install_theme_url(state: S<'_>, url: String) -> R<Theme> {
     let css = tauri::async_runtime::spawn_blocking(move || -> R<String> {
         let agent = ureq::AgentBuilder::new().try_proxy_from_env(true).build();
         let resp = agent.get(&fetch_url).call().map_err(err)?;
+        // Byte count recorded below once the size is known.
         let mut body = String::new();
         resp.into_reader().take(2 * 1024 * 1024 + 1).read_to_string(&mut body).map_err(err)?;
         if body.len() > 2 * 1024 * 1024 {
@@ -451,6 +493,7 @@ pub async fn install_theme_url(state: S<'_>, url: String) -> R<Theme> {
     })
     .await
     .map_err(err)??;
+    state.traffic.record("in", "https", crate::traffic::redact_url(&url), css.len() as u64, "theme download");
     let name = url.rsplit('/').next().unwrap_or("theme").trim_end_matches(".css").to_owned();
     install_theme(state, name, css)
 }

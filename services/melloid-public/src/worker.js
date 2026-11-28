@@ -557,6 +557,33 @@ async function getPublicProfile(slug, env) {
   if (!profile) return json({ error: "Profile not found." }, 404);
   return json({ profile, updated_at: row.updated_at }, 200, { "Cache-Control": "public, max-age=60" });
 }
+/**
+ * Global badges for MelloGram clients: given up to 50 Telegram user ids,
+ * returns the visible badges and handle of each one that has a PUBLIC
+ * MelloID profile. Unlisted and private profiles are never matched, so this
+ * reveals nothing a public profile page does not already show.
+ */
+export function parseBadgeIds(raw) {
+  const ids = [...new Set(String(raw || "").split(",").map((v) => v.trim()).filter((v) => /^[1-9][0-9]{0,15}$/.test(v)))];
+  return ids.slice(0, 50);
+}
+async function getBadges(url, env) {
+  const ids = parseBadgeIds(url.searchParams.get("ids"));
+  if (!ids.length) return json({ users: {} }, 200, { "Cache-Control": "public, max-age=300" });
+  const placeholders = ids.map((_, i) => `?${i + 1}`).join(",");
+  const rows = await env.DB.prepare(
+    `SELECT owner_telegram_id, slug, profile_json FROM profiles WHERE visibility = 'public' AND owner_telegram_id IN (${placeholders})`
+  ).bind(...ids).all();
+  const users = {};
+  for (const row of rows.results || []) {
+    let profile;
+    try { profile = JSON.parse(row.profile_json); } catch { continue; }
+    const badges = (profile.badges || []).filter((b) => b && b.visible).slice(0, 6)
+      .map((b) => ({ title: String(b.title || "").slice(0, 48), description: String(b.description || "").slice(0, 160) }));
+    users[row.owner_telegram_id] = { slug: row.slug, badges };
+  }
+  return json({ users }, 200, { "Cache-Control": "public, max-age=300" });
+}
 async function staticAsset(path, request, env) {
   return env.ASSETS.fetch(new Request(new URL(path, request.url), request));
 }
@@ -618,6 +645,7 @@ export default {
         await env.DB.prepare("DELETE FROM oauth_transactions WHERE owner_telegram_id = ?1").bind(session.telegramId).run();
         return setSecurityHeaders(json({ ok: true }));
       }
+      if (path === "/api/v1/badges" && request.method === "GET") return setSecurityHeaders(await getBadges(url, env));
       if (path.startsWith("/api/v1/profiles/") && request.method === "GET") {
         const slug = decodeURIComponent(path.slice("/api/v1/profiles/".length));
         return setSecurityHeaders(await getPublicProfile(slug, env));

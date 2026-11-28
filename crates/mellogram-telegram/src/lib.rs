@@ -409,6 +409,9 @@ impl Telegram {
             .silent(msg.silent)
             .reply_to(msg.reply_to)
             .link_preview(msg.link_preview);
+        if let Some(at) = msg.schedule_at {
+            input = input.schedule_date(Some(std::time::UNIX_EPOCH + std::time::Duration::from_secs(u64::try_from(at).unwrap_or(0))));
+        }
         // Telegram sends one file per message here; extra files go as follow-ups.
         let mut files = msg.attachments.iter();
         if let Some(first) = files.next() {
@@ -419,7 +422,11 @@ impl Telegram {
         let latency_ms = started.elapsed().as_millis() as u64;
         for file in files {
             let up = self.upload(file).await?;
-            self.client.send_message(peer, InputMessage::new().silent(msg.silent).file(up)).await?;
+            let mut extra = InputMessage::new().silent(msg.silent).file(up);
+            if let Some(at) = msg.schedule_at {
+                extra = extra.schedule_date(Some(std::time::UNIX_EPOCH + std::time::Duration::from_secs(u64::try_from(at).unwrap_or(0))));
+            }
+            self.client.send_message(peer, extra).await?;
         }
         Ok(SendResult { message: convert(&sent), latency_ms })
     }
@@ -726,6 +733,7 @@ pub fn convert(m: &grammers_client::message::Message) -> IncomingMessage {
         sender_id: m.sender_id().map(|s| s.bot_api_dialog_id_unchecked()),
         sender_name: sender.and_then(|s| s.name()).map(str::to_owned),
         sender_username: sender.and_then(|s| s.username()).map(str::to_owned),
+        sender_photo: sender.and_then(peer_photo_id).map(|id| id.to_string()),
         display_name: None,
         text: m.text().to_owned(),
         date: m.date().as_second(),

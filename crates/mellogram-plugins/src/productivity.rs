@@ -503,3 +503,35 @@ mod tests {
         assert!(css.contains("blur(20px)") && css.contains(".mg-chat-last"));
     }
 }
+
+ui_plugin!(
+    SendLater, "send-later", "Send Later", Productivity,
+    "Schedule a message with Telegram's own scheduled messages, so it is delivered at the chosen time even if MelloGram is closed.",
+    "Spec: messageScheduler", true, "send-later.js",
+    [Permission::Ui, Permission::ModifyOutgoing],
+    []
+);
+
+ui_plugin!(
+    TrafficLog, "traffic-log", "Traffic Log", Privacy,
+    "A live, redacted list of every network exchange MelloGram makes: direction, host or API method, and size. Never message text, numbers or tokens.",
+    "Spec: traffic log", true, "traffic-log.js",
+    [Permission::Ui],
+    []
+);
+
+ui_plugin!(
+    ActivityTracker, "activity-tracker", "Activity Tracker", Productivity,
+    "Time spent in MelloGram per day and per chat, kept on this device, with optional WakaTime heartbeats (your key is stored sealed).",
+    "Vencord: vencord-wakatime", false, "activity-tracker.js",
+    [Permission::Ui, Permission::Storage, Permission::Network],
+    [SettingDef::boolean("wakatime", "Send WakaTime heartbeats", false)]
+);
+
+ui_plugin!(
+    GlobalBadges, "global-badges", "Global Badges", Appearance,
+    "Shows the badges of people who publish a public MelloID profile next to their name, in every MelloGram install.",
+    "Domis-Vencord-Plugins: GlobalBadges", true, "global-badges.js",
+    [Permission::Ui, Permission::Network, Permission::ReadMessages],
+    []
+);

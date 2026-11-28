@@ -597,3 +597,10 @@ body.mg-wallpaper-target-window { background: var(--mg-bg); }
 .mg-avatar-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .mg-avatar.mg-has-photo { color: transparent; }
 .mg-tag-premium { color: var(--mg-warning); }
+
+/* Sender photo next to the name in group messages. */
+.mg-sender { display: flex; align-items: center; gap: 6px; }
+.mg-sender-avatar { width: 22px; height: 22px; font-size: 9px; flex: none; }
+.mg-sender:not(:has(*)):empty { display: none; }
+.mg-global-badge { margin-left: 4px; padding: 0 6px; border-radius: 8px; font-size: .75em; font-weight: 700; text-decoration: none;
+  color: var(--mg-accent-text); background: linear-gradient(110deg, #8068f5, #5b8ef0); white-space: nowrap; }

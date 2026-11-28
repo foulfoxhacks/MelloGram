@@ -309,7 +309,11 @@
       oncontextmenu: (e) => { e.preventDefault(); messageMenu(e, m); },
       ondblclick: () => setReply(m),
     },
-    h("div", { class: "mg-sender", text: m.display_name || m.sender_name || "" }),
+    h("div", { class: "mg-sender" },
+      !m.outgoing && m.sender_id != null && state.current?.kind !== "user"
+        ? Object.assign(avatar(m.display_name || m.sender_name || "?", m.sender_id, m.sender_photo), { className: "mg-avatar mg-sender-avatar" })
+        : null,
+      m.display_name || m.sender_name || ""),
     m.reply_to ? h("div", { class: "mg-reply-preview", text: reply ? (reply.text || "Media").slice(0, 90) : "Reply", onclick: () => jumpTo(m.reply_to) }) : null,
     m.edit_history?.length ? h("div", { class: "mg-edit-history" }, ...m.edit_history.map((t) => h("div", { text: t }))) : null,
     m.__album ? window.MelloGram.Media.album(m.__album) : (m.media || m.has_media) && window.MelloGram.Media ? window.MelloGram.Media.render(m) : null,
@@ -466,6 +470,7 @@
       reply_to: state.replyTo?.id ?? null,
       silent: !!Hooks.composerFlags.silent,
       attachments: state.attachments.map((a) => a.path),
+      schedule_at: Hooks.composerFlags.scheduleAt ?? null,
     };
     composer.value = "";
     autosize();
@@ -484,6 +489,8 @@
     renderAttachments();
     if (result.status === "cancelled") {
       if (result.reason) UI.toast(result.reason, "info");
+    } else if (result.status === "scheduled") {
+      UI.toast(`Scheduled for ${new Date(result.at * 1000).toLocaleString()}`, "success");
     } else {
       upsert(result.message);
     }

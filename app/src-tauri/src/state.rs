@@ -106,6 +106,10 @@ pub struct AppState {
     pub tg: AsyncMutex<Option<Arc<Telegram>>>,
     /// End-to-end privacy overlay: identity, sessions and per-chat mode.
     pub e2e: E2eState,
+    /// Redacted record of network exchanges (Settings → Traffic Log plugin).
+    pub traffic: crate::traffic::TrafficLog,
+    /// Sealed third-party API keys.
+    pub secrets: crate::secrets::Secrets,
 }
 
 impl AppState {
@@ -137,6 +141,7 @@ impl AppState {
             plugins.init(&store.settings);
         }
         tracing::info!("config directory: {}", dir.display());
+        let secrets = crate::secrets::Secrets::new(&dir);
         Ok(Self {
             app,
             started: Instant::now(),
@@ -155,6 +160,8 @@ impl AppState {
             media: Default::default(),
             tg: AsyncMutex::new(None),
             e2e,
+            traffic: crate::traffic::TrafficLog::default(),
+            secrets,
         })
     }
 
@@ -308,7 +315,11 @@ impl AppState {
         tauri::async_runtime::spawn(async move {
             while let Some(event) = rx.recv().await {
                 match &event {
-                    TgEvent::NewMessage(_) => Counters::bump(&state.counters.messages),
+                    TgEvent::NewMessage(m) => {
+                        Counters::bump(&state.counters.messages);
+                        state.traffic.record("in", "telegram", "updates.newMessage", m.text.len() as u64, "message");
+                    }
+                    TgEvent::Edited(m) => state.traffic.record("in", "telegram", "updates.editMessage", m.text.len() as u64, "edit"),
                     TgEvent::Disconnected { .. } => Counters::bump(&state.counters.disconnects),
                     _ => {}
                 }

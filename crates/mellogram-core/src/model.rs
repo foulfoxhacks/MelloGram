@@ -16,6 +16,9 @@ pub struct OutgoingMessage {
     /// Ask Telegram to generate a link preview.
     pub link_preview: bool,
     pub attachments: Vec<OutgoingFile>,
+    /// Unix time to deliver at (Telegram scheduled message). `None` sends now.
+    #[serde(default)]
+    pub schedule_at: Option<i64>,
 }
 
 impl OutgoingMessage {
@@ -45,6 +48,9 @@ pub struct IncomingMessage {
     /// Display name as Telegram reports it. Plugins may rewrite `display_name`.
     pub sender_name: Option<String>,
     pub sender_username: Option<String>,
+    /// Sender's current profile photo id (string: does not fit a JS number).
+    #[serde(default)]
+    pub sender_photo: Option<String>,
     pub display_name: Option<String>,
     pub text: String,
     /// Unix seconds.
