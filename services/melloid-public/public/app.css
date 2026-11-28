@@ -39,3 +39,26 @@ h1,h2,h3{letter-spacing:-.035em}h1{font-weight:850;letter-spacing:-.05em}
 .result,.verified-label{color:#8fd3ff}footer{border-color:rgba(169,157,255,.13);color:#8f8cab}
 :focus-visible{outline:3px solid #79baff;outline-offset:3px;border-radius:5px}
 .mark{object-fit:contain;background:none;box-shadow:none;filter:drop-shadow(0 0 12px rgba(145,119,255,.28))}
+
+/* ---- Telegram-style layout: centered hero, feature grid, t.me-style profile cards ---- */
+.tg-shell{width:min(980px,calc(100% - 32px))}
+.tg-hero-id{display:flex;flex-direction:column;align-items:center;text-align:center;padding:56px 0 40px}
+.tg-hero-logo{width:132px;height:132px;object-fit:contain;filter:drop-shadow(0 10px 36px rgba(128,104,245,.45));margin-bottom:18px}
+.tg-hero-id h1{font-size:clamp(40px,7vw,64px);margin:0}
+.tg-tagline{font-size:clamp(19px,2.6vw,24px);font-weight:700;color:#e4e0fa;margin:6px 0 14px}
+.tg-hero-id .lead{max-width:600px;margin:0 auto 22px}
+.tg-cta{min-height:52px;padding:14px 30px;font-size:17px;border-radius:12px;margin-bottom:12px}
+.tg-why-id{padding:28px 0}.tg-why-id h2{text-align:center;font-size:30px;margin:0 0 22px}
+.tg-why-id .feature-grid{grid-template-columns:repeat(4,1fr)}
+.tg-why-id article{text-align:center}.tg-why-id h3{font-size:17px;margin:10px 0 6px}.tg-ico{font-size:30px}
+.tg-foot-id{text-align:center;border-top:1px solid rgba(169,157,255,.13);margin-top:40px;padding:22px 0 30px}
+.tg-foot-id nav{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 22px;margin-bottom:8px}
+.tg-foot-id a{color:#aaa8c3;text-decoration:none;font-weight:600;font-size:14px}.tg-foot-id a:hover{color:#fff}
+/* Public profile: centered card like a t.me page. */
+.profile-page .shell{width:min(560px,calc(100% - 28px));padding-top:40px}
+.profile-page .public-profile{text-align:center}
+.profile-page .profile-head{display:flex;flex-direction:column;align-items:center}
+.profile-page .profile-avatar{width:122px;height:122px;border-radius:50%;margin-top:-61px}
+.profile-page .profile-content{text-align:left}
+@media(max-width:860px){.tg-why-id .feature-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.tg-why-id .feature-grid{grid-template-columns:1fr}}

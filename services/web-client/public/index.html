@@ -9,19 +9,19 @@
     <script src="/app.js" defer></script>
   </head>
   <body>
-    <main class="page">
-      <header class="masthead">
-        <div class="wordmark"><img class="logo" src="/mark.png" alt="" width="28" height="28">MelloGram <span class="web">Web</span></div>
+    <main class="page tg-login">
+      <header class="tg-login-head">
+        <img class="tg-login-logo" src="/mark.png" alt="" width="128" height="128">
+        <h1>MelloGram <span class="web">Web</span></h1>
+        <p class="lede">Your chats, in the browser. Sign-in is being built: until it ships, this page shows exactly what works today.</p>
         <span class="badge" id="stage">skeleton</span>
       </header>
 
-      <section class="intro">
-        <h1>Your chats, in the browser.</h1>
-        <p class="lede">
-          This is the web client's shell. It runs as a Cloudflare Worker and serves the page
-          you are reading. The parts that matter — signing in, reading chats and the
-          end-to-end overlay — are not wired up yet, and this page will not pretend otherwise.
-        </p>
+      <section class="tg-login-card" aria-labelledby="signin-heading">
+        <h2 id="signin-heading" class="sr-only">Sign in</h2>
+        <button class="tg-btn" type="button" disabled aria-describedby="signin-note">Log in by QR code</button>
+        <button class="tg-btn tg-btn-ghost" type="button" disabled aria-describedby="signin-note">Log in by phone number</button>
+        <p class="muted small" id="signin-note">Coming soon. When it arrives, your code and password go straight to Telegram and never reach this server. Until then, use <a href="https://mellogram.foulfoxhacks.dev/download/">MelloGram desktop or Android</a>.</p>
       </section>
 
       <section class="panel" aria-labelledby="status-heading">
@@ -37,7 +37,7 @@
 
       <section class="panel" aria-labelledby="overlay-heading">
         <div class="panel-head">
-          <h2 id="overlay-heading">Overlay in the browser</h2>
+          <h2 id="overlay-heading">End-to-end overlay demo</h2>
           <span class="muted">in memory only</span>
         </div>
         <p class="muted">
@@ -54,22 +54,15 @@
         <p class="muted" id="overlay-note" role="status"></p>
       </section>
 
-      <section class="panel" aria-labelledby="next-heading">
-        <h2 id="next-heading">What comes next</h2>
-        <ol class="roadmap">
-          <li>Sign-in: a QR-code login handshake, so no password or code ever reaches this server.</li>
-          <li>Chats and messages, read straight from Telegram with the session this browser holds.</li>
-          <li>The overlay: the Rust protocol compiled to WebAssembly, sharing one identity with the desktop app.</li>
-        </ol>
-        <p class="muted">
-          Until then, <strong>MelloGram desktop</strong> is the full client, including the
-          encryption overlay.
-        </p>
-      </section>
-
-      <footer class="foot">
-        <span>MelloGram</span>
-        <a href="https://mellogram.foulfoxhacks.dev">mellogram.foulfoxhacks.dev</a>
+      <footer class="tg-foot">
+        <nav aria-label="MelloGram">
+          <a href="https://mellogram.foulfoxhacks.dev/">Home</a>
+          <a href="https://mellogram.foulfoxhacks.dev/download/">Download</a>
+          <a href="https://mellogram.foulfoxhacks.dev/plugins/">Plugins</a>
+          <a href="https://id.mellogram.foulfoxhacks.dev/">MelloID</a>
+          <a href="https://github.com/foulfoxhacks/MelloGram" rel="noopener">GitHub</a>
+        </nav>
+        <p class="muted small">MelloGram is an independent client and is not affiliated with Telegram.</p>
       </footer>
     </main>
   </body>
