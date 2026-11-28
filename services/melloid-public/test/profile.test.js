@@ -306,3 +306,33 @@ test("sign-in routes: widget when configured, 503 when nothing is", async () => 
   assert.match(html, /data-telegram-login="MelloIDBot"/);
   assert.match(login.headers.get("content-security-policy"), /script-src https:\/\/telegram\.org/);
 });
+
+test("a missing bot token is a configuration problem, not a bad signature", async () => {
+  const { verifyTelegramWidgetPayload } = await import("../src/worker.js");
+  const payload = await signWidget(widgetFields());
+  assert.deepEqual(await verifyTelegramWidgetPayload(payload, null, WIDGET_NOW), { id: null, reason: "bot_token_missing" });
+  assert.deepEqual(await verifyTelegramWidgetPayload(payload, "", WIDGET_NOW), { id: null, reason: "bot_token_missing" });
+});
+
+test("a signature failure names the bot the token belongs to", async () => {
+  const { default: worker, botIdOf } = await import("../src/worker.js");
+  assert.equal(botIdOf("8413521846:AAH-secret"), "8413521846");
+  assert.equal(botIdOf("not-a-token"), null);
+  assert.equal(botIdOf(null), null);
+
+  // The route verifies against the wall clock, so the payload must be fresh.
+  const payload = await signWidget({ ...widgetFields(), auth_date: String(Math.floor(Date.now() / 1000)) });
+  const env = {
+    PUBLIC_BASE_URL: "https://id.example.com",
+    DB: null,
+    TELEGRAM_BOT_TOKEN: "987654321:AAH-other-bot",
+    TELEGRAM_BOT_USERNAME: "MelloIDBot",
+  };
+  const res = await worker.fetch(new Request(`https://id.example.com/auth/telegram/widget?${payload.toString()}`), env);
+  assert.equal(res.status, 401);
+  const html = await res.text();
+  assert.match(html, /Reference: <code>signature<\/code>/);
+  assert.match(html, /belongs to Telegram bot 987654321, not @MelloIDBot/);
+  // The secret half of the token is never rendered.
+  assert.doesNotMatch(html, /AAH-other-bot/);
+});
