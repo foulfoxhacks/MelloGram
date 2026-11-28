@@ -25,7 +25,9 @@ async function sha256(value) {
 function cookie(request, name) {
   const header = request.headers.get("Cookie") || "";
   const item = header.split(";").map((part) => part.trim()).find((part) => part.startsWith(name + "="));
-  return item ? decodeURIComponent(item.slice(name.length + 1)) : null;
+  if (!item) return null;
+  try { return decodeURIComponent(item.slice(name.length + 1)); }
+  catch { return null; }
 }
 function cookieHeader(name, value, maxAge) {
   return `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
@@ -47,8 +49,8 @@ function redirect(location, cookies = []) {
 const escapeHtml = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 function errorPage(message, status = 400, reference = null) {
   // The reference is a fixed reason code (never request data), so the person
-  // running the deployment can tell an expired confirmation from a bot token
-  // that does not match the bot, without reading Worker logs.
+  // running the deployment can distinguish expiry, state and signature
+  // failures without looking at the callback URL.
   const note = reference ? `<p class="muted">Reference: <code>${escapeHtml(reference)}</code></p>` : "";
   return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>MelloID sign-in error</title><link rel="stylesheet" href="/app.css"></head><body><main class="shell tg-shell"><section class="tg-hero-id"><img class="tg-hero-logo" src="/mark.png" alt="" width="132" height="132"><h1>Sign-in failed</h1><p class="lead">${escapeHtml(message)}</p>${note}<p class="muted"><a href="/">Return home</a></p></section></main></body></html>`, {
     status,
@@ -62,7 +64,7 @@ function requireSameOrigin(request, env) {
 function setSecurityHeaders(response) {
   const headers = new Headers(response.headers);
   headers.set("X-Content-Type-Options", "nosniff");
-  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  if (!headers.has("Referrer-Policy")) headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("X-Frame-Options", "DENY");
   headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   headers.set("Strict-Transport-Security", "max-age=63072000");
@@ -116,6 +118,12 @@ async function startTelegramLogin(request, env) {
     cookieHeader("melloid_pkce_verifier", verifier, 600),
   ]);
 }
+// Telegram's OIDC subject and the Telegram user ID are separate claims.
+export function telegramProfileId(value) {
+  if (typeof value === "number" && !Number.isSafeInteger(value)) return null;
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  return /^[1-9][0-9]{0,15}$/.test(String(value)) ? String(value) : null;
+}
 async function finishTelegramLogin(request, env) {
   requireConfigured(env);
   const url = new URL(request.url);
@@ -156,11 +164,13 @@ async function finishTelegramLogin(request, env) {
       issuer: TELEGRAM_ISSUER,
       audience: env.TELEGRAM_CLIENT_ID,
       algorithms: ["RS256"],
+      requiredClaims: ["exp", "sub", "nonce", "id"],
     }));
   } catch {
     return errorPage("The Telegram identity token could not be verified.", 401);
   }
-  if (payload.nonce !== nonce || typeof payload.sub !== "string" || !/^\d{1,24}$/.test(payload.sub)) {
+  const telegramId = telegramProfileId(payload.id);
+  if (payload.nonce !== nonce || typeof payload.sub !== "string" || !payload.sub || !telegramId) {
     return errorPage("The Telegram identity token did not match this sign-in request.", 401);
   }
 
@@ -168,7 +178,7 @@ async function finishTelegramLogin(request, env) {
   const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
   await env.DB.prepare(
     "INSERT INTO sessions (session_hash, owner_telegram_id, expires_at, created_at) VALUES (?1, ?2, ?3, ?4)"
-  ).bind(await sha256(sessionId), payload.sub, expiresAt, Math.floor(Date.now() / 1000)).run();
+  ).bind(await sha256(sessionId), telegramId, expiresAt, Math.floor(Date.now() / 1000)).run();
   return redirect(new URL("/dashboard", env.PUBLIC_BASE_URL).toString(), [
     ...clearOAuth,
     cookieHeader("melloid_session", sessionId, SESSION_TTL_SECONDS),
@@ -183,6 +193,8 @@ async function finishTelegramLogin(request, env) {
 // SHA-256(bot token). Nothing else (no phone number, no session) is involved.
 
 const WIDGET_MAX_AGE_SECONDS = 600;
+const WIDGET_STATE_COOKIE = "__Host-melloid-widget-state";
+const WIDGET_STATE = /^[A-Za-z0-9_-]{43}$/;
 const BOT_USERNAME = /^[A-Za-z0-9_]{5,32}$/;
 
 /**
@@ -231,8 +243,8 @@ export async function verifyTelegramWidgetPayload(params, botToken, now = Math.f
   if (new Set(names).size !== names.length) return { id: null, reason: "duplicate_field" };
   const hash = params.get("hash") || "";
   if (!/^[0-9a-f]{64}$/.test(hash)) return { id: null, reason: "malformed_hash" };
-  const id = params.get("id") || "";
-  if (!/^[1-9][0-9]{0,15}$/.test(id)) return { id: null, reason: "malformed_id" };
+  const id = telegramProfileId(params.get("id"));
+  if (!id) return { id: null, reason: "malformed_id" };
   const authDate = Number(params.get("auth_date"));
   if (!Number.isInteger(authDate)) return { id: null, reason: "malformed_auth_date" };
   if (authDate > now + 60 || now - authDate > WIDGET_MAX_AGE_SECONDS) return { id: null, reason: "expired" };
@@ -257,18 +269,22 @@ export async function verifyTelegramWidget(params, botToken, now = Math.floor(Da
 
 function widgetLoginPage(env) {
   const bot = env.TELEGRAM_BOT_USERNAME;
-  const authUrl = new URL("/auth/telegram/widget", env.PUBLIC_BASE_URL).toString();
+  const state = randomToken();
+  // Keeping state in the path leaves every Telegram query field signed.
+  const authUrl = new URL(`/auth/telegram/widget/${state}`, env.PUBLIC_BASE_URL).toString();
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sign in to MelloID</title><link rel="stylesheet" href="/app.css"></head>
 <body><main class="shell tg-shell"><section class="tg-hero-id">
 <img class="tg-hero-logo" src="/mark.png" alt="" width="132" height="132"><h1>Sign in</h1>
 <p class="lead">Confirm with Telegram. MelloID receives your Telegram id, name, username and photo only: never your phone number, login code or session.</p>
-<div class="tg-widget"><script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="${bot}" data-size="large" data-radius="12" data-auth-url="${authUrl}"></script></div>
+<div class="tg-widget"><script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="${bot}" data-size="large" data-radius="12" data-auth-url="${escapeHtml(authUrl)}"></script></div>
 <p class="muted"><a href="/">Back to MelloID</a></p></section></main></body></html>`;
   return new Response(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
+      "Set-Cookie": cookieHeader(WIDGET_STATE_COOKIE, state, WIDGET_MAX_AGE_SECONDS),
+      "Referrer-Policy": "no-referrer",
       // Only this page may load Telegram's widget script and frame.
       "Content-Security-Policy": "default-src 'self'; script-src https://telegram.org; frame-src https://oauth.telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     },
@@ -281,31 +297,46 @@ const WIDGET_FAILURE_TEXT = {
   bot_token_missing: "Telegram sign-in is not configured on this server yet. Please try again later.",
 };
 
-async function finishWidgetLogin(request, env) {
+async function finishWidgetLogin(request, env, state) {
+  if (!WIDGET_STATE.test(state ?? "") || cookie(request, WIDGET_STATE_COOKIE) !== state) {
+    return errorPage("This sign-in did not start in this browser or has expired. Start again from MelloID.", 400, "state");
+  }
   const url = new URL(request.url);
   const { id, reason } = await verifyTelegramWidgetPayload(url.searchParams, widgetBotToken(env));
   if (!id) {
-    // Field names, never values, and never the token: enough for an operator to
-    // see which bot answered while keeping the log free of personal data.
-    console.warn("MelloID widget sign-in rejected", { reason, fields: [...url.searchParams.keys()].join(",") });
-    let message = WIDGET_FAILURE_TEXT[reason]
-      || "Telegram's sign-in confirmation could not be verified. Please sign in again.";
-    // The most common cause of `signature` is a token for someone else's bot,
-    // and naming the bot the token belongs to turns a guess into a two-second
-    // check against @BotFather.
-    if (reason === "signature") {
-      const botId = botIdOf(widgetBotToken(env));
-      const owner = botId ? `Telegram bot ${botId}` : "a different bot";
-      message += ` The token on this server belongs to ${owner}, not @${env.TELEGRAM_BOT_USERNAME}.`;
-    }
+    // The token prefix identifies a bot, but a failed HMAC cannot tell us
+    // whether the token was rotated or the signed callback data changed.
+    console.warn("MelloID widget sign-in rejected", {
+      reason,
+      fields: [...url.searchParams.keys()].join(","),
+      widgetBot: env.TELEGRAM_BOT_USERNAME,
+      tokenBotId: botIdOf(widgetBotToken(env)),
+    });
+    const message = WIDGET_FAILURE_TEXT[reason]
+      || "Telegram's sign-in confirmation could not be verified. Start a fresh sign-in from MelloID. If this keeps happening, contact the site administrator.";
     return errorPage(message, 401, reason);
   }
   const sessionId = randomToken();
   const now = Math.floor(Date.now() / 1000);
-  await env.DB.prepare(
-    "INSERT INTO sessions (session_hash, owner_telegram_id, expires_at, created_at) VALUES (?1, ?2, ?3, ?4)"
-  ).bind(await sha256(sessionId), id, now + SESSION_TTL_SECONDS, now).run();
+  const sessionHash = await sha256(sessionId);
+  const confirmationHash = await sha256(url.searchParams.get("hash"));
+  const stateHash = await sha256(state);
+  // D1 batches are transactional. Only the request that claims the signed
+  // confirmation can insert a session, including for simultaneous callbacks.
+  const [, claim] = await env.DB.batch([
+    env.DB.prepare("DELETE FROM widget_confirmations WHERE expires_at < ?1").bind(now),
+    env.DB.prepare(
+      "INSERT OR IGNORE INTO widget_confirmations (confirmation_hash, state_hash, session_hash, expires_at) VALUES (?1, ?2, ?3, ?4)"
+    ).bind(confirmationHash, stateHash, sessionHash, now + WIDGET_MAX_AGE_SECONDS + 60),
+    env.DB.prepare(
+      "INSERT INTO sessions (session_hash, owner_telegram_id, expires_at, created_at) SELECT ?1, ?2, ?3, ?4 WHERE EXISTS (SELECT 1 FROM widget_confirmations WHERE confirmation_hash = ?5 AND session_hash = ?1)"
+    ).bind(sessionHash, id, now + SESSION_TTL_SECONDS, now, confirmationHash),
+  ]);
+  if (claim.meta.changes !== 1) {
+    return errorPage("This Telegram sign-in was already used. Start again from MelloID.", 401, "used");
+  }
   return redirect(new URL("/dashboard", env.PUBLIC_BASE_URL).toString(), [
+    expiredCookie(WIDGET_STATE_COOKIE),
     cookieHeader("melloid_session", sessionId, SESSION_TTL_SECONDS),
   ]);
 }
@@ -747,9 +778,12 @@ export default {
         if (!widgetConfigured(env)) return setSecurityHeaders(json({ error: "Telegram sign-in is not configured on this MelloID server yet." }, 503));
         return setSecurityHeaders(widgetLoginPage(env));
       }
-      if (path === "/auth/telegram/widget" && request.method === "GET") {
+      const widgetCallback = path.match(/^\/auth\/telegram\/widget(?:\/([^/]+))?$/);
+      if (widgetCallback && request.method === "GET") {
         if (!widgetConfigured(env)) return setSecurityHeaders(json({ error: "Telegram sign-in is not configured on this MelloID server yet." }, 503));
-        return setSecurityHeaders(await finishWidgetLogin(request, env));
+        const response = await finishWidgetLogin(request, env, widgetCallback[1]);
+        response.headers.set("Referrer-Policy", "no-referrer");
+        return setSecurityHeaders(response);
       }
       if (path.startsWith("/auth/telegram/") && !oidcConfigured(env)) {
         if (path === "/auth/telegram/start" && widgetConfigured(env)) return setSecurityHeaders(redirect(new URL("/login", env.PUBLIC_BASE_URL).toString(), []));

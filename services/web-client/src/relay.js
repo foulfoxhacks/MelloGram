@@ -10,8 +10,8 @@
 // It is deliberately not a generic TCP proxy:
 //   * the destination comes from a fixed table, chosen by data-centre number.
 //     No host, port or URL is ever taken from the client;
-//   * only the web client's own origin may connect. Browsers cannot forge
-//     Origin, and a relay that lets anyone open a socket is an open proxy;
+//   * browsers must present the web client origin. This prevents cross-site
+//     browser use, but does not authenticate non-browser clients;
 //   * each connection has a byte and a time budget, and an isolate accepts a
 //     small number at once, so one client cannot exhaust the Worker.
 //
@@ -54,6 +54,7 @@ export function relayTarget(raw) {
  */
 export function relayRejection(request, env) {
   const upgrade = String(request.headers.get("Upgrade") || "").toLowerCase();
+  if (request.method !== "GET") return "method";
   if (upgrade !== "websocket") return "upgrade-required";
   const allowed = originOf(env.PUBLIC_BASE_URL);
   if (!allowed || request.headers.get("Origin") !== allowed) return "origin";
@@ -100,24 +101,39 @@ export async function relayFetch(request, env, dc) {
   if (!target) return plain("no such data centre", 404);
 
   const rejection = relayRejection(request, env);
+  if (rejection === "method") return plain("method not allowed", 405, { Allow: "GET" });
   if (rejection === "upgrade-required") {
     return plain("this endpoint is a WebSocket relay", 426, { Upgrade: "websocket", Connection: "Upgrade" });
   }
   if (rejection === "origin") return plain("this relay serves the MelloGram web client only", 403);
-  if (open >= MAX_CONNECTIONS) return plain("the relay is busy, try again in a moment", 503);
-
-  let sockets;
-  try {
-    // Worker-only module: imported lazily so `node --test` can load this file.
-    sockets = await import("cloudflare:sockets");
-  } catch {
-    return plain("this deployment cannot open TCP sockets", 501);
+  const ip = request.headers.get("CF-Connecting-IP");
+  if (ip && env.RELAY_RATE_LIMIT) {
+    try {
+      if (!(await env.RELAY_RATE_LIMIT.limit({ key: ip })).success) {
+        return plain("too many relay connections", 429, { "Retry-After": "60" });
+      }
+    } catch {
+      return plain("the relay is temporarily unavailable", 503);
+    }
   }
 
-  const pair = new WebSocketPair();
-  const [client, server] = Object.values(pair);
-  server.accept();
+  if (open >= MAX_CONNECTIONS) return plain("the relay is busy, try again in a moment", 503);
+
+  // Reserve before loading the Worker-only module so simultaneous requests
+  // cannot all pass the limit while the import is pending.
   open++;
+  let sockets;
+  let client;
+  let server;
+  try {
+    sockets = await import("cloudflare:sockets");
+    [client, server] = Object.values(new WebSocketPair());
+    server.binaryType = "arraybuffer";
+    server.accept();
+  } catch {
+    open--;
+    return plain("this deployment cannot open TCP sockets", 501);
+  }
 
   let done = false;
   let sent = 0;
@@ -139,7 +155,7 @@ export async function relayFetch(request, env, dc) {
     // Close the TCP side too, or the Worker holds the upstream socket until
     // the isolate recycles (a write may still be pending, hence the catch).
     try {
-      socket?.close?.();
+      void socket?.close().catch(() => {});
     } catch {
       /* already closed */
     }
@@ -148,6 +164,7 @@ export async function relayFetch(request, env, dc) {
   try {
     socket = sockets.connect({ hostname: target.hostname, port: target.port });
     socket.opened.catch(() => finish(1011, "could not reach telegram"));
+    socket.closed.catch(() => finish(1011, "telegram connection lost"));
     writer = socket.writable.getWriter();
   } catch {
     finish(1011, "could not reach telegram");
@@ -157,15 +174,9 @@ export async function relayFetch(request, env, dc) {
   timer = setTimeout(() => finish(1001, "relay time limit reached"), MAX_SECONDS * 1000);
 
   // WebSocket (browser) -> TCP (Telegram).
-  server.addEventListener("message", async (event) => {
+  server.addEventListener("message", (event) => {
     if (done) return;
-    // A Blob has to be read before it can be forwarded.
-    const data = bytesOfMessage(event.data) ? event.data : await event.data.arrayBuffer?.().catch(() => null);
-    if (data == null) {
-      finish(1003, "binary frames only");
-      return;
-    }
-    const chunk = bytesOfMessage(data);
+    const chunk = bytesOfMessage(event.data);
     if (!chunk || !chunk.byteLength) {
       finish(1003, "binary frames only");
       return;

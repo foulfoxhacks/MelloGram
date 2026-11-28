@@ -106,3 +106,33 @@ test("the page's policy allows the relay socket and nothing else", async () => {
   const csp = page.headers.get("content-security-policy");
   assert.match(csp, /connect-src 'self' https:\/\/wc-api\.example\.com wss:\/\/wc-api\.example\.com/);
 });
+
+test("relay errors keep security headers and writes cannot start a relay", async () => {
+  const path = "https://wc-api.example.com/relay/dc/2";
+  const response = await worker.fetch(new Request(path, {
+    method: "POST",
+    headers: { Upgrade: "websocket", Origin: "https://wc.example.com" },
+  }), env());
+  assert.equal(response.status, 405);
+  assert.equal(response.headers.get("allow"), "GET");
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+});
+
+test("the edge rate limit groups allowed relay requests by the Cloudflare client IP", async () => {
+  const path = "https://wc-api.example.com/relay/dc/2";
+  const address = "192.0.2.15";
+  const headers = { Upgrade: "websocket", Origin: "https://wc.example.com", "CF-Connecting-IP": address };
+  const seen = [];
+  const binding = {
+    ...env(),
+    RELAY_RATE_LIMIT: { limit: async ({ key }) => {
+      seen.push(key);
+      return { success: false };
+    } },
+  };
+  assert.equal((await worker.fetch(new Request(path, { headers: { ...headers, Origin: "https://elsewhere.example" } }), binding)).status, 403);
+  const response = await worker.fetch(new Request(path, { headers }), binding);
+  assert.equal(response.status, 429);
+  assert.equal(response.headers.get("retry-after"), "60");
+  assert.deepEqual(seen, [address]);
+});

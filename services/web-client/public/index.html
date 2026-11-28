@@ -4,24 +4,60 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>MelloGram Web</title>
-    <meta name="description" content="The browser client for MelloGram. Telegram transport in place; sign-in in progress." />
+    <meta name="description" content="The browser client for MelloGram, powered by the Telegram API." />
     <link rel="stylesheet" href="/styles.css" />
-    <script src="/app.js" defer></script>
+    <script src="/app.js" type="module"></script>
   </head>
   <body>
     <main class="page tg-login">
       <header class="tg-login-head">
         <img class="tg-login-logo" src="/mark.png" alt="" width="128" height="128">
         <h1>MelloGram <span class="web">Web</span></h1>
-        <p class="lede">Your chats, in the browser. Sign-in is being built: until it ships, this page shows exactly what works today.</p>
+        <p class="lede">MelloGram uses the Telegram API to connect to your account.</p>
         <span class="badge" id="stage">transport</span>
       </header>
 
-      <section class="tg-login-card" aria-labelledby="signin-heading">
-        <h2 id="signin-heading" class="sr-only">Sign in</h2>
-        <button class="tg-btn" type="button" disabled aria-describedby="signin-note">Log in by QR code</button>
-        <button class="tg-btn tg-btn-ghost" type="button" disabled aria-describedby="signin-note">Log in by phone number</button>
-        <p class="muted small" id="signin-note">Sign-in is not finished. The page can already reach Telegram through this server's relay, but the login handshake on top of it is still being built; when it lands, your code and password go straight to Telegram and never reach this server. Until then, use <a href="https://mellogram.foulfoxhacks.dev/download/">MelloGram desktop or Android</a>.</p>
+      <section class="tg-login-card" id="signin" aria-labelledby="signin-heading">
+        <h2 id="signin-heading" class="sr-only">Sign in to Telegram</h2>
+        <div class="stack" id="signin-options">
+          <button class="tg-btn" id="signin-qr" type="button" disabled>Log in by QR code</button>
+          <button class="tg-btn tg-btn-ghost" id="signin-phone" type="button" disabled>Log in by phone number</button>
+        </div>
+        <div id="qr-panel" hidden>
+          <p>In Telegram, open Settings → Devices → Link Desktop Device and scan this code.</p>
+          <canvas id="qr-code" role="img" aria-label="Telegram sign-in QR code"></canvas>
+        </div>
+        <form class="stack" id="signin-form" hidden>
+          <label id="signin-label" for="signin-value"></label>
+          <input id="signin-value" required maxlength="256" />
+          <button id="signin-submit" type="submit">Continue</button>
+        </form>
+        <button class="tg-btn-ghost" id="signin-cancel" type="button" hidden>Cancel sign-in</button>
+        <p class="muted small" id="signin-note" role="status">Checking sign-in availability…</p>
+        <p class="muted small">You can also use <a href="https://mellogram.foulfoxhacks.dev/download/">MelloGram desktop or Android</a>.</p>
+      </section>
+
+      <section class="panel stack" id="chats-panel" aria-labelledby="chats-heading" hidden>
+        <h2 id="chats-heading">Telegram chats</h2>
+        <p id="account-name"></p>
+        <p class="muted small">Use Sign out to end your Telegram session. Closing the page clears this tab; manage any remaining sessions in Telegram Settings → Devices.</p>
+        <button class="tg-btn-ghost" id="signout" type="button">Sign out</button>
+        <button class="tg-btn-ghost" id="forget-session" type="button" hidden>Clear this tab anyway</button>
+        <p class="muted small" id="chat-status" role="status"></p>
+        <label for="chat-list">Recent conversations</label>
+        <select id="chat-list"></select>
+        <div class="chat-actions">
+          <button class="tg-btn-ghost" id="reload-chats" type="button">Refresh chats</button>
+          <button class="tg-btn-ghost" id="reload-messages" type="button" disabled>Refresh messages</button>
+          <button class="tg-btn-ghost" id="older-messages" type="button" disabled>Older messages</button>
+        </div>
+        <ol class="chat-messages" id="messages" aria-label="Messages"></ol>
+        <form class="stack" id="compose" hidden>
+          <label for="compose-text">Telegram message</label>
+          <p class="muted small" id="compose-note">This browser does not support MelloGram’s end-to-end overlay.</p>
+          <textarea id="compose-text" aria-describedby="compose-note" rows="3" maxlength="4096" required></textarea>
+          <button id="send-message" type="submit">Send</button>
+        </form>
       </section>
 
       <section class="panel" aria-labelledby="status-heading">
