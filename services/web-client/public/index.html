@@ -44,27 +44,40 @@
         <a class="official-link" href="https://web.telegram.org/" rel="noreferrer">Open official Telegram Web <span aria-hidden="true">↗</span></a>
       </section>
 
-      <section class="panel stack" id="chats-panel" aria-labelledby="chats-heading" hidden>
-        <h2 id="chats-heading">Telegram chats</h2>
-        <p id="account-name"></p>
-        <p class="muted small">This browser keeps the session until you sign out, so the page survives a reload. Only use your own device: anyone with access to this browser profile can use the session.</p>
-        <button class="tg-btn-ghost" id="signout" type="button">Sign out</button>
-        <button class="tg-btn-ghost" id="forget-session" type="button">Forget this browser</button>
-        <p class="muted small" id="chat-status" role="status"></p>
-        <label for="chat-list">Recent conversations</label>
-        <select id="chat-list"></select>
-        <div class="chat-actions">
-          <button class="tg-btn-ghost" id="reload-chats" type="button">Refresh chats</button>
-          <button class="tg-btn-ghost" id="reload-messages" type="button" disabled>Refresh messages</button>
-          <button class="tg-btn-ghost" id="older-messages" type="button" disabled>Older messages</button>
+      <section class="tg-app" id="chats-panel" aria-labelledby="chats-heading" hidden>
+        <aside class="tg-sidebar">
+          <div class="tg-account">
+            <span class="tg-avatar" id="account-avatar" aria-hidden="true">M</span>
+            <span class="tg-account-name">
+              <strong id="account-name"></strong>
+              <span class="tg-account-note">Signed in · this browser</span>
+            </span>
+            <button class="tg-icon-btn" id="signout" type="button" title="Sign out of Telegram" aria-label="Sign out of Telegram">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4v16h-4"/><path d="M11 8l-4 4 4 4"/><path d="M7 12h9"/></svg>
+            </button>
+          </div>
+          <div class="tg-sidebar-actions">
+            <button class="tg-btn-ghost" id="reload-chats" type="button">Refresh chats</button>
+            <button class="tg-btn-ghost" id="forget-session" type="button">Forget this browser</button>
+          </div>
+          <ul class="tg-chat-list" id="chat-list" aria-label="Recent conversations"></ul>
+          <p class="tg-sidebar-status" id="chat-status" role="status"></p>
+        </aside>
+        <div class="tg-conversation">
+          <header class="tg-conv-head">
+            <h2 id="chats-heading" tabindex="-1">Choose a chat</h2>
+            <div class="tg-conv-actions">
+              <button class="tg-btn-ghost" id="older-messages" type="button" disabled>Older messages</button>
+              <button class="tg-btn-ghost" id="reload-messages" type="button" disabled>Refresh</button>
+            </div>
+          </header>
+          <ol class="tg-messages" id="messages" aria-label="Messages" aria-live="polite"></ol>
+          <form class="tg-composer" id="compose" hidden>
+            <textarea id="compose-text" aria-label="Message" aria-describedby="compose-note" rows="1" maxlength="4096" required placeholder="Write a message"></textarea>
+            <button class="primary" id="send-message" type="submit">Send</button>
+            <p class="tg-compose-note" id="compose-note">Messages go through Telegram; MelloGram’s end-to-end overlay is not available in the browser.</p>
+          </form>
         </div>
-        <ol class="chat-messages" id="messages" aria-label="Messages"></ol>
-        <form class="stack" id="compose" hidden>
-          <label for="compose-text">Telegram message</label>
-          <p class="muted small" id="compose-note">This browser does not support MelloGram’s end-to-end overlay.</p>
-          <textarea id="compose-text" aria-describedby="compose-note" rows="3" maxlength="4096" required></textarea>
-          <button id="send-message" type="submit">Send</button>
-        </form>
       </section>
 
       <details class="preview-details">

@@ -250,11 +250,200 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 #qr-code { display: block; max-width: 100%; height: auto; margin: 0 auto; }
 .app-link, .official-link { display: inline-block; margin-top: 13px; font-size: .85rem; font-weight: 650; }
 .app-link { display: block; }
-.chat-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
-.chat-actions button, .chat-messages button { font-size: .85rem; padding: .35rem .6rem; }
-.chat-messages { display: grid; gap: .5rem; padding: 0; list-style: none; }
-.chat-messages li { border: 1px solid var(--line); padding: .6rem .75rem; border-radius: 8px; }
-.chat-messages p { white-space: pre-wrap; overflow-wrap: anywhere; margin: .2rem 0; }
+/* Signed-in console: conversation list on the left, messages on the right. */
+.tg-app {
+  display: grid;
+  grid-template-columns: minmax(232px, 310px) minmax(0, 1fr);
+  height: min(78vh, 720px);
+  min-height: 460px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.tg-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  padding: 12px;
+  border-inline-end: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.tg-account { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 9px; }
+.tg-avatar {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #231a3a;
+  font-size: .95rem;
+  font-weight: 800;
+}
+.tg-account-name { min-width: 0; }
+.tg-account-name strong { display: block; font-size: .92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tg-account-note { display: block; color: var(--muted); font-size: .72rem; }
+
+.tg-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.tg-icon-btn:hover:not(:disabled) { color: var(--text); background: var(--tint); }
+.tg-sidebar-actions { display: flex; gap: 6px; }
+.tg-sidebar-actions button { flex: 1; padding: 6px 8px; font-size: .76rem; }
+
+.tg-chat-list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  display: grid;
+  gap: 2px;
+  align-content: start;
+}
+
+.tg-chat {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.tg-chat:hover:not(:disabled) { background: var(--tint); }
+.tg-chat[aria-current="true"] { background: #7250c7; color: #fff; }
+.tg-chat-avatar {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--tint);
+  color: var(--accent);
+  font-size: .82rem;
+  font-weight: 800;
+}
+.tg-chat[aria-current="true"] .tg-chat-avatar { background: #ffffff29; color: #fff; }
+.tg-chat-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .89rem; font-weight: 640; }
+.tg-unread {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 20px;
+  background: #7250c7;
+  color: #fff;
+  font-size: .7rem;
+  font-weight: 800;
+  text-align: center;
+}
+.tg-chat[aria-current="true"] .tg-unread { background: #fff; color: #6a44c9; }
+.tg-sidebar-empty, .tg-empty { margin: 0; padding: 18px 10px; color: var(--muted); font-size: .84rem; text-align: center; }
+.tg-sidebar-status { margin: auto 0 0; min-height: 1.2em; color: var(--muted); font-size: .76rem; }
+
+.tg-conversation { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; background: var(--bg); }
+.tg-conv-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 11px 15px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.tg-conv-head h2 { font-size: 1rem; letter-spacing: -.02em; }
+.tg-conv-head h2:focus-visible { outline-offset: 4px; }
+.tg-conv-actions { display: flex; gap: 6px; }
+.tg-conv-actions button { padding: 5px 9px; font-size: .75rem; }
+
+.tg-messages {
+  min-height: 0;
+  margin: 0;
+  padding: 16px;
+  list-style: none;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scrollbar-gutter: stable;
+}
+.tg-msg { display: flex; }
+.tg-msg.is-out { justify-content: flex-end; }
+.tg-bubble {
+  max-width: min(74%, 560px);
+  padding: 7px 11px 9px;
+  border: 1px solid var(--line);
+  border-radius: 14px 14px 14px 4px;
+  background: var(--panel);
+}
+.tg-msg.is-out .tg-bubble {
+  border-color: transparent;
+  border-radius: 14px 14px 4px 14px;
+  background: #6a44c9;
+  color: #fff;
+}
+.tg-msg-meta { display: block; margin-bottom: 2px; color: var(--muted); font-size: .7rem; }
+.tg-msg.is-out .tg-msg-meta { color: #e5dcff; }
+.tg-bubble p { margin: 0; font-size: .92rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tg-download {
+  margin-top: 7px;
+  padding: 4px 8px;
+  border: 1px solid currentColor;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: .76rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.tg-composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 11px 15px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+.tg-composer textarea {
+  min-height: 44px;
+  max-height: 140px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+.tg-composer button.primary { align-self: end; width: auto; min-width: 84px; padding: 0 18px; min-height: 44px; }
+.tg-compose-note { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: .72rem; }
+
+@media (max-width: 820px) {
+  .tg-app { grid-template-columns: 1fr; grid-template-rows: minmax(0, 230px) minmax(0, 1fr); height: min(84vh, 720px); }
+  .tg-sidebar { border-inline-end: 0; border-bottom: 1px solid var(--line); }
+  .tg-bubble { max-width: 88%; }
+}
 .capabilities li[data-ready="beta"] .mark { background: #b27816; border-color: #b27816; }
 
 /* Keep the existing dark client palette after sign-in. */
@@ -263,7 +452,12 @@ body:has(#chats-panel:not([hidden])) {
   --bg: #10101a; --panel: #1b1b2d; --line: #3e3a56;
   --text: #f4f2ff; --muted: #c0bed2; --accent: #c1b2ff;
   --accent-hover: #d5caff; --tint: #26233b;
+  background: var(--bg);
 }
+body:has(#chats-panel:not([hidden])) .page { width: min(1200px, calc(100% - 20px)); padding: 12px 0 10px; }
+body:has(#chats-panel:not([hidden])) .signin-head,
+body:has(#chats-panel:not([hidden])) .preview-details { display: none; }
+body:has(#chats-panel:not([hidden])) .page-footer { margin-top: 8px; border-top: 0; }
 body:has(#chats-panel:not([hidden])) .primary { background: #7250c7; color: #fff; }
 body:has(#chats-panel:not([hidden])) .secondary,
 body:has(#chats-panel:not([hidden])) .tg-btn-ghost { border-color: #696282; }
