@@ -100,6 +100,16 @@
       fields: () => [field("Login code", h("input", { type: "text", name: "code", inputmode: "numeric", required: true, autocomplete: "one-time-code" }))],
       submit: (f) => withDeadline(Bridge.invoke("submit_code", { code: f.code.value }), UNREACHABLE),
     },
+    // Shown instead of the credentials form when the app already has its
+    // built-in API credentials but could not reach Telegram. Asking for an
+    // API ID and hash here is a dead end: they are compiled in and nobody has
+    // a copy to type.
+    offline: {
+      busy: "Reconnecting…",
+      help: (s) => `MelloGram has no Telegram connection yet${s && s.reason ? `: ${s.reason}` : ""}. Check the connection (or Settings → Network & Tunnels if you use a proxy), then try again.`,
+      fields: () => [],
+      submit: () => Bridge.invoke("login_state"),
+    },
     "need-password": {
       busy: "Signing in…",
       help: (s) => `This account has two-step verification.${s.hint ? ` Hint: ${s.hint}` : ""}`,
@@ -113,8 +123,10 @@
   }
 
   let loginStep = null;
+  // True once boot learned that the app has API credentials of its own.
+  let hasSavedCredentials = false;
   function showLogin(s) {
-    const key = s ? s.state : "credentials";
+    const key = s ? s.state : (hasSavedCredentials ? "offline" : "credentials");
     if (key === "ready") { $("login").hidden = true; onReady(s.me); return; }
     loginStep = { key, s: s || {} };
     const step = loginSteps[key];
@@ -668,13 +680,21 @@
     state.commands = await Bridge.invoke("list_commands");
     await PluginHost.sync(App);
     // The backend connects in the background; give it a moment on cold start.
+    // A failure here is worth showing: swallowing it turned a network error
+    // into a form asking for credentials that are compiled into the app.
+    hasSavedCredentials = Boolean(settings.telegram.has_hash);
     let login = null;
-    for (let i = 0; i < 20 && settings.telegram.has_hash; i++) {
-      login = await Bridge.invoke("login_state").catch(() => null);
-      if (login) break;
+    let failure = null;
+    for (let i = 0; i < 20 && hasSavedCredentials; i++) {
+      try {
+        login = await Bridge.invoke("login_state");
+      } catch (e) {
+        failure = String(e?.message || e);
+      }
+      if (login || failure) break;
       await new Promise((r) => setTimeout(r, 250));
     }
-    showLogin(login);
+    showLogin(login ?? (failure ? { state: "offline", reason: failure } : null));
     window.MelloGram.Extras?.afterBoot(await Bridge.invoke("startup_status"));
   }
   // Wait until every script (settings, studio, extras) has loaded before booting.

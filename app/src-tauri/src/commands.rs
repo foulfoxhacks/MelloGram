@@ -201,13 +201,33 @@ async fn after_login(state: &Arc<AppState>, login: LoginState) -> R<LoginState> 
 
 #[tauri::command]
 pub async fn login_state(state: S<'_>) -> R<Option<LoginState>> {
+    // The startup connect runs in a background task, so on a phone that came up
+    // before its network did this call can arrive first and answer `None`. The
+    // UI reads `None` as "nothing saved" and falls back to the API ID / hash
+    // form, which nobody can fill in: those values are compiled in. Connect
+    // here when the client is missing, and report the failure instead of
+    // pretending nothing is configured.
+    if state.tg.lock().await.is_none() {
+        if let Err(e) = state.connect_if_configured().await {
+            tracing::warn!("login_state could not connect: {e}");
+            return Err(e);
+        }
+    }
     let Some(tg) = state.tg.lock().await.clone() else { return Ok(None) };
     tg.login_state().await.map(Some).map_err(err)
 }
 
 #[tauri::command]
 pub async fn request_code(state: S<'_>, phone: String) -> R<LoginState> {
-    state.telegram().await?.request_code(&phone).await.map_err(err)
+    // Never log the number itself, only that a code was asked for and why it
+    // was refused; a login that fails silently is what took days to find.
+    tracing::info!("request_code: asking Telegram for a login code");
+    let login = state.telegram().await?.request_code(&phone).await;
+    match &login {
+        Ok(_) => tracing::info!("request_code: code sent"),
+        Err(e) => tracing::warn!("request_code failed: {e}"),
+    }
+    login.map_err(err)
 }
 
 #[tauri::command]
