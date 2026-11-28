@@ -29,11 +29,17 @@ The error page ends with a `Reference:` code, and the same reason is logged by
 
 | Reference | Meaning | Fix |
 | --- | --- | --- |
-| `signature` | The payload was signed by a different bot than `TELEGRAM_BOT_TOKEN` | Re-set the secret with `npx wrangler secret put TELEGRAM_BOT_TOKEN` using the token of the bot named by `TELEGRAM_BOT_USERNAME` |
+| `signature` | The payload was signed by a different bot than `TELEGRAM_BOT_TOKEN`; the page names the bot id the token belongs to | Re-set the secret with `npx wrangler secret put TELEGRAM_BOT_TOKEN` using the token of the bot named by `TELEGRAM_BOT_USERNAME` |
+| `bot_token_missing` | Verification ran with no token. The routes answer `503` before that happens, so this is a safety net, not a step you should ever reach | Keep `TELEGRAM_BOT_TOKEN` set |
 | `expired` | `auth_date` is more than 10 minutes old | Sign in again without leaving the page open |
 | `missing` | The callback page was opened directly | Start again from **Continue with Telegram** |
 | `malformed_hash` / `malformed_id` / `malformed_auth_date` | The query string was not a Telegram payload | Nothing; a real attempt never produces these |
 | `duplicate_field` | A parameter arrived twice | Nothing; a real attempt never produces this |
+
+A `signature` failure renders as *"The token on this server belongs to Telegram
+bot <id>, not @<username>"*, so a token pasted from the wrong bot is one glance
+away from being fixed. Only the id half of the token is ever shown; the secret
+half never leaves the Worker.
 
 The bot token is trimmed before use, so a trailing space or newline left by a
 copy/paste no longer breaks verification. Fields this build does not know are

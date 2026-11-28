@@ -194,6 +194,15 @@ export function widgetBotToken(env) {
   const token = typeof env?.TELEGRAM_BOT_TOKEN === "string" ? env.TELEGRAM_BOT_TOKEN.trim() : "";
   return token || null;
 }
+/**
+ * The bot id half of a bot token (`8413521846:AAH…`). Bot ids are public —
+ * they appear in every Bot API URL — so an error page may name one; the secret
+ * half never leaves this function.
+ */
+export function botIdOf(token) {
+  const id = String(token || "").split(":")[0];
+  return /^[0-9]{5,12}$/.test(id) ? id : null;
+}
 export function widgetConfigured(env) {
   return Boolean(widgetBotToken(env) && BOT_USERNAME.test(env.TELEGRAM_BOT_USERNAME || ""));
 }
@@ -214,6 +223,9 @@ export function oidcConfigured(env) {
  * break sign-in for everyone.
  */
 export async function verifyTelegramWidgetPayload(params, botToken, now = Math.floor(Date.now() / 1000)) {
+  // Without a token there is nothing to verify against. Reporting that as a
+  // bad signature sends the operator looking at the wrong bot.
+  if (!botToken) return { id: null, reason: "bot_token_missing" };
   const names = [...params.keys()];
   if (!names.length) return { id: null, reason: "missing" };
   if (new Set(names).size !== names.length) return { id: null, reason: "duplicate_field" };
@@ -266,6 +278,7 @@ function widgetLoginPage(env) {
 const WIDGET_FAILURE_TEXT = {
   expired: "Telegram's sign-in confirmation expired. Please sign in again.",
   missing: "This page is the last step of sign-in with Telegram. Start again from MelloID.",
+  bot_token_missing: "Telegram sign-in is not configured on this server yet. Please try again later.",
 };
 
 async function finishWidgetLogin(request, env) {
@@ -275,8 +288,16 @@ async function finishWidgetLogin(request, env) {
     // Field names, never values, and never the token: enough for an operator to
     // see which bot answered while keeping the log free of personal data.
     console.warn("MelloID widget sign-in rejected", { reason, fields: [...url.searchParams.keys()].join(",") });
-    const message = WIDGET_FAILURE_TEXT[reason]
+    let message = WIDGET_FAILURE_TEXT[reason]
       || "Telegram's sign-in confirmation could not be verified. Please sign in again.";
+    // The most common cause of `signature` is a token for someone else's bot,
+    // and naming the bot the token belongs to turns a guess into a two-second
+    // check against @BotFather.
+    if (reason === "signature") {
+      const botId = botIdOf(widgetBotToken(env));
+      const owner = botId ? `Telegram bot ${botId}` : "a different bot";
+      message += ` The token on this server belongs to ${owner}, not @${env.TELEGRAM_BOT_USERNAME}.`;
+    }
     return errorPage(message, 401, reason);
   }
   const sessionId = randomToken();
