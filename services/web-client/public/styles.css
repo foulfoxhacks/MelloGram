@@ -305,6 +305,7 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 
 .tg-chat-list {
   flex: 1;
+  outline: none;
   min-height: 0;
   margin: 0;
   padding: 0;
@@ -456,6 +457,7 @@ body:has(#chats-panel:not([hidden])) {
 }
 body:has(#chats-panel:not([hidden])) .page { width: min(1200px, calc(100% - 20px)); padding: 12px 0 10px; }
 body:has(#chats-panel:not([hidden])) .signin-head,
+body:has(#chats-panel:not([hidden])) #signin,
 body:has(#chats-panel:not([hidden])) .preview-details { display: none; }
 body:has(#chats-panel:not([hidden])) .page-footer { margin-top: 8px; border-top: 0; }
 body:has(#chats-panel:not([hidden])) .primary { background: #7250c7; color: #fff; }

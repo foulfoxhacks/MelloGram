@@ -38,8 +38,9 @@ export function openChats(client, sdk, user, onExit) {
   panel.hidden = false;
   byId("account-name").textContent = user.displayName;
   byId("account-avatar").textContent = initials(user.displayName);
-  heading.tabIndex = -1;
-  heading.focus();
+  // Move focus into the console without ringing the conversation heading.
+  chatsEl.tabIndex = -1;
+  chatsEl.focus();
 
   function buttons() {
     const busy = loadingChats || sending || leaving;
@@ -66,8 +67,8 @@ export function openChats(client, sdk, user, onExit) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "tg-chat";
-      button.dataset.id = chat.id;
-      if (chat.id === selectedId) button.setAttribute("aria-current", "true");
+      button.dataset.id = String(chat.id);
+      if (String(chat.id) === selectedId) button.setAttribute("aria-current", "true");
 
       const avatar = document.createElement("span");
       avatar.className = "tg-chat-avatar";
@@ -267,7 +268,7 @@ export function openChats(client, sdk, user, onExit) {
       void loadMessages({ quiet: true });
     }, 600);
   }
-  const onMessage = (message) => { if (message.chat.id === selectedId) refreshSoon(); };
+  const onMessage = (message) => { if (String(message.chat.id) === selectedId) refreshSoon(); };
   client.onNewMessage.add(onMessage);
   client.onEditMessage.add(onMessage);
   client.onDeleteMessage.add(refreshSoon);
