@@ -314,25 +314,143 @@ test("a missing bot token is a configuration problem, not a bad signature", asyn
   assert.deepEqual(await verifyTelegramWidgetPayload(payload, "", WIDGET_NOW), { id: null, reason: "bot_token_missing" });
 });
 
-test("a signature failure names the bot the token belongs to", async () => {
+test("a signature failure does not claim the bot is wrong when only its token suffix differs", async () => {
   const { default: worker, botIdOf } = await import("../src/worker.js");
   assert.equal(botIdOf("8413521846:AAH-secret"), "8413521846");
   assert.equal(botIdOf("not-a-token"), null);
   assert.equal(botIdOf(null), null);
 
   // The route verifies against the wall clock, so the payload must be fresh.
-  const payload = await signWidget({ ...widgetFields(), auth_date: String(Math.floor(Date.now() / 1000)) });
+  const payload = await signWidget({ ...widgetFields(), auth_date: String(Math.floor(Date.now() / 1000)) }, "987654321:AAH-current");
   const env = {
     PUBLIC_BASE_URL: "https://id.example.com",
     DB: null,
-    TELEGRAM_BOT_TOKEN: "987654321:AAH-other-bot",
+    TELEGRAM_BOT_TOKEN: "987654321:AAH-stale",
     TELEGRAM_BOT_USERNAME: "MelloIDBot",
   };
-  const res = await worker.fetch(new Request(`https://id.example.com/auth/telegram/widget?${payload.toString()}`), env);
+  const { url, cookie } = await widgetAttempt(worker, env);
+  url.search = payload.toString();
+  const res = await worker.fetch(new Request(url, { headers: { Cookie: cookie } }), env);
   assert.equal(res.status, 401);
   const html = await res.text();
   assert.match(html, /Reference: <code>signature<\/code>/);
-  assert.match(html, /belongs to Telegram bot 987654321, not @MelloIDBot/);
-  // The secret half of the token is never rendered.
-  assert.doesNotMatch(html, /AAH-other-bot/);
+  assert.match(html, /Start a fresh sign-in from MelloID/);
+  assert.equal(res.headers.get("set-cookie"), null);
+  assert.doesNotMatch(html, /different bot|belongs to|AAH-stale/);
+});
+
+async function widgetAttempt(worker, env) {
+  const login = await worker.fetch(new Request(new URL("/login", env.PUBLIC_BASE_URL)), env);
+  const cookie = login.headers.get("set-cookie").split(";")[0];
+  const html = await login.text();
+  return { url: new URL(html.match(/data-auth-url="([^"]+)"/)[1]), cookie };
+}
+
+test("Telegram profile id is distinct from OIDC subject and rejects imprecise values", async () => {
+  const { telegramProfileId } = await import("../src/worker.js");
+  assert.equal(telegramProfileId(987654321), "987654321");
+  assert.equal(telegramProfileId("987654321"), "987654321");
+  for (const invalid of [null, -1, 0, "0", "01", "1e3", 2.5, 9007199254740992, "1234123412341234123"]) {
+    assert.equal(telegramProfileId(invalid), null);
+  }
+});
+
+test("widget confirmation requires browser state and creates exactly one session", async (t) => {
+  const { default: worker } = await import("../src/worker.js");
+  const sqlite = await import("node:sqlite").catch((error) => {
+    if (error.code !== "ERR_UNKNOWN_BUILTIN_MODULE") throw error;
+    return null;
+  });
+  if (!sqlite) return t.skip("The SQL integration test requires Node 22 with node:sqlite");
+  const { DatabaseSync } = sqlite;
+  const { readFileSync } = await import("node:fs");
+  const db = new DatabaseSync(":memory:");
+  try {
+    for (const name of ["0001_init.sql", "0003_widget_confirmations.sql"]) {
+      db.exec(readFileSync(new URL(`../migrations/${name}`, import.meta.url), "utf8"));
+    }
+    // D1's numbered placeholders map to SQLite's named parameter binding.
+    const DB = {
+      prepare: (sql) => ({ bind: (...values) => () => {
+        const bindings = Object.fromEntries(values.map((value, i) => [`?${i + 1}`, value]));
+        const { changes } = db.prepare(sql).run(bindings);
+        return { meta: { changes } };
+      } }),
+      batch: async (statements) => {
+        db.exec("BEGIN");
+        try {
+          const results = statements.map((statement) => statement());
+          db.exec("COMMIT");
+          return results;
+        } catch (error) {
+          db.exec("ROLLBACK");
+          throw error;
+        }
+      },
+    };
+    const env = { PUBLIC_BASE_URL: "https://id.example.com", TELEGRAM_BOT_TOKEN: WIDGET_TOKEN, TELEGRAM_BOT_USERNAME: "MelloIDBot", DB };
+    const first = await widgetAttempt(worker, env);
+    const other = await widgetAttempt(worker, env);
+    const payload = await signWidget({ ...widgetFields(), auth_date: String(Math.floor(Date.now() / 1000)), future_field: "unchanged" });
+    first.url.search = other.url.search = payload.toString();
+    const callback = (url, cookie) => worker.fetch(new Request(url, { headers: cookie ? { Cookie: cookie } : {} }), env);
+    for (const rejected of [await callback(first.url), await callback(first.url, other.cookie)]) {
+      assert.equal(rejected.status, 400);
+      assert.equal(rejected.headers.get("set-cookie"), null);
+    }
+    const success = await callback(first.url, first.cookie);
+    assert.equal(success.status, 303, await success.text());
+    assert.equal(success.headers.get("location"), "https://id.example.com/dashboard");
+    assert.equal(success.headers.get("referrer-policy"), "no-referrer");
+    assert.match(success.headers.get("set-cookie"), /melloid_session=/);
+    const duplicate = await callback(other.url, other.cookie);
+    const secondConfirmation = await signWidget({ ...widgetFields(), auth_date: String(Math.floor(Date.now() / 1000)), first_name: "Different confirmation" });
+    first.url.search = secondConfirmation.toString();
+    const reusedState = await callback(first.url, first.cookie);
+    assert.equal(reusedState.status, 401);
+    assert.match(await reusedState.text(), /Reference: <code>used<\/code>/);
+    assert.equal(duplicate.status, 401);
+    assert.match(await duplicate.text(), /Reference: <code>used<\/code>/);
+    assert.equal(db.prepare("SELECT count(*) AS count FROM sessions WHERE owner_telegram_id = '42'").get().count, 1);
+  } finally {
+    db.close();
+  }
+});
+
+test("OIDC stores Telegram's verified profile id rather than the OIDC subject", async (t) => {
+  const { default: worker } = await import("../src/worker.js");
+  const { generateKeyPair, exportJWK, SignJWT } = await import("jose");
+  const { privateKey, publicKey } = await generateKeyPair("RS256");
+  const env = {
+    PUBLIC_BASE_URL: "https://id.example.com",
+    TELEGRAM_CLIENT_ID: "123456",
+    TELEGRAM_CLIENT_SECRET: "synthetic",
+    DB: { prepare: () => ({ bind: (...values) => ({ run: async () => { stored = values; } }) }) },
+  };
+  let stored;
+  const start = await worker.fetch(new Request(`${env.PUBLIC_BASE_URL}/auth/telegram/start`), env);
+  assert.equal(start.status, 303);
+  const redirect = new URL(start.headers.get("location"));
+  const { searchParams } = redirect;
+  const state = searchParams.get("state");
+  const nonce = searchParams.get("nonce");
+  const cookie = start.headers.getSetCookie().map((part) => part.split(";")[0]).join("; ");
+  const token = await new SignJWT({ id: 987654321, nonce })
+    .setProtectedHeader({ alg: "RS256", kid: "test" })
+    .setSubject("1234123412341234123")
+    .setIssuer("https://oauth.telegram.org").setAudience(env.TELEGRAM_CLIENT_ID)
+    .setExpirationTime("5m").sign(privateKey);
+  const jwk = { ...await exportJWK(publicKey), alg: "RS256", kid: "test" };
+  t.mock.method(globalThis, "fetch", async (input) => {
+    switch (String(input)) {
+      case "https://oauth.telegram.org/token": return Response.json({ id_token: token });
+      case "https://oauth.telegram.org/.well-known/jwks.json": return Response.json({ keys: [jwk] });
+      default: throw new Error("Unexpected upstream call");
+    }
+  });
+  const response = await worker.fetch(new Request(
+    `${env.PUBLIC_BASE_URL}/auth/telegram/callback?state=${state}&code=fixture`, { headers: { Cookie: cookie } },
+  ), env);
+  assert.equal(response.status, 303, await response.text());
+  assert.equal(stored[1], "987654321");
 });

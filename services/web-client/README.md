@@ -1,117 +1,99 @@
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:2937af2c27ce8c8666fb110f5c34969d70d42e57bb45e1f08286873ac784bd63 -->
+
 # MelloGram web client
 
-The browser client for MelloGram, served as a Cloudflare Worker at
-`wc.mellogram.foulfoxhacks.dev`.
+MelloGram Web is a Telegram client served by a Cloudflare Worker. The default
+deployment serves a status page, the MTProto relay and an in-memory overlay
+demo. An opt-in beta adds existing-account sign-in and basic chats.
 
-**This is a skeleton with a working transport.** It serves a real shell, a real
-status API and the MTProto relay that a browser needs to reach Telegram at all.
-Nothing here signs in yet, stores messages or claims encryption it does not have,
-and the capability list says exactly that.
+## Telegram beta
 
-## What exists today
+The browser uses [mtcute](https://github.com/mtcute/mtcute) for MTProto key
+exchange, encrypted RPCs, QR token refresh, data centre migration and two-step
+verification. The Worker relays opaque bytes to one of five fixed Telegram data
+centres. The browser holds the authorization key in memory. The Worker does not
+store accounts, sessions or messages.
 
-- `GET /` — static shell (`public/`), served through the `ASSETS` binding.
-- `GET /api/health` — liveness.
-- `GET /api/status` — service version and the capability list the page renders.
-  Mutating methods are refused with `405` and an `Allow` header; unknown API
-  routes are JSON `404`s.
-- Security headers on every response: strict CSP (no inline script or style,
-  `wasm-unsafe-eval` for the overlay module only), `nosniff`, `DENY` framing,
-  `Permissions-Policy`, `no-store` on JSON.
-- **Run the protocol** on the page: the Rust overlay, compiled to WebAssembly,
-  generates two throwaway identities, shows their 60-digit safety number and
-  round-trips a message. Everything is in memory; nothing is stored.
-- `GET /relay/dc/1` … `/relay/dc/5` — the MTProto TCP relay (below). It opens a
-  WebSocket that pipes opaque bytes to one Telegram data centre.
+The beta supports QR sign-in and phone sign-in where Telegram delivers a
+supported code, recent direct chats and groups, paged message history, text
+sending and downloads up to 4 MiB. Some verification methods, account creation,
+broadcast channels, group topics, uploads and ephemeral content require the
+desktop or Android app. Ordinary Telegram chats do not use the MelloGram
+overlay. The demo generates throwaway identities and never stores their keys.
 
-Capabilities live in `src/capabilities.js`, which is also what the tests assert
-against, so the page cannot drift from the code.
+Use **Sign out** to revoke the Telegram session. Closing or reloading the tab
+clears its local state but does not revoke the authorization at Telegram. Users
+can review and revoke sessions in Telegram under **Settings → Devices**.
 
-## The relay
+## Develop and deploy
 
-A browser cannot open a TCP socket and Telegram has no HTTP API, so the page
-reaches a data centre through this Worker: it upgrades to a WebSocket and the
-Worker pipes the bytes over TCP with `cloudflare:sockets`. The relay never parses,
-logs or stores traffic, and holds no Telegram credential, `api_id` or session —
-every byte is opaque MTProto.
+From `services/web-client`, using Node 22 or later:
 
-It is deliberately **not** a TCP proxy: the destination comes from a fixed table
-(`src/relay.js`) chosen by data-centre number, so no host or port is ever taken
-from the client; only `PUBLIC_BASE_URL`'s origin may connect (browsers cannot
-forge `Origin`, and a relay anyone may open is an open proxy); and each
-connection has an 8 MiB per-direction byte budget, a 10-minute lifetime and a
-cap of 4 concurrent connections per isolate.
-
-`public/mtproto/transport.js` is the browser half: abridged and intermediate
-framing, a reader that survives frames split across socket chunks, and the
-transport tag (`0xef`, or `0xeeeeeeee`) that must precede the first frame.
-
-Verified end to end against production, not just in unit tests: a `req_pq_multi`
-sent through `wrangler dev` over `/relay/dc/2` reached DC2 and `resPQ` came back
-(a 100-byte message, `auth_key_id` 0, constructor `0x05162463`). Two things that
-only that run revealed are now pinned in code and tests: a packet sent without
-the transport tag makes Telegram close the socket, and a WebSocket message that
-is not an `ArrayBuffer` silently became zero bytes with a plain
-`new Uint8Array(event.data)`.
-
-## What is deliberately missing
-
-- **Sign-in.** The transport is in place; the authorization key exchange and QR
-  login that sit on top of it are not. They need a second DH generation, the
-  encrypted message layer and `auth.exportLoginToken`, and none of it should
-  ship before it is tested against a real data centre.
-- **Chats and messages.** They need sign-in first. No server-side storage is
-  provisioned, and none should be added for message content.
-- **Overlay storage and chat wiring.** The protocol runs in the browser, but
-  where a device secret lives (and how it would be shared with the desktop app)
-  is still an open design question. Until it is answered, the demo's identities
-  are discarded when the page closes and no chat uses the overlay.
-
-## Development
-
-```bash
-cd services/web-client
-npm install
-npm test                     # node --test, no network
-node dev.mjs 8787            # preview the shell without Wrangler
-scripts/build-wasm.sh        # rebuild public/wasm after changing the crate
+```sh
+npm ci
+npm run check
+npm run dev -- --infer-origin-from-routes=false --var PUBLIC_BASE_URL:http://127.0.0.1:8787
 ```
 
-### Deployment
+Open `http://127.0.0.1:8787/`. Use Wrangler when testing the relay; the
+dependency-free shell adapter (`npm run preview`) cannot open relay sockets.
+Both Wrangler configs build the browser bundle before serving or deploying.
+The embedded config additionally packages the static files into the Worker.
 
-One Worker serves two custom domains (see `wrangler.toml`):
-
-| Host | Serves |
+| Host | Routes |
 | --- | --- |
-| `wc.mellogram.foulfoxhacks.dev` | the shell, plus same-origin `/api/*` |
-| `wc-api.mellogram.foulfoxhacks.dev` | the API only (`/api/*`); anything else is a JSON 404 |
+| `wc.mellogram.foulfoxhacks.dev` | Shell, same-origin API and relay |
+| `wc-api.mellogram.foulfoxhacks.dev` | Status and health API, plus relay |
 
-Transport and endpoint rules, all covered by `npm test`:
+`/api/health` reports Worker liveness, not Telegram connectivity.
+`/api/status` reports the features available on that deployment. When the beta
+is enabled, `/api/telegram-config` on the web host returns the public Telegram
+application ID and hash. Treat those as public application identifiers. Never
+use a Telegram account password, verification code or session as a Worker
+binding.
 
-- HTTPS only: plain HTTP `GET`/`HEAD` gets a `308` to HTTPS, writes get `403`;
-  every response sends `Strict-Transport-Security` and the CSP includes
-  `upgrade-insecure-requests`.
-- The API grants CORS to the web client origin (`PUBLIC_BASE_URL`) only,
-  with `Vary: Origin`; other origins get no CORS headers and a `403` preflight.
-  No credentials are ever accepted cross-origin.
-- Only `GET`, `HEAD` and `OPTIONS` exist; everything else is `405`.
+For a staging Worker, set `TELEGRAM_WEB_BETA=true`, `TELEGRAM_API_ID` and
+`TELEGRAM_API_HASH` in the Worker's variables, using an application registered
+with Telegram. For Wrangler dev, the same variables can go in the ignored
+`.dev.vars` file. Set `PUBLIC_BASE_URL` to the exact browser origin. Leave
+`TELEGRAM_WEB_BETA` unset or set it to `false` to disable new browser logins.
+Existing tabs remain authorized until they sign out or close.
 
-`.github/workflows/web-client.yml` tests and deploys on pushes to `main` that
-touch this folder, then smoke-tests both hostnames over TLS and checks HSTS
-and CORS. Add the repository secrets `CLOUDFLARE_API_TOKEN` (Workers Scripts
-edit + Workers Routes on the `foulfoxhacks.dev` zone) and
-`CLOUDFLARE_ACCOUNT_ID`; without them the workflow tests and skips the deploy.
-Manual deploy: `npx wrangler deploy`. The Worker needs no secrets, database or
-KV namespace yet.
+GitHub Actions tests the client and validates the deployment bundle before
+deploying. Normal deployment uses `npm run deploy` and needs the existing
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets.
 
-## Layout
+## Release checks
 
-```
-src/worker.js        routing, security headers, asset passthrough
-src/relay.js         MTProto relay: data-centre table, policy, WebSocket pipe
-src/capabilities.js  service metadata and the capability list
-public/              static shell (index.html, styles.css, app.js)
-public/mtproto/      browser transport framing for the relay
-public/wasm/         committed wasm-bindgen output for the overlay demo
-test/                node:test suite for routing, headers, relay policy and framing
-```
+Before enabling the beta on the public domains:
+
+1. On a staging deployment, verify HTTPS, HSTS, API CORS, WebAssembly MIME
+   types, both allowed and rejected WebSocket origins, and the Worker bundle.
+2. With a dedicated Telegram account, exercise QR refresh and sign-in,
+   phone code and two-step verification, a DC redirect, cancel and retry,
+   recent chats, older history, message send and receive, a small attachment,
+   reconnect, and sign-out. Confirm the session disappears from Devices.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:95c1d5d3b391ccda4530e1c0670a02d18184f1c20e559d74f5412457440cc069 -->
+
+3. Verify and monitor the Worker rate limit for `/relay/dc/*` (30 upgrades
+   per IP per minute in each Cloudflare location). Add edge rules if staging
+   traffic requires them. The browser Origin check is not client authentication.
+   Each connection lasts at most ten minutes and carries up to 8 MiB per
+   direction. The four-connection cap applies to each isolate.
+
+<!-- /coderabbit-ai-generated:v1 -->
+4. Keep chat overlay disabled until browser secret storage, key changes,
+   durable ratchet updates and desktop interoperability are designed and
+   tested. See [WASM overlay](../../docs/WASM.md) and
+   [end-to-end encryption](../../docs/E2E.md).
+
+Telegram references: [QR login](https://core.telegram.org/api/qr-login),
+[authorization and test accounts](https://core.telegram.org/api/auth),
+and [API terms](https://core.telegram.org/api/terms).
+
+
+<!-- /coderabbit-ai-generated:v1 -->

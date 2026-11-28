@@ -1,1 +1,5 @@
 src/embedded-assets.js
+
+node_modules/
+public/generated/
+.dev.vars

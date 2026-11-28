@@ -454,15 +454,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Validate Worker and shell JavaScript
+      - name: Install locked web client dependencies
         working-directory: services/web-client
-        run: |
-          node --check src/worker.js
-          node --check src/capabilities.js
-          node --check public/app.js
-      - name: Test routing, headers and capability claims
+        run: npm ci --no-audit --no-fund
+      - name: Verify the Worker, capabilities and browser bundle
         working-directory: services/web-client
-        run: node --test test/*.test.js
+        run: npm run check
 
   site:
     name: Website build and Worker tests

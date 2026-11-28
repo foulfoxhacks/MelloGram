@@ -1,15 +1,17 @@
 // Shared metadata for the browser client. Kept free of Worker-only APIs so the
 // same module runs under `node --test`.
 
+import { telegramConfig } from "./telegram-config.js";
+
 export const SERVICE = "mellogram-web-client";
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 
 /**
  * What the browser client can honestly do today. Every entry says what is
  * missing rather than pretending a feature exists: an entry flips to true only
  * when the feature is implemented and tested in this service.
  */
-export function capabilities() {
+export function capabilities(beta = false) {
   return [
     {
       id: "shell",
@@ -21,19 +23,21 @@ export function capabilities() {
       id: "relay",
       label: "MTProto transport relay",
       ready: true,
-      detail: "The Worker pipes the page's MTProto bytes to a fixed Telegram data centre over TCP (/relay/dc/1-5). No client-chosen host or port, own origin only, byte and time limits.",
+      detail: "The Worker pipes the page's MTProto bytes to a fixed Telegram data centre over TCP (/relay/dc/1-5). Fixed destinations with a browser origin check, byte and time limits.",
     },
     {
       id: "login",
       label: "Telegram sign-in",
       ready: false,
-      detail: "The transport is in place; the key exchange, QR login and message encryption are the next step. The desktop app owns account login today.",
+      beta,
+      detail: beta ? "QR and phone sign-in are available for beta testing." : "Sign-in is disabled on this deployment. Use MelloGram desktop or Android.",
     },
     {
       id: "messaging",
       label: "Chats, messages, media",
       ready: false,
-      detail: "Needs the sign-in handshake first. Nothing is stored server-side until then.",
+      beta,
+      detail: beta ? "The beta supports recent chats, text messages and small downloads." : "Available only when the messaging beta is enabled. The Worker does not store messages.",
     },
     {
       id: "overlay-wasm",
@@ -51,13 +55,15 @@ export function capabilities() {
 }
 
 export function status(env = {}) {
+  const beta = Boolean(telegramConfig(env));
   return {
     service: SERVICE,
     version: VERSION,
-    stage: "transport",
+    stage: beta ? "beta" : "transport",
+    telegramBeta: beta,
     origin: env.PUBLIC_BASE_URL || null,
     api: env.API_BASE_URL || null,
-    capabilities: capabilities(),
+    capabilities: capabilities(beta),
   };
 }
 
