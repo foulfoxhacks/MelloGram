@@ -288,3 +288,21 @@ button:hover, .button:hover { filter: brightness(1.1); }
 .wordmark .logo { width: 28px; height: 28px; object-fit: contain; filter: drop-shadow(0 0 12px rgba(145, 119, 255, 0.28)); }
 .wordmark .web { color: var(--accent); }
 .capabilities li.muted { display: block; }
+
+/* ---- Telegram Web-style layout: centered logo, title and sign-in card ---- */
+.tg-login { width: min(480px, calc(100% - 2rem)); padding-top: 3.5rem; }
+.tg-login-head { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.4rem; margin-bottom: 1.6rem; }
+.tg-login-logo { width: 128px; height: 128px; object-fit: contain; filter: drop-shadow(0 10px 36px rgba(128, 104, 245, 0.45)); margin-bottom: 0.8rem; }
+.tg-login-head h1 { font-size: 2rem; margin: 0; }
+.tg-login-head .lede { color: var(--muted); max-width: 36ch; margin: 0.2rem 0 0.6rem; }
+.tg-login-card { display: grid; gap: 0.7rem; padding: 1.4rem; margin-bottom: 1.4rem; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+.tg-btn { width: 100%; min-height: 54px; border-radius: 12px; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.tg-btn-ghost { background: transparent; box-shadow: none; border: 1px solid var(--line); color: var(--accent); }
+.tg-btn:disabled { opacity: 0.55; cursor: not-allowed; filter: none; }
+.tg-login .panel { border-radius: 16px; background: var(--panel); border-color: var(--line); }
+.tg-foot { text-align: center; padding: 1.6rem 0 2.4rem; border-top: 1px solid var(--line); margin-top: 1.6rem; }
+.tg-foot nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem 1.2rem; margin-bottom: 0.6rem; }
+.tg-foot a { color: var(--muted); text-decoration: none; font-weight: 600; }
+.tg-foot a:hover { color: var(--text); }
+.small { font-size: 0.86rem; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

@@ -8,21 +8,33 @@
   <script src="/index.js" defer></script>
 </head>
 <body>
-  <main class="shell">
-    <header class="brand"><img class="mark" src="/mark.png" alt="" width="42" height="42"><div><strong>MelloID</strong><span>Identity beyond the chat</span></div></header>
-    <section class="hero">
-      <p class="eyebrow">MELLOGRAM IDENTITY</p>
-      <h1>Your profile. Your communities. Your presence.</h1>
-      <p class="lead">Publish a customizable public profile with your bio, connections, badges, widgets, and personal style. Sign in with Telegram, then import your MelloGram profile export.</p>
-      <a class="button primary" href="/auth/telegram/start">Continue with Telegram</a>
-      <p class="muted">We request basic profile identity only. Your phone number and Telegram session are not needed for a public MelloID page.</p>
+  <main class="shell tg-shell">
+    <section class="tg-hero-id">
+      <img class="tg-hero-logo" src="/mark.png" alt="" width="132" height="132">
+      <h1>MelloID</h1>
+      <p class="tg-tagline">Your profile. Your communities. Your presence.</p>
+      <p class="lead">Publish a public profile with your bio, connections, badges, widgets and personal style, then share it anywhere with one link.</p>
+      <a class="button primary tg-cta" href="/auth/telegram/start">Continue with Telegram</a>
+      <p class="muted">Only your basic Telegram identity is requested. Your phone number and Telegram session are never needed.</p>
     </section>
-    <section class="feature-grid">
-      <article><h2>Make it yours</h2><p>Themes, avatar frames, decorative effects, and modular widgets.</p></article>
-      <article><h2>Choose what shows</h2><p>Keep private sections private. Public pages include only visible content.</p></article>
-      <article><h2>Keep control</h2><p>Update or remove your hosted profile from your dashboard.</p></article>
+    <section class="tg-why-id" aria-labelledby="why-id">
+      <h2 id="why-id">Why MelloID?</h2>
+      <div class="feature-grid">
+        <article><span class="tg-ico" aria-hidden="true">🎨</span><h3>Make it yours</h3><p>Themes, avatar frames, decorative effects and modular widgets.</p></article>
+        <article><span class="tg-ico" aria-hidden="true">🔒</span><h3>Choose what shows</h3><p>Keep private sections private. Public pages include only what you mark visible.</p></article>
+        <article><span class="tg-ico" aria-hidden="true">🔗</span><h3>Verified links</h3><p>Connect GitHub, Discord or Steam and show them as verified on your page.</p></article>
+        <article><span class="tg-ico" aria-hidden="true">🗑️</span><h3>Keep control</h3><p>Update, hide or delete your hosted profile from the dashboard at any time.</p></article>
+      </div>
     </section>
-    <footer>Independent MelloGram service · <a href="https://github.com/foulfoxhacks/MelloGram">Source repository</a></footer>
+    <footer class="tg-foot-id">
+      <nav aria-label="MelloGram">
+        <a href="https://mellogram.foulfoxhacks.dev/">MelloGram</a>
+        <a href="https://mellogram.foulfoxhacks.dev/download/">Download</a>
+        <a href="https://wc.mellogram.foulfoxhacks.dev/">Web</a>
+        <a href="https://github.com/foulfoxhacks/MelloGram" rel="noopener">GitHub</a>
+      </nav>
+      <p>Independent MelloGram service, not affiliated with Telegram.</p>
+    </footer>
   </main>
 </body>
 </html>
