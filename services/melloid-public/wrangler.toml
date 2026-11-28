@@ -1,6 +1,13 @@
 name = "melloid-public"
 main = "src/worker.js"
 compatibility_date = "2026-11-27"
+workers_dev = false
+
+# Public MelloID profiles. Cloudflare issues the certificate for the custom
+# domain; the Worker adds HSTS and its own security headers.
+routes = [
+  { pattern = "id.mellogram.foulfoxhacks.dev", custom_domain = true },
+]
 
 [assets]
 directory = "./public"
@@ -8,10 +15,10 @@ binding = "ASSETS"
 run_worker_first = true
 
 [vars]
-PUBLIC_BASE_URL = "https://profiles.example.com"
+PUBLIC_BASE_URL = "https://id.mellogram.foulfoxhacks.dev"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "melloid-public"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "c25a970f-9235-49f0-9e11-c68628c82a10"
 migrations_dir = "migrations"

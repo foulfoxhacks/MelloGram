@@ -1,0 +1,22 @@
+# Same Worker as wrangler.toml, with the static pages bundled into the
+# script (see scripts/embed-assets.mjs) instead of Workers Static Assets.
+# Run `node scripts/embed-assets.mjs` first.
+name = "melloid-public"
+main = "src/worker-embedded.js"
+compatibility_date = "2026-11-27"
+workers_dev = false
+
+# Public MelloID profiles. Cloudflare issues the certificate for the custom
+# domain; the Worker adds HSTS and its own security headers.
+routes = [
+  { pattern = "id.mellogram.foulfoxhacks.dev", custom_domain = true },
+]
+
+[vars]
+PUBLIC_BASE_URL = "https://id.mellogram.foulfoxhacks.dev"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "melloid-public"
+database_id = "c25a970f-9235-49f0-9e11-c68628c82a10"
+migrations_dir = "migrations"
