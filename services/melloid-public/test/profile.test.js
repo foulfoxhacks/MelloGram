@@ -219,3 +219,38 @@ test("badge lookup ids are validated, de-duplicated and capped", async () => {
   assert.equal(parseBadgeIds(Array.from({ length: 80 }, (_, i) => i + 1).join(",")).length, 50);
   assert.deepEqual(parseBadgeIds(""), []);
 });
+
+test("Telegram Login Widget hashes are verified, fresh and field-restricted", async () => {
+  const { verifyTelegramWidget } = await import("../src/worker.js");
+  const token = "123456:TEST-token";
+  const now = 1_800_000_000;
+  const sign = async (fields) => {
+    const lines = Object.keys(fields).sort().map((k) => `${k}=${fields[k]}`).join("\n");
+    const secret = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+    const key = await crypto.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(lines)));
+    return new URLSearchParams({ ...fields, hash: [...mac].map((b) => b.toString(16).padStart(2, "0")).join("") });
+  };
+  const fields = { id: "42", first_name: "Ava", username: "ava", auth_date: String(now - 30) };
+  assert.equal(await verifyTelegramWidget(await sign(fields), token, now), "42");
+  const tampered = await sign(fields); tampered.set("id", "43");
+  assert.equal(await verifyTelegramWidget(tampered, token, now), null);
+  assert.equal(await verifyTelegramWidget(await sign({ ...fields, auth_date: String(now - 3600) }), token, now), null);
+  assert.equal(await verifyTelegramWidget(await sign({ ...fields, evil: "1" }), token, now), null);
+  assert.equal(await verifyTelegramWidget(await sign(fields), "other:token", now), null);
+});
+
+test("sign-in routes: widget when configured, 503 when nothing is", async () => {
+  const { default: worker } = await import("../src/worker.js");
+  const base = { PUBLIC_BASE_URL: "https://id.example.com", ASSETS: { fetch: async () => new Response("") }, DB: null };
+  const none = await worker.fetch(new Request("https://id.example.com/auth/telegram/start"), base);
+  assert.equal(none.status, 503);
+  const env = { ...base, TELEGRAM_BOT_TOKEN: "1:x", TELEGRAM_BOT_USERNAME: "MelloIDBot" };
+  const start = await worker.fetch(new Request("https://id.example.com/auth/telegram/start"), env);
+  assert.equal(start.status, 303);
+  assert.equal(start.headers.get("location"), "https://id.example.com/login");
+  const login = await worker.fetch(new Request("https://id.example.com/login"), env);
+  const html = await login.text();
+  assert.match(html, /data-telegram-login="MelloIDBot"/);
+  assert.match(login.headers.get("content-security-policy"), /script-src https:\/\/telegram\.org/);
+});

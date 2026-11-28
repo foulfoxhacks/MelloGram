@@ -13,7 +13,11 @@ at MelloGram's scale.
 - Manual: `npx wrangler d1 migrations apply melloid-public --remote` then
   `npx wrangler deploy`. Where Static Assets uploads cannot authenticate, use
   `node scripts/embed-assets.mjs && npx wrangler deploy -c wrangler.embedded.toml`.
-- Sign-in answers `503` until the Worker secrets `TELEGRAM_CLIENT_ID` and
-  `TELEGRAM_CLIENT_SECRET` are set (`npx wrangler secret put …`). Account
+- Sign-in answers `503` until one Telegram login method is configured:
+  - **Login Widget** (simplest): create a bot with @BotFather, run `/setdomain`
+    for `id.mellogram.foulfoxhacks.dev`, then set the secret
+    `TELEGRAM_BOT_TOKEN` and the variable `TELEGRAM_BOT_USERNAME`.
+  - **OpenID Connect**: secrets `TELEGRAM_CLIENT_ID` and `TELEGRAM_CLIENT_SECRET`
+    (takes precedence when set). Account
   linking additionally needs the GitHub / Discord client secrets and
   `STEAM_WEB_API_KEY`. Public profile pages work without them.

@@ -61,7 +61,8 @@ function setSecurityHeaders(response) {
   headers.set("X-Frame-Options", "DENY");
   headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   headers.set("Strict-Transport-Security", "max-age=63072000");
-  if (headers.get("Content-Type")?.includes("text/html")) {
+  // A page that sets its own (narrower or Telegram-widget) CSP keeps it.
+  if (headers.get("Content-Type")?.includes("text/html") && !headers.has("Content-Security-Policy")) {
     headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
   }
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
@@ -168,6 +169,82 @@ async function finishTelegramLogin(request, env) {
     cookieHeader("melloid_session", sessionId, SESSION_TTL_SECONDS),
   ]);
 }
+// ---- Telegram Login Widget -------------------------------------------------------------
+//
+// The widget (telegram.org/js/telegram-widget.js) needs only a bot from
+// @BotFather with /setdomain pointing at this host. Telegram redirects back
+// with the user's id, names, username, photo_url, auth_date and a hash; the
+// hash is HMAC-SHA256 over the sorted "key=value" lines, keyed with
+// SHA-256(bot token). Nothing else (no phone number, no session) is involved.
+
+const WIDGET_MAX_AGE_SECONDS = 600;
+const BOT_USERNAME = /^[A-Za-z0-9_]{5,32}$/;
+
+export function widgetConfigured(env) {
+  return Boolean(env.TELEGRAM_BOT_TOKEN && BOT_USERNAME.test(env.TELEGRAM_BOT_USERNAME || ""));
+}
+export function oidcConfigured(env) {
+  return Boolean(env.TELEGRAM_CLIENT_ID && env.TELEGRAM_CLIENT_SECRET);
+}
+
+/** Returns the verified Telegram user id, or null. */
+export async function verifyTelegramWidget(params, botToken, now = Math.floor(Date.now() / 1000)) {
+  const hash = params.get("hash") || "";
+  if (!/^[0-9a-f]{64}$/.test(hash)) return null;
+  const id = params.get("id") || "";
+  const authDate = Number(params.get("auth_date"));
+  if (!/^[1-9][0-9]{0,15}$/.test(id) || !Number.isInteger(authDate)) return null;
+  if (authDate > now + 60 || now - authDate > WIDGET_MAX_AGE_SECONDS) return null;
+  const allowed = ["auth_date", "first_name", "id", "last_name", "photo_url", "username"];
+  const lines = [];
+  for (const key of [...params.keys()].sort()) {
+    if (key === "hash") continue;
+    if (!allowed.includes(key)) return null;
+    lines.push(`${key}=${params.get(key)}`);
+  }
+  const secret = await crypto.subtle.digest("SHA-256", encoder.encode(botToken));
+  const key = await crypto.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(lines.join("\n"))));
+  const expected = [...mac].map((b) => b.toString(16).padStart(2, "0")).join("");
+  let diff = 0;
+  for (let i = 0; i < 64; i++) diff |= expected.charCodeAt(i) ^ hash.charCodeAt(i);
+  return diff === 0 ? id : null;
+}
+
+function widgetLoginPage(env) {
+  const bot = env.TELEGRAM_BOT_USERNAME;
+  const authUrl = new URL("/auth/telegram/widget", env.PUBLIC_BASE_URL).toString();
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in to MelloID</title><link rel="stylesheet" href="/app.css"></head>
+<body><main class="shell tg-shell"><section class="tg-hero-id">
+<img class="tg-hero-logo" src="/mark.png" alt="" width="132" height="132"><h1>Sign in</h1>
+<p class="lead">Confirm with Telegram. MelloID receives your Telegram id, name, username and photo only: never your phone number, login code or session.</p>
+<div class="tg-widget"><script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="${bot}" data-size="large" data-radius="12" data-auth-url="${authUrl}"></script></div>
+<p class="muted"><a href="/">Back to MelloID</a></p></section></main></body></html>`;
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      // Only this page may load Telegram's widget script and frame.
+      "Content-Security-Policy": "default-src 'self'; script-src https://telegram.org; frame-src https://oauth.telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    },
+  });
+}
+
+async function finishWidgetLogin(request, env) {
+  const url = new URL(request.url);
+  const id = await verifyTelegramWidget(url.searchParams, env.TELEGRAM_BOT_TOKEN);
+  if (!id) return errorPage("Telegram's sign-in confirmation could not be verified or has expired. Please sign in again.", 401);
+  const sessionId = randomToken();
+  const now = Math.floor(Date.now() / 1000);
+  await env.DB.prepare(
+    "INSERT INTO sessions (session_hash, owner_telegram_id, expires_at, created_at) VALUES (?1, ?2, ?3, ?4)"
+  ).bind(await sha256(sessionId), id, now + SESSION_TTL_SECONDS, now).run();
+  return redirect(new URL("/dashboard", env.PUBLIC_BASE_URL).toString(), [
+    cookieHeader("melloid_session", sessionId, SESSION_TTL_SECONDS),
+  ]);
+}
+
 async function logout(request, env) {
   if (!requireSameOrigin(request, env)) return json({ error: "Origin check failed." }, 403);
   const session = await getSession(request, env);
@@ -599,8 +676,18 @@ export default {
         url.protocol = "https:";
         return setSecurityHeaders(new Response(null, { status: 308, headers: { Location: url.toString() } }));
       }
-      // Sign-in needs the Telegram login client; say so instead of failing with a 500.
-      if (path.startsWith("/auth/telegram/") && (!env.TELEGRAM_CLIENT_ID || !env.TELEGRAM_CLIENT_SECRET)) {
+      // Telegram sign-in: OpenID Connect when its client is configured,
+      // otherwise the Login Widget; a clear 503 when neither is.
+      if (path === "/login" && request.method === "GET") {
+        if (!widgetConfigured(env)) return setSecurityHeaders(json({ error: "Telegram sign-in is not configured on this MelloID server yet." }, 503));
+        return setSecurityHeaders(widgetLoginPage(env));
+      }
+      if (path === "/auth/telegram/widget" && request.method === "GET") {
+        if (!widgetConfigured(env)) return setSecurityHeaders(json({ error: "Telegram sign-in is not configured on this MelloID server yet." }, 503));
+        return setSecurityHeaders(await finishWidgetLogin(request, env));
+      }
+      if (path.startsWith("/auth/telegram/") && !oidcConfigured(env)) {
+        if (path === "/auth/telegram/start" && widgetConfigured(env)) return setSecurityHeaders(redirect(new URL("/login", env.PUBLIC_BASE_URL).toString(), []));
         return setSecurityHeaders(json({ error: "Telegram sign-in is not configured on this MelloID server yet." }, 503));
       }
       if (path === "/auth/telegram/start" && request.method === "GET") return setSecurityHeaders(await startTelegramLogin(request, env));
