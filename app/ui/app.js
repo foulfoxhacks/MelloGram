@@ -102,6 +102,12 @@
     }
   });
 
+  // Layout style (Settings → General), applied once per launch.
+  Bridge.invoke("get_settings").then((s) => {
+    const layout = s?.general?.layout;
+    if (["classic", "compact", "wide"].includes(layout)) document.body.classList.add(`mg-layout-${layout}`);
+  }).catch(() => {});
+
   async function onReady(me) {
     document.title = `MelloGram — ${me.name}`;
     // "Check for updates on launch" (Settings → General): one request to

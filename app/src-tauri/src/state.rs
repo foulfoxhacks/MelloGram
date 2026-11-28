@@ -203,7 +203,7 @@ impl AppState {
 
     pub async fn connect(self: &Arc<Self>, api_id: i32, api_hash: String) -> Result<(), String> {
         let net = self.store.lock().unwrap().settings.network.clone();
-        let proxy_url = net.proxy_url.filter(|u| mellogram_core::settings::validate_proxy_url(u).is_ok());
+        let proxy_url = crate::network::proxy_for_connect(self, net.proxy_url).filter(|u| mellogram_core::settings::validate_proxy_url(u).is_ok());
         let tg = Telegram::connect(TelegramConfig {
             api_id,
             api_hash,

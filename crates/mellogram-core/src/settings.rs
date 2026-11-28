@@ -151,7 +151,13 @@ pub struct GeneralSettings {
     pub start_minimized: bool,
     /// Start MelloGram when you sign in to your computer (desktop).
     pub launch_at_login: bool,
+    /// Window layout: "telegram" (default), "classic" (Discord-classic style
+    /// rail and flat messages), "compact" or "wide". Applied at startup.
+    pub layout: String,
 }
+
+/// Known layouts; anything else falls back to the default.
+pub const LAYOUTS: &[&str] = &["telegram", "classic", "compact", "wide"];
 
 impl Default for GeneralSettings {
     fn default() -> Self {
@@ -162,6 +168,7 @@ impl Default for GeneralSettings {
             frameless: false,
             start_minimized: false,
             launch_at_login: false,
+            layout: "telegram".into(),
         }
     }
 }

@@ -10,6 +10,7 @@ mod traffic;
 mod commands;
 mod e2e;
 mod media;
+mod network;
 mod extras;
 mod mellorpc;
 mod state;
@@ -91,6 +92,8 @@ pub fn run() {
             activity::wakatime_heartbeat,
             activity::melloid_badges,
             commands::check_for_update,
+            network::get_network_settings,
+            network::set_network_settings,
             media::save_media,
             media::send_location,
             media::get_media_settings,

@@ -604,3 +604,35 @@ body.mg-wallpaper-target-window { background: var(--mg-bg); }
 .mg-sender:not(:has(*)):empty { display: none; }
 .mg-global-badge { margin-left: 4px; padding: 0 6px; border-radius: 8px; font-size: .75em; font-weight: 700; text-decoration: none;
   color: var(--mg-accent-text); background: linear-gradient(110deg, #8068f5, #5b8ef0); white-space: nowrap; }
+
+/* ---- Layout styles (Settings → General; applied at startup) -------------------- */
+.mg-layout-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin-top: 6px; }
+.mg-layout-option { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 12px; border-radius: var(--mg-radius);
+  border: 1px solid var(--mg-border); background: var(--mg-surface); color: var(--mg-text); cursor: pointer; font: inherit; }
+.mg-layout-option.mg-active { border-color: var(--mg-accent); box-shadow: 0 0 0 1px var(--mg-accent); }
+
+/* Classic: a narrow avatar rail instead of the full chat list, and flat,
+   left-aligned messages (yours included), each with its sender name. */
+body.mg-layout-classic:not(.mg-phone) { --mg-sidebar-width: 76px; }
+body.mg-layout-classic:not(.mg-phone) .mg-sidebar .mg-search,
+body.mg-layout-classic:not(.mg-phone) .mg-chat-meta,
+body.mg-layout-classic:not(.mg-phone) .mg-unread { display: none; }
+body.mg-layout-classic:not(.mg-phone) .mg-chat-item { justify-content: center; padding: 6px 0; }
+body.mg-layout-classic:not(.mg-phone) .mg-chat-item.mg-selected .mg-avatar { border-radius: 30%; box-shadow: 0 0 0 2px var(--mg-accent); }
+body.mg-layout-classic:not(.mg-phone) .mg-chat-item .mg-avatar { transition: border-radius .15s; }
+body.mg-layout-classic:not(.mg-phone) .mg-chat-item:hover .mg-avatar { border-radius: 30%; }
+body.mg-layout-classic:not(.mg-phone) .mg-message,
+body.mg-layout-classic:not(.mg-phone) .mg-message.mg-out {
+  align-self: stretch; max-width: none; background: none; color: var(--mg-text); border-radius: 4px; padding: 4px 12px; margin-block: 1px;
+}
+body.mg-layout-classic:not(.mg-phone) .mg-message:hover { background: color-mix(in srgb, var(--mg-surface) 60%, transparent); }
+body.mg-layout-classic:not(.mg-phone) .mg-message.mg-out .mg-sender::before { content: "You"; }
+
+/* Compact: denser list and tighter bubbles. */
+body.mg-layout-compact:not(.mg-phone) { --mg-avatar: 32px; --mg-density: .7; --mg-sidebar-width: 260px; --mg-message-gap: 1px; }
+body.mg-layout-compact:not(.mg-phone) .mg-chat-last { display: none; }
+body.mg-layout-compact:not(.mg-phone) .mg-message { padding: 3px 8px; font-size: .95em; }
+
+/* Wide: roomier for large monitors. */
+body.mg-layout-wide:not(.mg-phone) { --mg-sidebar-width: 400px; --mg-avatar: 50px; --mg-bubble-max: 80%; }
+body.mg-layout-wide:not(.mg-phone) .mg-message { max-width: min(var(--mg-bubble-max), 920px); padding: 8px 14px; }

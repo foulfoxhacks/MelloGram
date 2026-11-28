@@ -98,7 +98,10 @@ pub fn get_settings(state: S<'_>) -> Value {
 }
 
 #[tauri::command]
-pub fn set_general(state: S<'_>, general: GeneralSettings) -> R<()> {
+pub fn set_general(state: S<'_>, mut general: GeneralSettings) -> R<()> {
+    if !mellogram_core::settings::LAYOUTS.contains(&general.layout.as_str()) {
+        general.layout = "telegram".into();
+    }
     let launch = general.launch_at_login;
     let changed = state.store.lock().unwrap().settings.general.launch_at_login != launch;
     state.store.lock().unwrap().settings.general = general;

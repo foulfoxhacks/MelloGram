@@ -35,6 +35,7 @@
     mellorpc: { group: "System", label: "MelloRPC Presence", render: renderMelloRpc },
     notifications: { group: "System", label: "Notifications", render: renderNotifications },
     media: { group: "System", label: "Media & Storage", render: renderMedia },
+    network: { group: "Security", label: "Network & Tunnels", render: renderNetwork },
     general: { group: "System", label: "General", render: renderGeneral },
     about: { group: "System", label: "About & Updates", render: renderAbout },
     developer: { group: "System", label: "Developer", render: renderDeveloper, devOnly: true },
@@ -113,7 +114,7 @@
     const draw = () => {
       const q = pluginFilter.q.toLowerCase();
       const list = plugins
-        .filter((p) => !q || `${p.name} ${p.description} ${p.id} ${p.inspired_by || ""}`.toLowerCase().includes(q))
+        .filter((p) => !q || `${p.name} ${p.description} ${p.id}`.toLowerCase().includes(q))
         .filter((p) => pluginFilter.category === "all" || p.category === pluginFilter.category)
         .filter((p) => ({ all: true, enabled: p.enabled, disabled: !p.enabled, favorites: p.favorite, errors: p.errors.length })[pluginFilter.status])
         .sort((a, b) => (b.favorite - a.favorite) || a.name.localeCompare(b.name));
@@ -142,7 +143,6 @@
           h("span", { class: "mg-tag", text: CATEGORY_LABELS[p.category] || p.category }),
           h("span", { class: "mg-tag", text: `v${p.version}` }),
           p.has_ui ? h("span", { class: "mg-tag", text: "UI" }) : null,
-          p.inspired_by ? h("span", { class: "mg-tag", title: "Feature this adapts", text: p.inspired_by }) : null,
           p.dependencies.length ? h("span", { class: "mg-tag", text: `needs ${p.dependencies.join(", ")}` }) : null,
           ...p.permissions.map((perm) => h("span", { class: `mg-tag mg-perm mg-perm-${perm}`, title: "Permission", text: PERMISSION_LABELS[perm] || perm })),
           p.enabled && p.stats.calls ? h("span", { class: "mg-tag", title: "Hook calls this session / average time", text: `${p.stats.calls} calls · ${Math.round(p.stats.total_us / p.stats.calls)}µs` }) : null,
@@ -390,6 +390,51 @@
     }
   }
 
+  // ---- Network & Tunnels -------------------------------------------------------------
+  //
+  // Telegram traffic can go through a SOCKS5 proxy, which is also how MelloGram
+  // uses a Tailscale, WireGuard or Tor tunnel: each of those exposes a local
+  // SOCKS5 port. System-wide VPNs (IPsec/IKEv2, L2TP, OpenVPN, WireGuard apps)
+  // need no setting here: they already carry all of the device's traffic.
+
+  const TUNNELS = [
+    { name: "Tor", url: "socks5h://127.0.0.1:9050", how: "Run Tor (or Tor Browser: port 9150). Hostnames resolve inside Tor." },
+    { name: "Tailscale", url: "socks5h://127.0.0.1:1055", how: "Run tailscaled with --tun=userspace-networking --socks5-server=localhost:1055, then pick an exit node to route Telegram through your tailnet." },
+    { name: "WireGuard", url: "socks5h://127.0.0.1:25344", how: "Run wireproxy with your WireGuard config and a [Socks5] BindAddress = 127.0.0.1:25344 section. (Or use the official WireGuard app as a system VPN and leave the proxy empty.)" },
+    { name: "SSH tunnel", url: "socks5h://127.0.0.1:1080", how: "ssh -D 1080 -N you@your-server opens a SOCKS5 tunnel through any SSH server." },
+  ];
+
+  async function renderNetwork() {
+    const n = (await Bridge.invoke("get_network_settings")) || { obfuscated_transport: true, proxy_url: null, proxy_has_password: false };
+    const proxy = h("input", { type: "text", value: n.proxy_url || "", placeholder: "socks5h://127.0.0.1:9050", spellcheck: false, autocomplete: "off" });
+    const how = h("p", { class: "mg-hint" });
+    const status = h("p", { class: "mg-hint", role: "status" });
+    const save = async (url = proxy.value) => {
+      try {
+        await Bridge.invoke("set_network_settings", { network: { obfuscated_transport: n.obfuscated_transport, proxy_url: url || null } });
+        status.textContent = "Saved. Restart MelloGram to reconnect through the new route.";
+        UI.toast("Network settings saved — restart to apply", "success");
+      } catch (e) { status.textContent = String(e); UI.toast(String(e), "error"); }
+    };
+    return [
+      h("h2", { text: "Network & Tunnels" }),
+      h("div", { class: "mg-field-row" },
+        h("div", {}, h("label", { text: "Obfuscated MTProto transport" }), h("div", { class: "mg-hint", text: "Makes Telegram traffic look like random bytes, which defeats protocol fingerprinting and DPI blocking. Recommended." })),
+        sw(!!n.obfuscated_transport, (v) => { n.obfuscated_transport = v; save(); })),
+      h("h3", { text: "Proxy or tunnel" }),
+      h("p", { class: "mg-hint", text: "SOCKS5 only (socks5:// or socks5h://, where socks5h also resolves names through the tunnel). A password in the URL is moved to the sealed secret store, never the settings file." }),
+      h("div", { class: "mg-toolbar" }, ...TUNNELS.map((t) => h("button", { class: "mg-btn", text: t.name, onclick: () => { proxy.value = t.url; how.textContent = t.how; } }))),
+      proxy, how,
+      n.proxy_has_password ? h("p", { class: "mg-hint", text: "A proxy password is saved (sealed). Type a new user:password@ to replace it, or clear the field to remove it." }) : null,
+      h("div", { class: "mg-toolbar" },
+        h("button", { class: "mg-btn mg-primary", text: "Save", onclick: () => save() }),
+        h("button", { class: "mg-btn", text: "Direct connection", onclick: () => { proxy.value = ""; how.textContent = ""; save(""); } })),
+      status,
+      h("h3", { text: "System VPNs" }),
+      h("p", { class: "mg-hint", text: "IPsec/IKEv2, L2TP/IPsec, OpenVPN and the WireGuard or Tailscale apps all work as system VPNs: turn them on in your operating system and MelloGram's traffic goes through them with no setting here. PPTP is not supported or recommended: its encryption is broken." }),
+    ];
+  }
+
   async function renderMedia() {
     const m = await Bridge.invoke("get_media_settings");
     const save = async () => { await call("set_media_settings", { media: m }); await window.MelloGram.Media?.reloadSettings(); };
@@ -416,6 +461,23 @@
     const row = (key, label, hint) => h("div", { class: "mg-field-row" }, h("div", {}, h("label", { text: label }), h("div", { class: "mg-hint", text: hint })), sw(g[key], (v) => { g[key] = v; save(); }));
     return [
       h("h2", { text: "General" }),
+      h("div", { class: "mg-field" },
+        h("label", { text: "Layout style" }),
+        h("div", { class: "mg-hint", text: "Changes the whole window arrangement, so it applies after a restart." }),
+        h("div", { class: "mg-layout-picker" }, ...[
+          ["telegram", "Telegram", "Chat list beside rounded message bubbles."],
+          ["classic", "Classic", "Discord-classic style: a narrow avatar rail, flat left-aligned messages with avatars."],
+          ["compact", "Compact", "Dense list and tight bubbles for small screens or lots of chats."],
+          ["wide", "Wide", "Roomy bubbles and a wider chat list for big monitors."],
+        ].map(([id, name, hint]) => h("button", {
+          class: `mg-layout-option${(g.layout || "telegram") === id ? " mg-active" : ""}`,
+          onclick: async () => {
+            g.layout = id; await save();
+            UI.confirm?.("Restart to apply?", `The ${name} layout takes effect after MelloGram restarts.`, "Restart now")
+              ?.then?.((ok) => ok && Bridge.invoke("restart_app", { safeMode: false }));
+            show("general");
+          },
+        }, h("b", { text: name }), h("span", { class: "mg-hint", text: hint }))))),
       row("auto_check_updates", "Check for updates on launch", "Looks for new GitHub releases. Nothing else is sent."),
       row("developer_mode", "Developer mode", "Shows the Developer tab with the live stylesheet and event log."),
       h("h3", { text: "Background" }),
