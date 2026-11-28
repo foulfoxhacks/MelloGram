@@ -31,7 +31,8 @@ test("health and status answer JSON with security headers", async () => {
   const status = await call("/api/status");
   const body = await status.json();
   assert.equal(body.service, "mellogram-web-client");
-  assert.equal(body.stage, "transport");
+  assert.equal(body.stage, "beta");
+  assert.equal(body.telegramBeta, true);
   assert.equal(body.origin, "https://wc.example.com");
   assert.equal(body.capabilities.length, capabilities().length);
 });
@@ -127,19 +128,26 @@ test("plain HTTP is upgraded and HSTS is always sent", async () => {
   assert.match(page.headers.get("content-security-policy"), /upgrade-insecure-requests/);
 });
 
-test("the Telegram beta requires explicit opt-in and valid application settings", async () => {
+test("the Telegram beta is on by default, can be disabled, and validates overrides", async () => {
   const configured = {
     TELEGRAM_API_ID: "1234",
     TELEGRAM_API_HASH: "a".repeat(32),
-    TELEGRAM_WEB_BETA: "true",
   };
   const fetch = (path, overrides, init) =>
     worker.fetch(new Request(`https://wc.example.com${path}`, init), env(overrides));
+  // Nothing configured: the deployment uses MelloGram's own public application.
+  const builtin = await (await fetch("/api/telegram-config", {})).json();
+  assert.equal(builtin.apiId, 30886269);
+  assert.match(builtin.apiHash, /^[a-f\d]{32}$/);
+  for (const off of ["false", "FALSE", "0", "off"]) {
+    const disabled = { TELEGRAM_WEB_BETA: off };
+    assert.equal((await fetch("/api/telegram-config", disabled)).status, 404, off);
+    assert.equal((await (await fetch("/api/status", disabled)).json()).telegramBeta, false, off);
+  }
   for (const bad of [
-    {},
-    { ...configured, TELEGRAM_WEB_BETA: "false" },
     { ...configured, TELEGRAM_API_ID: "2147483648" },
     { ...configured, TELEGRAM_API_HASH: "invalid" },
+    { TELEGRAM_API_ID: "1234" },
   ]) {
     assert.equal((await fetch("/api/telegram-config", bad)).status, 404);
     assert.equal((await (await fetch("/api/status", bad)).json()).telegramBeta, false);
@@ -151,6 +159,7 @@ test("the Telegram beta requires explicit opt-in and valid application settings"
   assert.equal(status.stage, "beta");
   assert.equal(status.telegramBeta, true);
   assert.equal(status.capabilities.find(({ id }) => id === "login").beta, true);
+  assert.equal(status.capabilities.find(({ id }) => id === "session").ready, true);
   assert.equal(status.capabilities.find(({ id }) => id === "overlay").ready, false);
   assert.equal((await fetch("/api/telegram-config", configured, { method: "POST" })).status, 405);
   assert.equal((await worker.fetch(new Request("https://wc-api.mellogram.foulfoxhacks.dev/api/telegram-config"), env(configured))).status, 404);

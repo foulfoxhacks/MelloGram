@@ -30,14 +30,20 @@ export function capabilities(beta = false) {
       label: "Telegram sign-in",
       ready: false,
       beta,
-      detail: beta ? "QR and phone sign-in are available for beta testing." : "Sign-in is disabled on this deployment. Use MelloGram desktop or Android.",
+      detail: beta ? "QR and phone sign-in, including two-step verification, for beta testing." : "Sign-in is disabled on this deployment. Use MelloGram desktop or Android.",
+    },
+    {
+      id: "session",
+      label: "Session kept in this browser",
+      ready: beta,
+      detail: beta ? "The authorization key and peer cache live in this browser's own storage, so a reload keeps you signed in. Sign out revokes the session at Telegram; Forget this browser deletes the local copy. No server stores it." : "No session is kept while browser sign-in is disabled.",
     },
     {
       id: "messaging",
       label: "Chats, messages, media",
       ready: false,
       beta,
-      detail: beta ? "The beta supports recent chats, text messages and small downloads." : "Available only when the messaging beta is enabled. The Worker does not store messages.",
+      detail: beta ? "Recent direct chats and groups with unread counts, paged history, text messages and downloads up to 4 MiB." : "Available only when the messaging beta is enabled. The Worker does not store messages.",
     },
     {
       id: "overlay-wasm",

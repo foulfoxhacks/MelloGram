@@ -1,8 +1,11 @@
 import { connectWs } from "@fuman/net";
-import { FileLocation, IntermediatePacketCodec, MemoryStorage, TelegramClient, tl } from "@mtcute/web";
+import { FileLocation, IdbStorage, IntermediatePacketCodec, TelegramClient, tl } from "@mtcute/web";
 import qrcode from "qrcode-generator";
 
 const MAX_MEDIA = 4 * 1024 * 1024;
+// One IndexedDB database per browser profile. It holds the authorization key
+// and the peer cache; "Forget this browser" deletes it.
+export const SESSION_DB = "mellogram-web";
 
 export function relaySocketUrl(page, id) {
   if (!Number.isInteger(id) || id < 1 || id > 5) throw new Error("Unsupported Telegram data centre");
@@ -15,7 +18,7 @@ export function createTelegram(config, page = location.href) {
   const client = new TelegramClient({
     apiId: config.apiId,
     apiHash: config.apiHash,
-    storage: new MemoryStorage(),
+    storage: new IdbStorage(SESSION_DB),
     logLevel: 0,
     transport: {
       connect: (dc, signal) => connectWs({
@@ -48,6 +51,41 @@ export function drawLoginCode(canvas, url) {
   }
 }
 
+// Returns the signed-in user when this browser still holds a valid session.
+// A revoked or unregistered key reads as "nobody signed in", which is what the
+// page shows; any other failure is the caller's to report.
+export async function resumeSession(client, signal) {
+  try {
+    // `withParams` is how mtcute attaches a call-level abort; the plain client
+    // is used when no signal is supplied (tests).
+    const call = signal && typeof client.withParams === "function"
+      ? client.withParams({ abortSignal: signal })
+      : client;
+    return await call.getMe();
+  } catch (error) {
+    for (const code of ["AUTH_KEY_UNREGISTERED", "SESSION_REVOKED", "USER_DEACTIVATED"]) {
+      if (tl.RpcError.is(error, code)) return null;
+    }
+    throw error;
+  }
+}
+
+// True when Telegram says the stored session no longer exists, so the page can
+// drop it and ask for a fresh sign-in instead of retrying forever.
+export function sessionExpired(error) {
+  return ["AUTH_KEY_UNREGISTERED", "SESSION_REVOKED", "USER_DEACTIVATED"].some((code) => tl.RpcError.is(error, code));
+}
+
+// Removes this browser's session database. Call it after the client has been
+// destroyed; a deletion blocked by an open connection completes once it closes.
+export function forgetDevice(name = SESSION_DB) {
+  if (typeof indexedDB === "undefined") return Promise.resolve();
+  return new Promise((resolve) => {
+    const request = indexedDB.deleteDatabase(name);
+    request.onsuccess = request.onerror = request.onblocked = () => resolve();
+  });
+}
+
 export function needsPassword(error) {
   return tl.RpcError.is(error, "SESSION_PASSWORD_NEEDED");
 }
@@ -69,9 +107,15 @@ export function telegramError(error, fallback) {
 export async function listChats(client) {
   const chats = [];
   for await (const dialog of client.iterDialogs({ limit: 100 })) {
+    const peer = dialog.peer;
     // Broadcast channels require a separate sponsored message integration.
-    if (dialog.peer.type !== "user" && (!["group", "supergroup"].includes(dialog.peer.chatType) || dialog.peer.raw.forum)) continue;
-    chats.push(dialog.peer);
+    if (peer.type !== "user" && (!["group", "supergroup"].includes(peer.chatType) || peer.raw?.forum)) continue;
+    chats.push({
+      id: peer.id,
+      displayName: peer.displayName,
+      inputPeer: peer.inputPeer,
+      unreadCount: dialog.unreadCount,
+    });
   }
   return chats;
 }

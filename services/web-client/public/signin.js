@@ -1,3 +1,6 @@
+// Telegram sign-in: resume a session kept in this browser, or start a new one
+// by QR code or phone code. The client and its keys live in IndexedDB through
+// mtcute's IdbStorage; nothing is sent to the Worker beyond opaque MTProto.
 import { openChats } from "./chats.js";
 
 const byId = (id) => document.getElementById(id);
@@ -13,51 +16,100 @@ const input = byId("signin-value");
 const submit = byId("signin-submit");
 const cancel = byId("signin-cancel");
 
-let available = false;
-let active;
+const READY_NOTE = "Sign in with Telegram. This browser keeps the session until you sign out.";
+const DISABLED_NOTE = "Browser sign-in is disabled on this deployment.";
 
-export function setLoginAvailability(enabled, unavailable = false) {
-  available = enabled;
-  qr.disabled = phone.disabled = !enabled;
-  if (!active && !signin.hidden) {
-    note.textContent = enabled
-      ? "Telegram beta. Sign-in is kept in this tab only."
-      : unavailable ? "Could not check sign-in availability. Reload to try again."
-        : "Browser sign-in is disabled on this deployment.";
-  }
+let available = false;
+let current; // the shared client: { sdk, client }
+let active; // the attempt in progress, if any
+let signedIn = false;
+let busy = false;
+
+function setButtons() {
+  const off = !available || busy || signedIn;
+  qr.disabled = phone.disabled = off;
+  cancel.disabled = !active;
 }
 
 function clearCode(attempt) {
-  clearTimeout(attempt.qrTimer);
+  if (attempt) clearTimeout(attempt.qrTimer);
   canvas.width = 0;
   qrPanel.hidden = true;
 }
 
-function reset(attempt, message) {
-  if (active !== attempt) return;
-  active = undefined;
-  attempt.abort.abort();
-  clearCode(attempt);
-  void attempt.client?.destroy().catch(() => {});
-  form.reset();
-  signin.hidden = false;
-  form.hidden = cancel.hidden = true;
-  options.hidden = false;
-  submit.disabled = false;
-  note.textContent = message;
-  (available ? qr : signin.querySelector("a")).focus();
+// Builds (or rebuilds) the client and restores a session left by an earlier
+// visit. A stored session that cannot be checked right now is not fatal: the
+// sign-in buttons still work, and the next attempt reconnects.
+async function boot() {
+  if (!available || busy || active || signedIn || current) return;
+  busy = true;
+  setButtons();
+  try {
+    const [sdk, response] = await Promise.all([
+      import("./generated/telegram.js"),
+      fetch("/api/telegram-config", {
+        credentials: "omit",
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000),
+      }),
+    ]);
+    if (!response.ok) throw new Error("Sign-in unavailable");
+    const client = sdk.createTelegram(await response.json());
+    if (!available) {
+      void client.destroy().catch(() => {});
+      return;
+    }
+    current = { sdk, client };
+    note.textContent = "Connecting to Telegram…";
+    // A hung connection must not leave the page on "Connecting…": after the
+    // timeout the sign-in buttons are offered instead.
+    const user = await sdk.resumeSession(client, AbortSignal.timeout(15000)).catch(() => null);
+    if (!available) return;
+    if (user) return signedInAs(user);
+    note.textContent = READY_NOTE;
+  } catch {
+    current?.client.destroy().catch(() => {});
+    current = undefined;
+    note.textContent = "Could not reach Telegram. Check your connection and try again.";
+  } finally {
+    busy = false;
+    setButtons();
+  }
 }
 
-function signedIn(attempt, user) {
-  if (active !== attempt) return;
-  clearCode(attempt);
+function signedInAs(user) {
+  if (!current) return;
+  signedIn = true;
+  clearCode(active);
+  active = undefined;
   form.reset();
-  delete attempt.phone;
-  delete attempt.codeHash;
-  delete attempt.password;
   form.hidden = true;
+  cancel.hidden = true;
+  options.hidden = false;
+  submit.disabled = false;
+  qrPanel.hidden = true;
   signin.hidden = true;
-  openChats(attempt.client, attempt.sdk, user, (message) => reset(attempt, message));
+  note.textContent = "";
+  setButtons();
+  openChats(current.client, current.sdk, user, ended);
+}
+
+// Called by the chats view when the session ends, either because the user
+// signed out, cleared this browser, or Telegram revoked the key.
+function ended(message) {
+  signedIn = false;
+  active = undefined;
+  clearCode(active);
+  form.reset();
+  form.hidden = true;
+  cancel.hidden = true;
+  options.hidden = false;
+  signin.hidden = false;
+  submit.disabled = false;
+  note.textContent = message || READY_NOTE;
+  setButtons();
+  current?.client.destroy().catch(() => {});
+  current = undefined;
 }
 
 function field(attempt, step, label, type, autocomplete, mode = "text") {
@@ -69,38 +121,55 @@ function field(attempt, step, label, type, autocomplete, mode = "text") {
   input.inputMode = mode;
   byId("signin-label").textContent = label;
   submit.textContent = step === "phone" ? "Request code" : "Continue";
+  submit.disabled = false;
   form.hidden = false;
   input.focus();
 }
 
+// A half-finished attempt leaves the socket in an unknown state, so the client
+// is thrown away and rebuilt from storage on the next click.
+function reset(attempt, message) {
+  if (active !== attempt) return;
+  active = undefined;
+  attempt.abort.abort();
+  clearCode(attempt);
+  form.reset();
+  form.hidden = true;
+  cancel.hidden = true;
+  options.hidden = false;
+  submit.disabled = false;
+  note.textContent = message;
+  setButtons();
+  if (current?.client === attempt.client) {
+    current.client.destroy().catch(() => {});
+    current = undefined;
+  }
+  (available ? qr : signin.querySelector("a"))?.focus();
+}
+
 async function start(kind) {
-  if (!available || active) return;
-  const attempt = { abort: new AbortController() };
+  if (!available || active || signedIn) return;
+  if (!current) {
+    await boot();
+    if (!current || !available) return;
+  }
+  const attempt = { abort: new AbortController(), sdk: current.sdk, client: current.client };
   active = attempt;
   options.hidden = true;
   cancel.hidden = false;
-  note.textContent = "Preparing Telegram sign-in…";
+  setButtons();
+  note.textContent = kind === "phone"
+    ? "Enter your existing Telegram account’s phone number."
+    : "Connecting to Telegram for a QR code…";
   try {
-    const [sdk, response] = await Promise.all([
-      import("./generated/telegram.js"),
-      fetch("/api/telegram-config", {
-        credentials: "omit", cache: "no-store",
-        signal: AbortSignal.any([attempt.abort.signal, AbortSignal.timeout(8000)]),
-      }),
-    ]);
-    if (!response.ok) throw new Error("Sign-in unavailable");
-    const config = await response.json();
-    if (active !== attempt) return;
-    attempt.sdk = sdk;
-    attempt.client = sdk.createTelegram(config);
+    const sdk = attempt.sdk;
+    const client = attempt.client;
     if (kind === "phone") {
-      note.textContent = "Enter your existing Telegram account’s phone number.";
       field(attempt, "phone", "Phone number with country code", "tel", "tel", "tel");
       return;
     }
-    note.textContent = "Connecting to Telegram for a QR code…";
     const signal = AbortSignal.any([attempt.abort.signal, AbortSignal.timeout(180000)]);
-    const user = await attempt.client.signInQr({
+    const user = await client.signInQr({
       abortSignal: signal,
       onUrlUpdated(url, expires) {
         if (active !== attempt) return;
@@ -126,15 +195,33 @@ async function start(kind) {
         };
         clearCode(attempt);
         field(attempt, "qr-password", "Telegram two-step verification password", "password", "current-password");
-        submit.disabled = false;
-        note.textContent = attempt.passwordRejected ? "Telegram rejected that password. Try again." : "Telegram requires your two-step verification password.";
+        note.textContent = attempt.passwordRejected
+          ? "Telegram rejected that password. Try again."
+          : "Telegram requires your two-step verification password.";
       }),
       invalidPasswordCallback() { attempt.passwordRejected = true; },
     });
-    signedIn(attempt, user);
+    signedInAs(user);
   } catch (error) {
     reset(attempt, attempt.sdk?.telegramError(error, "Could not complete Telegram sign-in. Try again.") ?? "Sign-in could not be loaded. Try again.");
   }
+}
+
+export function setLoginAvailability(enabled, unavailable = false) {
+  available = enabled;
+  if (!enabled) {
+    if (current && !signedIn) {
+      current.client.destroy().catch(() => {});
+      current = undefined;
+    }
+    qr.disabled = phone.disabled = true;
+    if (!active && !signedIn && !signin.hidden) {
+      note.textContent = unavailable ? "Could not check sign-in availability. Reload to try again." : DISABLED_NOTE;
+    }
+    return;
+  }
+  setButtons();
+  if (!active && !signedIn && !current) void boot();
 }
 
 form.addEventListener("submit", async (event) => {
@@ -161,7 +248,7 @@ form.addEventListener("submit", async (event) => {
       attempt.phone = value.trim();
       const sent = await client.sendCode({ phone: attempt.phone, abortSignal });
       if (active !== attempt) return;
-      if (!sent.phoneCodeHash) return signedIn(attempt, sent);
+      if (!sent.phoneCodeHash) return signedInAs(sent);
       if (["email_required", "firebase", "fragment", "missed_call", "flash_call"].includes(sent.type)) {
         return reset(attempt, "This Telegram verification method is unavailable on the web. Try QR sign-in.");
       }
@@ -172,7 +259,7 @@ form.addEventListener("submit", async (event) => {
       const user = step === "code"
         ? await client.signIn({ phone: attempt.phone, phoneCodeHash: attempt.codeHash, phoneCode: value.trim(), abortSignal })
         : await client.checkPassword({ password: value, abortSignal });
-      signedIn(attempt, user);
+      signedInAs(user);
     }
   } catch (error) {
     if (active !== attempt) return;

@@ -4,17 +4,21 @@
 
 # MelloGram web client
 
-MelloGram Web is a Telegram client served by a Cloudflare Worker. The default
-deployment serves a status page, the MTProto relay and an in-memory overlay
-demo. An opt-in beta adds existing-account sign-in and basic chats.
+MelloGram Web is a Telegram client served by a Cloudflare Worker. It signs in
+to an existing Telegram account with QR or phone, keeps the session in the
+browser, lists recent chats and groups, pages history, sends text and
+downloads small files. It also serves the MTProto relay and an in-memory
+overlay demo. Sign-in can be switched off per deployment with
+`TELEGRAM_WEB_BETA=false`.
 
 ## Telegram beta
 
 The browser uses [mtcute](https://github.com/mtcute/mtcute) for MTProto key
 exchange, encrypted RPCs, QR token refresh, data centre migration and two-step
 verification. The Worker relays opaque bytes to one of five fixed Telegram data
-centres. The browser holds the authorization key in memory. The Worker does not
-store accounts, sessions or messages.
+centres. The authorization key and peer cache live in this browser's IndexedDB
+(`mellogram-web`), so a reload keeps you signed in. The Worker does not store
+accounts, sessions or messages.
 
 The beta supports QR sign-in and phone sign-in where Telegram delivers a
 supported code, recent direct chats and groups, paged message history, text
@@ -23,9 +27,11 @@ broadcast channels, group topics, uploads and ephemeral content require the
 desktop or Android app. Ordinary Telegram chats do not use the MelloGram
 overlay. The demo generates throwaway identities and never stores their keys.
 
-Use **Sign out** to revoke the Telegram session. Closing or reloading the tab
-clears its local state but does not revoke the authorization at Telegram. Users
-can review and revoke sessions in Telegram under **Settings → Devices**.
+**Sign out** revokes the session at Telegram and clears the local copy.
+**Forget this browser** deletes the local session without contacting Telegram,
+for a shared or borrowed machine; the session then stays listed in
+**Settings → Devices** and should be ended there. Closing the tab is not a
+sign-out.
 
 ## Develop and deploy
 
@@ -54,12 +60,15 @@ application ID and hash. Treat those as public application identifiers. Never
 use a Telegram account password, verification code or session as a Worker
 binding.
 
-For a staging Worker, set `TELEGRAM_WEB_BETA=true`, `TELEGRAM_API_ID` and
-`TELEGRAM_API_HASH` in the Worker's variables, using an application registered
-with Telegram. For Wrangler dev, the same variables can go in the ignored
-`.dev.vars` file. Set `PUBLIC_BASE_URL` to the exact browser origin. Leave
-`TELEGRAM_WEB_BETA` unset or set it to `false` to disable new browser logins.
-Existing tabs remain authorized until they sign out or close.
+Sign-in needs no configuration: the Worker falls back to MelloGram's own
+public Telegram application (the same pair the desktop app ships) and
+`/api/telegram-config` returns it. To use a different application, set
+`TELEGRAM_API_ID` and `TELEGRAM_API_HASH` in the Worker's variables; both are
+validated, and an incomplete pair disables sign-in instead of mixing
+applications. Set `TELEGRAM_WEB_BETA=false` to turn browser sign-in off
+entirely. For Wrangler dev, the same variables can go in the ignored
+`.dev.vars` file, and `PUBLIC_BASE_URL` must be the exact browser origin.
+Existing sessions remain authorized until they sign out or are revoked.
 
 GitHub Actions tests the client and validates the deployment bundle before
 deploying. Normal deployment uses `npm run deploy` and needs the existing
@@ -74,7 +83,9 @@ Before enabling the beta on the public domains:
 2. With a dedicated Telegram account, exercise QR refresh and sign-in,
    phone code and two-step verification, a DC redirect, cancel and retry,
    recent chats, older history, message send and receive, a small attachment,
-   reconnect, and sign-out. Confirm the session disappears from Devices.
+   reconnect, a reload that restores the session, and sign-out. Confirm the
+   session disappears from Devices, and that Forget this browser removes the
+   `mellogram-web` IndexedDB database.
 <!-- coderabbit-ai-generated:v1 -->
 
 <!-- coderabbit-ai-generated-section:v1:95c1d5d3b391ccda4530e1c0670a02d18184f1c20e559d74f5412457440cc069 -->

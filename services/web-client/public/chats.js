@@ -31,7 +31,6 @@ export function openChats(client, sdk, user, onExit) {
   let typingAt = -Infinity;
 
   panel.hidden = false;
-  forget.hidden = true;
   byId("account-name").textContent = `Signed in as ${user.displayName}`;
   byId("chats-heading").tabIndex = -1;
   byId("chats-heading").focus();
@@ -142,7 +141,9 @@ export function openChats(client, sdk, user, onExit) {
         void client.readHistory(chat.inputPeer, { maxId: page[0].id }).catch(() => {});
       }
     } catch (error) {
-      if (!current.signal.aborted && !quiet) status.textContent = sdk.telegramError(error, "Could not load messages. Try refreshing.");
+      if (current.signal.aborted || leaving) return;
+      if (sdk.sessionExpired(error)) return close("Your Telegram session ended. Sign in again.");
+      if (!quiet) status.textContent = sdk.telegramError(error, "Could not load messages. Try refreshing.");
     } finally {
       if (current === view) {
         loading = false;
@@ -167,22 +168,27 @@ export function openChats(client, sdk, user, onExit) {
     else status.textContent = "";
   }
 
-  async function loadChats() {
+  async function loadChats({ quiet = false } = {}) {
     if (loadingChats || leaving) return;
     const old = select.value;
     loadingChats = true;
     buttons();
-    status.textContent = "Loading chats…";
+    if (!quiet) status.textContent = "Loading chats…";
     try {
       const chats = await sdk.listChats(client);
       if (signal.aborted || leaving) return;
       conversations = new Map(chats.map((chat) => [String(chat.id), chat]));
-      select.replaceChildren(new Option("Select a conversation", ""), ...chats.map((chat) => new Option(chat.displayName, String(chat.id))));
+      select.replaceChildren(new Option("Select a conversation", ""), ...chats.map((chat) => new Option(
+        chat.unreadCount ? `${chat.displayName} · ${chat.unreadCount} unread` : chat.displayName,
+        String(chat.id),
+      )));
       if (conversations.has(old)) select.value = old;
       else choose();
-      status.textContent = chats.length ? "" : "No supported chats found.";
+      if (!quiet) status.textContent = chats.length ? "" : "No supported chats found.";
     } catch (error) {
-      if (!signal.aborted) status.textContent = sdk.telegramError(error, "Could not load chats. Try refreshing.");
+      if (signal.aborted) return;
+      if (sdk.sessionExpired(error)) return close("Your Telegram session ended. Sign in again.");
+      if (!quiet) status.textContent = sdk.telegramError(error, "Could not load chats. Try refreshing.");
     } finally {
       loadingChats = false;
       if (!signal.aborted) buttons();
@@ -201,6 +207,19 @@ export function openChats(client, sdk, user, onExit) {
   client.onNewMessage.add(onMessage);
   client.onEditMessage.add(onMessage);
   client.onDeleteMessage.add(refreshSoon);
+
+  // Unread counts change in chats the user is not looking at. Refresh the list
+  // occasionally instead of on every message, and never while it is open.
+  let chatsTimer;
+  const onAnyMessage = () => {
+    if (signal.aborted || document.visibilityState !== "visible") return;
+    clearTimeout(chatsTimer);
+    chatsTimer = setTimeout(() => {
+      if (signal.aborted || loadingChats || sending || document.activeElement === select) return;
+      void loadChats({ quiet: true });
+    }, 8000);
+  };
+  client.onNewMessage.add(onAnyMessage);
 
   function visibility() {
     if (document.visibilityState === "visible") refreshSoon();
@@ -230,7 +249,9 @@ export function openChats(client, sdk, user, onExit) {
       status.textContent = "Sent.";
       refreshSoon();
     } catch (error) {
-      status.textContent = sdk.telegramError(error, "Telegram did not confirm delivery. Refresh messages before trying again.");
+      status.textContent = sdk.sessionExpired(error)
+        ? "Your Telegram session ended. Sign in again."
+        : sdk.telegramError(error, "Telegram did not confirm delivery. Refresh messages before trying again.");
     } finally {
       sending = false;
       buttons();
@@ -241,9 +262,11 @@ export function openChats(client, sdk, user, onExit) {
     lifetime.abort();
     view?.abort();
     clearTimeout(refreshTimer);
+    clearTimeout(chatsTimer);
     client.onNewMessage.remove(onMessage);
     client.onEditMessage.remove(onMessage);
     client.onDeleteMessage.remove(refreshSoon);
+    client.onNewMessage.remove(onAnyMessage);
     byId("account-name").textContent = "";
     status.textContent = "";
     select.replaceChildren();
@@ -259,17 +282,19 @@ export function openChats(client, sdk, user, onExit) {
     buttons();
     status.textContent = "Signing out of Telegram…";
     try {
-      await client.call({ _: "auth.logOut" }, { abortSignal: AbortSignal.timeout(15000) });
+      await client.logOut();
       close("Signed out of Telegram.");
+      void sdk.forgetDevice();
     } catch {
       leaving = false;
       buttons();
-      forget.hidden = false;
-      status.textContent = "Telegram did not confirm sign-out. Retry, or clear this tab and end the session in Telegram Settings → Devices.";
+      status.textContent = "Telegram did not confirm sign-out. Retry, or use Forget this browser and end the session in Telegram Settings → Devices.";
     }
   }, { signal });
   forget.addEventListener("click", () => {
-    if (!leaving && !sending) close("This tab was cleared. End the session in Telegram Settings → Devices.");
+    if (leaving || sending) return;
+    close("This browser was cleared. If the session was not signed out, end it in Telegram Settings → Devices.");
+    void sdk.forgetDevice();
   }, { signal });
 
   choose();
