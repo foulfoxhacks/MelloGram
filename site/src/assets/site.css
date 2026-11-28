@@ -265,3 +265,36 @@ thead th{background:var(--surface-2)}
   .tg-why-grid,.tg-do-grid{grid-template-columns:1fr}
   .tg-hero h1{font-size:clamp(2.6rem,13vw,3.6rem)}
 }
+
+/* ---- Home page on telegram.org's structure, in MelloGram's palette ----------------- */
+.tgo-hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:clamp(48px,7vw,84px) 0 28px}
+.tgo-hero-logo img{width:clamp(120px,15vw,160px);height:auto;border-radius:50%;background:radial-gradient(circle at 50% 40%,rgba(160,140,255,.28),transparent 70%);filter:drop-shadow(0 14px 40px rgba(128,104,245,.4))}
+.tgo-hero h1{margin:18px 0 6px;font-size:clamp(2.6rem,6vw,3.8rem);font-weight:850;letter-spacing:-.04em}
+.tgo-tagline{margin:0;font-size:clamp(1.25rem,2.4vw,1.6rem);font-weight:650;color:#c9c3ef;letter-spacing:-.015em}
+.tgo-sub{max-width:520px;margin:12px auto 0;color:var(--muted);font-size:1rem}
+.tgo-apps{display:grid;grid-template-columns:1fr 1fr;gap:clamp(16px,3vw,34px);max-width:980px;margin:22px auto 0}
+.tgo-app{display:flex;flex-direction:column;align-items:center;gap:18px;padding:26px 22px 0;overflow:hidden;border:1px solid var(--border);border-radius:22px;
+  background:linear-gradient(180deg,rgba(160,140,255,.10),rgba(91,142,240,.04) 60%,transparent);text-decoration:none;color:var(--text);transition:transform .18s ease,border-color .18s ease}
+.tgo-app:hover{transform:translateY(-3px);border-color:var(--accent);color:var(--text)}
+.tgo-app-title{font-size:1.2rem;color:#d8d3f5}.tgo-app-title strong{color:#fff}
+.tgo-app-shot{width:100%;max-height:360px;object-fit:cover;object-position:top center;border-radius:14px 14px 0 0;border:1px solid rgba(255,255,255,.08);border-bottom:0}
+.tgo-app-phone{width:auto;max-width:62%;border-radius:22px 22px 0 0}
+.tgo-more-apps{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 34px;margin:26px auto 0;padding:0 0 10px}
+.tgo-more-apps a{color:#c9c3ef;text-decoration:none;font-size:1.02rem}.tgo-more-apps a strong{color:#fff}.tgo-more-apps a:hover{color:var(--accent-2)}
+.tgo-why{max-width:980px;margin:clamp(56px,8vw,96px) auto 0;text-align:center}
+.tgo-why h2{font-size:clamp(1.9rem,3.6vw,2.4rem);margin-bottom:38px}
+.tgo-why-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:38px 32px;list-style:none;margin:0;padding:0}
+.tgo-why-item{display:flex;flex-direction:column;align-items:center}
+.tgo-why-icon{display:grid;place-items:center;width:92px;height:92px;margin-bottom:16px;border-radius:50%;
+  background:linear-gradient(135deg,#8068f5,#5b8ef0);box-shadow:0 12px 32px rgba(104,91,235,.32);color:#fff}
+.tgo-why-icon svg{width:40px;height:40px}
+.tgo-why-item h3{font-size:1.15rem;margin:0 0 8px}
+.tgo-why-item p{max-width:270px;margin:0;color:var(--muted);font-size:.95rem;line-height:1.6}
+.tgo-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;max-width:980px;margin:clamp(56px,8vw,90px) auto 10px}
+.tgo-strip a{display:flex;flex-direction:column;gap:3px;padding:16px 18px;border:1px solid var(--border);border-radius:14px;background:var(--surface);text-decoration:none;color:var(--text)}
+.tgo-strip a span{color:var(--muted);font-size:.86rem}.tgo-strip a:hover{border-color:var(--accent)}
+@media(max-width:760px){.tgo-apps{grid-template-columns:1fr}.tgo-why-grid{grid-template-columns:1fr 1fr}.tgo-strip{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.tgo-why-grid{grid-template-columns:1fr}}
+.tgo-about{max-width:760px;margin:clamp(56px,8vw,90px) auto 0;text-align:center}
+.tgo-about h2{font-size:clamp(1.6rem,3vw,2rem)}
+.tgo-about p{color:#c2bfd7;line-height:1.75}

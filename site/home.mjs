@@ -47,158 +47,80 @@ const COMPARE = [
   ["Built with", "C++ (tdesktop)", "Rust and Tauri"],
 ];
 
+// Feature icons for the "Why MelloGram?" grid, drawn as simple line icons
+// inside round badges, the way telegram.org presents its features.
+const WHY_ICON = {
+  simple: '<path d="M5 12h14M12 5v14"/>',
+  private: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  synced: '<path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/>',
+  fast: '<path d="M13 3 5 14h6l-1 7 8-11h-6Z"/>',
+  custom: '<circle cx="12" cy="12" r="8.5"/><circle cx="9" cy="10" r="1.3"/><circle cx="14.5" cy="9" r="1.3"/><circle cx="15.5" cy="14" r="1.3"/>',
+  plugins: '<path d="M9 4h6v4a2 2 0 1 0 0 4v4H9v-4a2 2 0 1 1 0-4Z"/>',
+  secure: '<path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6Z"/><path d="m9 12 2 2 4-4"/>',
+  open: '<path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/><path d="m13.5 5-3 14"/>',
+  free: '<path d="M20 12v8H4v-8"/><path d="M2 8h20v4H2z"/><path d="M12 8v12"/><path d="M12 8S10 3 7.5 4.5 9 8 12 8Zm0 0s2-5 4.5-3.5S15 8 12 8Z"/>',
+};
+const whyItem = (key, title, text) => `
+    <li class="tgo-why-item">
+      <span class="tgo-why-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round">${WHY_ICON[key]}</svg></span>
+      <h3>${title}</h3>
+      <p>${text}</p>
+    </li>`;
+
 export function homeBody(c) {
   const { href, img, plugins } = c;
-  const compare = COMPARE.map(
-    ([label, telegram, mellogram]) => `
-      <tr>
-        <th scope="row">${label}</th>
-        <td>${telegram.replace("{PLUGINS}", plugins.length)}</td>
-        <td>${mellogram.replace("{PLUGINS}", plugins.length)}</td>
-      </tr>`,
-  ).join("");
-
   return `
-<section class="tg-hero">
-  <div class="home-hero-mark">
+<section class="tgo-hero">
+  <div class="tgo-hero-logo">
     ${img("logo.png", "MelloGram fox-paw and paper-plane mascot logo", "MelloGram logo", { eager: true, cls: "cute-logo" })}
   </div>
-  <p class="eyebrow">Free · Open source · GPL-3.0 · No telemetry</p>
   <h1>MelloGram</h1>
-  <h2 class="hero-tagline">Messaging, on your terms.</h2>
-  <p class="lead">MelloGram is a Rust-based Telegram client for desktop and Android with plugins, CSS themes and an end-to-end overlay. It signs in to your own Telegram account, so your chats stay in sync with every other device you use.</p>
-  <div class="cta home-cta buttons">
-    <a class="btn main-btn" href="${href("/download/")}" data-download>Download MelloGram</a>
-    <a class="btn btn-ghost" href="${href("/plugins/")}">See what's inside</a>
-    <a class="btn btn-ghost" href="${c.REPO}" rel="noopener">Source on GitHub ↗</a>
-  </div>
-  <ul class="tg-downloads" aria-label="Download MelloGram for your platform">
-    ${tile(c, "Windows", ".exe · .msi", "windows", "/download/")}
-    ${tile(c, "macOS", ".dmg, universal", "macos", "/download/")}
-    ${tile(c, "Linux", ".deb · .rpm · AppImage", "linux", "/download/")}
-    ${tile(c, "Android", ".apk · .aab", "android", "/download/")}
-    ${tile(c, "Web", "early shell", "web", c.WEB)}
+  <p class="tgo-tagline">a customizable era of messaging</p>
+  <p class="tgo-sub">Your Telegram account, your chats, your look. Free, open source and written in Rust.</p>
+</section>
+
+<section class="tgo-apps" aria-label="Get MelloGram">
+  <a class="tgo-app" href="${href("/download/")}#android" data-os="android">
+    <span class="tgo-app-title">MelloGram for <strong>Android</strong></span>
+    ${img("screenshot-android.webp", "MelloGram on an Android phone, showing the chat list with filter chips and bottom navigation", "MelloGram for Android", { eager: true, cls: "tgo-app-shot tgo-app-phone" })}
+  </a>
+  <a class="tgo-app" href="${href("/download/")}">
+    <span class="tgo-app-title">MelloGram for <strong>Desktop</strong></span>
+    ${img("screenshot-chat.webp", "MelloGram desktop chat window with custom colours and a paw-print wallpaper", "MelloGram for Desktop", { eager: true, cls: "tgo-app-shot" })}
+  </a>
+</section>
+<nav class="tgo-more-apps" aria-label="Other platforms">
+  <a href="${href("/download/")}#windows">MelloGram for <strong>Windows</strong></a>
+  <a href="${href("/download/")}#macos">MelloGram for <strong>macOS</strong></a>
+  <a href="${href("/download/")}#linux">MelloGram for <strong>Linux</strong></a>
+  <a href="${c.WEB}" rel="noopener">MelloGram <strong>Web</strong></a>
+</nav>
+
+<section class="tgo-why" aria-labelledby="why-title">
+  <h2 id="why-title">Why MelloGram?</h2>
+  <ul class="tgo-why-grid">
+    ${whyItem("simple", "Simple", "It opens on your chats. Plugins, themes and controls wait in settings until you want them.")}
+    ${whyItem("private", "Private", "No analytics, no telemetry, and a traffic log that shows every connection the app makes.")}
+    ${whyItem("synced", "Synced", "Messages come from Telegram itself, so your phone, desktop and other apps share one history.")}
+    ${whyItem("fast", "Fast", "Native Rust with the system webview — no Electron and no bundled browser.")}
+    ${whyItem("custom", "Customizable", "CSS themes, live QuickCSS, wallpapers, layouts and an Appearance Studio, applied instantly.")}
+    ${whyItem("plugins", "Powerful", `${plugins.length} built-in plugins, from scheduled messages to message history, each showing its permissions.`)}
+    ${whyItem("secure", "Secure", "An optional end-to-end overlay for one-to-one chats and groups, with 60-digit safety numbers.")}
+    ${whyItem("open", "Open", "GPL-3.0-or-later source, with every installer built in public CI from that code.")}
+    ${whyItem("free", "Free", "Free to use on Windows, macOS, Linux and Android, with no ads and no subscriptions.")}
   </ul>
 </section>
 
-<figure class="home-hero-shot">
-  ${img("screenshot-chat.webp", "MelloGram desktop chat window with custom colours and a paw-print wallpaper", "MelloGram desktop preview", { eager: true })}
-  <figcaption>One desktop app, ${plugins.length} plugins, and every chat looking the way you set it up.</figcaption>
-</figure>
-
-<section class="section tg-why" aria-labelledby="why-title">
-  <div class="home-section-heading">
-    <p class="eyebrow">Why MelloGram?</p>
-    <h2 id="why-title">Telegram underneath. Yours on top.</h2>
-    <p class="lead">A native client that keeps what makes Telegram good and rebuilds everything around it to be configurable.</p>
-  </div>
-  <ul class="tg-why-grid">
-    ${why("Simple", "It opens on your chats. The plugins, themes and controls live in settings until you go looking for them.")}
-    ${why("Fast", "Written in Rust with a native webview — no Electron, no bundled browser, no multi-second launch.")}
-    ${why("Secure", "The overlay adds X3DH and a Double Ratchet on top of Telegram, with 60-digit safety numbers and group sender keys.")}
-    ${why("Synced", "Messages come from Telegram itself, so the phone, the desktop and every other client see the same history.")}
-    ${why("Customizable", "CSS themes, QuickCSS, an Appearance Studio, wallpapers and workspaces — all applied live, no rebuild.")}
-    ${why("Open", "GPL-3.0-or-later source, reproducible CI packages for every platform, and no analytics or telemetry.")}
-  </ul>
+<section class="tgo-about" aria-labelledby="about-title">
+  <h2 id="about-title">What is MelloGram?</h2>
+  <p>MelloGram is an independent, open-source Telegram client for Windows, macOS, Linux and Android. You sign in with your own Telegram account, so every chat, group, channel and contact is the same one you see on your phone and in any other Telegram app. Nothing moves to a new network and nobody has to switch with you.</p>
+  <p>On top of Telegram, MelloGram adds what the official apps leave out: a plugin manager with permission labels, CSS themes and live QuickCSS, chat wallpapers, saved workspaces, layout styles, scheduled messages, a redacted traffic log, proxy and tunnel presets for Tor, Tailscale and WireGuard, and an optional end-to-end overlay for one-to-one chats and groups. It is not affiliated with Telegram, and it never asks for your login code or password outside Telegram's own sign-in.</p>
 </section>
 
-<section class="section tg-rows" aria-labelledby="themes-title">
-  <article class="tg-row">
-    <div class="tg-row-copy">
-      <p class="eyebrow">Appearance</p>
-      <h2 id="themes-title">The interface is CSS, so you can change it</h2>
-      <p>Install a theme someone shared, edit its variables with colour pickers, or write CSS that applies while you type. Nothing is compiled, nothing needs a restart.</p>
-      <ul class="tg-list">
-        <li>CSS themes with ordering and variables</li>
-        <li>Live QuickCSS with instant preview</li>
-        <li>Appearance Studio: bubbles, radius, spacing, fonts, density, motion</li>
-      </ul>
-      <a class="tg-link" href="${href("/themes/")}">Explore themes and wallpapers <span aria-hidden="true">↗</span></a>
-    </div>
-    <figure class="tg-row-shot">
-      ${img("screenshot-appearance-studio.webp", "MelloGram Appearance Studio with live controls for bubbles, fonts and spacing", "Appearance Studio")}
-      <figcaption>Appearance Studio — every control previews immediately.</figcaption>
-    </figure>
-  </article>
-
-  <article class="tg-row tg-row-flip">
-    <div class="tg-row-copy">
-      <p class="eyebrow">Plugins</p>
-      <h2>Features without a patched installer</h2>
-      <p>${plugins.length} plugins ship in the app: link cleaning, message history, templates, bookmarks, statistics, translation, quiet hours and more. Each one states what it reads and changes before you enable it.</p>
-      <ul class="tg-list">
-        <li>Search, filter and favourite plugins</li>
-        <li>Permission labels on every plugin</li>
-        <li>Backend logic in Rust, UI halves as plain scripts</li>
-      </ul>
-      <a class="tg-link" href="${href("/plugins/")}">Browse all ${plugins.length} plugins <span aria-hidden="true">↗</span></a>
-    </div>
-    <figure class="tg-row-shot">
-      ${img("screenshot-plugins.webp", "MelloGram plugin manager listing searchable extensions with permission labels", "Plugin manager")}
-      <figcaption>The plugin manager — every extension declares its permissions.</figcaption>
-    </figure>
-  </article>
-
-  <article class="tg-row">
-    <div class="tg-row-copy">
-      <p class="eyebrow">Privacy</p>
-      <h2>End-to-end when a chat calls for it</h2>
-      <p>Turn on the overlay for a one-to-one chat or a group and MelloGram seals messages with its own protocol before Telegram ever sees them. Verification is a 60-digit safety number you read aloud, and group keys rotate when someone leaves.</p>
-      <ul class="tg-list">
-        <li>One-to-one: X3DH setup, Double Ratchet, per-message keys</li>
-        <li>Groups: sender keys delivered inside pairwise sessions</li>
-        <li>Device-sealed state, bounded decrypted cache, no cloud copies</li>
-      </ul>
-      <a class="tg-link" href="${href("/privacy/")}">Read what the overlay protects <span aria-hidden="true">↗</span></a>
-    </div>
-    <figure class="tg-row-shot">
-      ${img("screenshot-chat.webp", "A MelloGram chat showing the encrypted overlay badge on messages", "Encrypted chat preview")}
-      <figcaption>The overlay marks every sealed message and shows when a key is missing.</figcaption>
-    </figure>
-  </article>
-</section>
-
-<section class="section tg-compare-section" aria-labelledby="compare-title">
-  <div class="home-section-heading">
-    <p class="eyebrow">Comparison</p>
-    <h2 id="compare-title">MelloGram and Telegram Desktop, side by side</h2>
-    <p class="lead">MelloGram is an independent client, not a fork. It uses the same account and the same servers, and adds a customization layer Telegram Desktop does not have.</p>
-  </div>
-  <div class="tg-compare">
-    <table>
-      <thead>
-        <tr><td></td><th scope="col">Telegram Desktop</th><th scope="col" class="tg-compare-us">MelloGram</th></tr>
-      </thead>
-      <tbody>${compare}</tbody>
-    </table>
-  </div>
-  <p class="muted small">Telegram Desktop details follow Telegram's public documentation and the current desktop app. MelloGram never asks for your password outside Telegram's own login flow, and it is not affiliated with Telegram.</p>
-</section>
-
-<section class="section tg-do" aria-labelledby="do-title">
-  <div class="home-section-heading">
-    <p class="eyebrow">Get going</p>
-    <h2 id="do-title">What you can do next</h2>
-  </div>
-  <ul class="tg-do-grid">
-    <li><a href="${href("/download/")}"><strong>Install it</strong><span>Pick your platform and sign in with your phone number.</span></a></li>
-    <li><a href="${href("/plugins/")}"><strong>Enable plugins</strong><span>Start with link cleaning and message history.</span></a></li>
-    <li><a href="${href("/themes/")}"><strong>Make it yours</strong><span>Theme, wallpaper and workspace in a few minutes.</span></a></li>
-    <li><a href="${href("/privacy/")}"><strong>Turn on the overlay</strong><span>Exchange keys with one contact and compare digits.</span></a></li>
-    <li><a href="${href("/faq/")}"><strong>Read the FAQ</strong><span>Backups, notifications, safe mode and account safety.</span></a></li>
-    <li><a href="${href("/developers/")}"><strong>Build on it</strong><span>Plugin API, architecture notes and diagnostics.</span></a></li>
-  </ul>
-</section>
-
-<section class="home-bottom-cta" aria-labelledby="home-bottom-title">
-  <div>
-    <p class="eyebrow">Ready when you are</p>
-    <h2 id="home-bottom-title">Start with MelloGram.</h2>
-    <p>Free, open source under GPL-3.0, and built for the way you use Telegram.</p>
-  </div>
-  <div class="cta">
-    <a class="btn main-btn" href="${href("/download/")}" data-download>Get MelloGram</a>
-    <a class="btn btn-ghost" href="${href("/faq/")}">Read the FAQ</a>
-  </div>
+<section class="tgo-strip" aria-label="Learn more">
+  <a href="${href("/plugins/")}"><strong>Plugins</strong><span>Browse all ${plugins.length}</span></a>
+  <a href="${href("/themes/")}"><strong>Themes &amp; wallpapers</strong><span>Make it yours</span></a>
+  <a href="${href("/privacy/")}"><strong>Privacy</strong><span>What the overlay protects</span></a>
+  <a href="${href("/faq/")}"><strong>FAQ</strong><span>Answers in one place</span></a>
 </section>`;
 }
