@@ -213,6 +213,23 @@ test("worker: HTTPS redirect, HSTS and unconfigured sign-in", async () => {
   assert.match(page.headers.get("strict-transport-security"), /max-age=/);
 });
 
+test("pages are fetched from their exact asset path, never a self-redirect", async () => {
+  // Workers Static Assets answers /dashboard.html with a 307 to /dashboard when
+  // extension handling is on, and /dashboard routes straight back here.
+  const { default: worker } = await import("../src/worker.js");
+  const seen = [];
+  const env = {
+    PUBLIC_BASE_URL: "https://id.example.com",
+    DB: null,
+    ASSETS: { fetch: async (request) => { seen.push(new URL(request.url).pathname); return new Response("<!doctype html>", { headers: { "Content-Type": "text/html" } }); } },
+  };
+  for (const [path, asset] of [["/", "/index.html"], ["/dashboard", "/dashboard.html"], ["/@/someone", "/profile.html"]]) {
+    const response = await worker.fetch(new Request("https://id.example.com" + path), env);
+    assert.equal(response.status, 200);
+    assert.equal(seen.at(-1), asset, `GET ${path}`);
+  }
+});
+
 test("badge lookup ids are validated, de-duplicated and capped", async () => {
   const { parseBadgeIds } = await import("../src/worker.js");
   assert.deepEqual(parseBadgeIds("12, 12,abc,0,-5,99999999999999999,34"), ["12", "34"]);
@@ -220,24 +237,59 @@ test("badge lookup ids are validated, de-duplicated and capped", async () => {
   assert.deepEqual(parseBadgeIds(""), []);
 });
 
-test("Telegram Login Widget hashes are verified, fresh and field-restricted", async () => {
+const WIDGET_TOKEN = "123456:TEST-token";
+const WIDGET_NOW = 1_800_000_000;
+async function signWidget(fields, token = WIDGET_TOKEN) {
+  const lines = Object.keys(fields).sort().map((k) => `${k}=${fields[k]}`).join("\n");
+  const secret = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  const key = await crypto.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(lines)));
+  return new URLSearchParams({ ...fields, hash: [...mac].map((b) => b.toString(16).padStart(2, "0")).join("") });
+}
+const widgetFields = () => ({ id: "42", first_name: "Ava", username: "ava", auth_date: String(WIDGET_NOW - 30) });
+
+test("Telegram Login Widget hashes are verified and fresh", async () => {
   const { verifyTelegramWidget } = await import("../src/worker.js");
-  const token = "123456:TEST-token";
-  const now = 1_800_000_000;
-  const sign = async (fields) => {
-    const lines = Object.keys(fields).sort().map((k) => `${k}=${fields[k]}`).join("\n");
-    const secret = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
-    const key = await crypto.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-    const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(lines)));
-    return new URLSearchParams({ ...fields, hash: [...mac].map((b) => b.toString(16).padStart(2, "0")).join("") });
-  };
-  const fields = { id: "42", first_name: "Ava", username: "ava", auth_date: String(now - 30) };
-  assert.equal(await verifyTelegramWidget(await sign(fields), token, now), "42");
-  const tampered = await sign(fields); tampered.set("id", "43");
-  assert.equal(await verifyTelegramWidget(tampered, token, now), null);
-  assert.equal(await verifyTelegramWidget(await sign({ ...fields, auth_date: String(now - 3600) }), token, now), null);
-  assert.equal(await verifyTelegramWidget(await sign({ ...fields, evil: "1" }), token, now), null);
-  assert.equal(await verifyTelegramWidget(await sign(fields), "other:token", now), null);
+  const fields = widgetFields();
+  assert.equal(await verifyTelegramWidget(await signWidget(fields), WIDGET_TOKEN, WIDGET_NOW), "42");
+  const tampered = await signWidget(fields); tampered.set("id", "43");
+  assert.equal(await verifyTelegramWidget(tampered, WIDGET_TOKEN, WIDGET_NOW), null);
+  assert.equal(await verifyTelegramWidget(await signWidget({ ...fields, auth_date: String(WIDGET_NOW - 3600) }), WIDGET_TOKEN, WIDGET_NOW), null);
+  assert.equal(await verifyTelegramWidget(await signWidget(fields), "other:token", WIDGET_NOW), null);
+});
+
+test("a signed field this build does not know still signs in", async () => {
+  // Telegram signs every field it sends; refusing a signed newcomer (is_premium
+  // today, something else tomorrow) would fail the whole sign-in.
+  const { verifyTelegramWidgetPayload } = await import("../src/worker.js");
+  const payload = await signWidget({ ...widgetFields(), is_premium: "true" });
+  assert.deepEqual(await verifyTelegramWidgetPayload(payload, WIDGET_TOKEN, WIDGET_NOW), { id: "42", reason: null });
+  const unsigned = await signWidget(widgetFields());
+  unsigned.set("is_premium", "true");
+  assert.deepEqual(await verifyTelegramWidgetPayload(unsigned, WIDGET_TOKEN, WIDGET_NOW), { id: null, reason: "signature" });
+});
+
+test("a bot token with a trailing newline or space still verifies", async () => {
+  const { verifyTelegramWidgetPayload, widgetBotToken } = await import("../src/worker.js");
+  const trimmed = widgetBotToken({ TELEGRAM_BOT_TOKEN: `  ${WIDGET_TOKEN}\n` });
+  assert.equal(trimmed, WIDGET_TOKEN);
+  const payload = await signWidget(widgetFields());
+  assert.equal((await verifyTelegramWidgetPayload(payload, trimmed, WIDGET_NOW)).id, "42");
+  assert.equal(widgetBotToken({ TELEGRAM_BOT_TOKEN: "   " }), null);
+});
+
+test("widget failures say which one happened", async () => {
+  const { verifyTelegramWidgetPayload } = await import("../src/worker.js");
+  assert.deepEqual(await verifyTelegramWidgetPayload(new URLSearchParams(), WIDGET_TOKEN, WIDGET_NOW), { id: null, reason: "missing" });
+  const stale = await signWidget({ ...widgetFields(), auth_date: String(WIDGET_NOW - 3600) });
+  assert.deepEqual(await verifyTelegramWidgetPayload(stale, WIDGET_TOKEN, WIDGET_NOW), { id: null, reason: "expired" });
+  const wrongBot = await signWidget(widgetFields(), "987654:OTHER-bot");
+  assert.deepEqual(await verifyTelegramWidgetPayload(wrongBot, WIDGET_TOKEN, WIDGET_NOW), { id: null, reason: "signature" });
+  const duplicated = await signWidget(widgetFields());
+  const doubled = new URLSearchParams(`${duplicated.toString()}&id=43`);
+  assert.deepEqual(await verifyTelegramWidgetPayload(doubled, WIDGET_TOKEN, WIDGET_NOW), { id: null, reason: "duplicate_field" });
+  const noHash = new URLSearchParams({ id: "42", auth_date: String(WIDGET_NOW) });
+  assert.deepEqual(await verifyTelegramWidgetPayload(noHash, WIDGET_TOKEN, WIDGET_NOW), { id: null, reason: "malformed_hash" });
 });
 
 test("sign-in routes: widget when configured, 503 when nothing is", async () => {
