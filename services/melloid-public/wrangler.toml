@@ -16,6 +16,8 @@ run_worker_first = true
 
 [vars]
 PUBLIC_BASE_URL = "https://id.mellogram.foulfoxhacks.dev"
+# Telegram Login Widget bot (its token is the TELEGRAM_BOT_TOKEN secret).
+TELEGRAM_BOT_USERNAME = "melloidlogingatewaybot"
 
 [[d1_databases]]
 binding = "DB"
