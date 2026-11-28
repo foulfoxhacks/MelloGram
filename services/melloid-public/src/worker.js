@@ -44,8 +44,13 @@ function redirect(location, cookies = []) {
   for (const value of cookies) headers.append("Set-Cookie", value);
   return new Response(null, { status: 303, headers });
 }
-function errorPage(message, status = 400) {
-  return new Response(`<!doctype html><title>MelloID sign-in error</title><main><h1>Sign-in failed</h1><p>${String(message).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c])}</p><a href="/">Return home</a></main>`, {
+const escapeHtml = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+function errorPage(message, status = 400, reference = null) {
+  // The reference is a fixed reason code (never request data), so the person
+  // running the deployment can tell an expired confirmation from a bot token
+  // that does not match the bot, without reading Worker logs.
+  const note = reference ? `<p class="muted">Reference: <code>${escapeHtml(reference)}</code></p>` : "";
+  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>MelloID sign-in error</title><link rel="stylesheet" href="/app.css"></head><body><main class="shell tg-shell"><section class="tg-hero-id"><img class="tg-hero-logo" src="/mark.png" alt="" width="132" height="132"><h1>Sign-in failed</h1><p class="lead">${escapeHtml(message)}</p>${note}<p class="muted"><a href="/">Return home</a></p></section></main></body></html>`, {
     status,
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
   });
@@ -180,35 +185,62 @@ async function finishTelegramLogin(request, env) {
 const WIDGET_MAX_AGE_SECONDS = 600;
 const BOT_USERNAME = /^[A-Za-z0-9_]{5,32}$/;
 
+/**
+ * The configured bot token, trimmed. A secret pasted into a dashboard keeps
+ * any trailing newline or space, and that one character silently breaks every
+ * Login Widget signature.
+ */
+export function widgetBotToken(env) {
+  const token = typeof env?.TELEGRAM_BOT_TOKEN === "string" ? env.TELEGRAM_BOT_TOKEN.trim() : "";
+  return token || null;
+}
 export function widgetConfigured(env) {
-  return Boolean(env.TELEGRAM_BOT_TOKEN && BOT_USERNAME.test(env.TELEGRAM_BOT_USERNAME || ""));
+  return Boolean(widgetBotToken(env) && BOT_USERNAME.test(env.TELEGRAM_BOT_USERNAME || ""));
 }
 export function oidcConfigured(env) {
   return Boolean(env.TELEGRAM_CLIENT_ID && env.TELEGRAM_CLIENT_SECRET);
 }
 
-/** Returns the verified Telegram user id, or null. */
-export async function verifyTelegramWidget(params, botToken, now = Math.floor(Date.now() / 1000)) {
+/**
+ * Verifies the payload `data-auth-url` receives and reports why it was not
+ * accepted. Returns `{ id, reason }`: `id` is the verified Telegram user id,
+ * or null with a short reason code ("missing", "malformed_hash", "expired",
+ * "signature", ...).
+ *
+ * The signature covers every field Telegram sent except `hash`, exactly as
+ * telegram.org documents it, so fields this build has never heard of are
+ * included rather than rejected: an unsigned extra parameter can only make the
+ * HMAC fail, and refusing a *signed* field that Telegram starts sending would
+ * break sign-in for everyone.
+ */
+export async function verifyTelegramWidgetPayload(params, botToken, now = Math.floor(Date.now() / 1000)) {
+  const names = [...params.keys()];
+  if (!names.length) return { id: null, reason: "missing" };
+  if (new Set(names).size !== names.length) return { id: null, reason: "duplicate_field" };
   const hash = params.get("hash") || "";
-  if (!/^[0-9a-f]{64}$/.test(hash)) return null;
+  if (!/^[0-9a-f]{64}$/.test(hash)) return { id: null, reason: "malformed_hash" };
   const id = params.get("id") || "";
+  if (!/^[1-9][0-9]{0,15}$/.test(id)) return { id: null, reason: "malformed_id" };
   const authDate = Number(params.get("auth_date"));
-  if (!/^[1-9][0-9]{0,15}$/.test(id) || !Number.isInteger(authDate)) return null;
-  if (authDate > now + 60 || now - authDate > WIDGET_MAX_AGE_SECONDS) return null;
-  const allowed = ["auth_date", "first_name", "id", "last_name", "photo_url", "username"];
-  const lines = [];
-  for (const key of [...params.keys()].sort()) {
-    if (key === "hash") continue;
-    if (!allowed.includes(key)) return null;
-    lines.push(`${key}=${params.get(key)}`);
-  }
+  if (!Number.isInteger(authDate)) return { id: null, reason: "malformed_auth_date" };
+  if (authDate > now + 60 || now - authDate > WIDGET_MAX_AGE_SECONDS) return { id: null, reason: "expired" };
+  const lines = names
+    .filter((key) => key !== "hash" && key !== "")
+    .sort()
+    .map((key) => `${key}=${params.get(key)}`);
   const secret = await crypto.subtle.digest("SHA-256", encoder.encode(botToken));
   const key = await crypto.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(lines.join("\n"))));
   const expected = [...mac].map((b) => b.toString(16).padStart(2, "0")).join("");
   let diff = 0;
   for (let i = 0; i < 64; i++) diff |= expected.charCodeAt(i) ^ hash.charCodeAt(i);
-  return diff === 0 ? id : null;
+  return diff === 0 ? { id, reason: null } : { id: null, reason: "signature" };
+}
+
+/** Returns the verified Telegram user id, or null. */
+export async function verifyTelegramWidget(params, botToken, now = Math.floor(Date.now() / 1000)) {
+  const { id } = await verifyTelegramWidgetPayload(params, botToken, now);
+  return id;
 }
 
 function widgetLoginPage(env) {
@@ -231,10 +263,22 @@ function widgetLoginPage(env) {
   });
 }
 
+const WIDGET_FAILURE_TEXT = {
+  expired: "Telegram's sign-in confirmation expired. Please sign in again.",
+  missing: "This page is the last step of sign-in with Telegram. Start again from MelloID.",
+};
+
 async function finishWidgetLogin(request, env) {
   const url = new URL(request.url);
-  const id = await verifyTelegramWidget(url.searchParams, env.TELEGRAM_BOT_TOKEN);
-  if (!id) return errorPage("Telegram's sign-in confirmation could not be verified or has expired. Please sign in again.", 401);
+  const { id, reason } = await verifyTelegramWidgetPayload(url.searchParams, widgetBotToken(env));
+  if (!id) {
+    // Field names, never values, and never the token: enough for an operator to
+    // see which bot answered while keeping the log free of personal data.
+    console.warn("MelloID widget sign-in rejected", { reason, fields: [...url.searchParams.keys()].join(",") });
+    const message = WIDGET_FAILURE_TEXT[reason]
+      || "Telegram's sign-in confirmation could not be verified. Please sign in again.";
+    return errorPage(message, 401, reason);
+  }
   const sessionId = randomToken();
   const now = Math.floor(Date.now() / 1000);
   await env.DB.prepare(
