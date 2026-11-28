@@ -233,6 +233,12 @@ jobs:
       - name: Generate Android project
         working-directory: app/src-tauri
         run: cargo tauri android init --ci
+      # Icons, the exact permission set (INTERNET, notifications, location) and
+      # MelloGram's IME-aware MainActivity. Without this the APK shipped with
+      # Tauri's defaults: no notification permission, no adjustResize, and a
+      # MainActivity that ignores the keyboard and the display cutout.
+      - name: Brand the Android project
+        run: python3 scripts/configure-android.py
       - name: Add Firebase Messaging service to Android manifest
         run: python3 scripts/configure-android-firebase.py
       - name: Build debug APKs (arm64, armv7 and x86_64)
