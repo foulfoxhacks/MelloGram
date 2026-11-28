@@ -1,3 +1,11 @@
+## Login code delivery and resend — 2026-11-27
+
+- Invoke `auth.sendCode` directly so the login screen can report the actual delivery channel: another signed-in Telegram session, SMS, a phone call, email, or Fragment. Third-party clients can be refused SMS entirely, so "we sent a code" was often false.
+- Added "Resend code" using `auth.resendCode` with the `next_type` Telegram nominates, plus a countdown from the server's `timeout`.
+- Added "Use a different number", which clears the pending login locally and cancels the code with `auth.cancelCode`.
+- Phone numbers are normalised to E.164 on the backend before `auth.sendCode`; common RPC errors (flood limits, invalid or published API ID, banned numbers, SMS creation failures) now explain the next step.
+- Handled `auth.sentCodeSuccess` (previously a panic) and `auth.sentCodePaymentRequired`, and replicated the private post-sign-in session setup for the raw `auth.signIn` path.
+
 ## Steam OpenID verification hardening — 2026-11-27
 
 - Added a testable Steam OpenID response validator for exact return URL, signed identity fields, SteamID64, allowed OP endpoint, and recent nonce checks.

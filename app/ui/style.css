@@ -173,12 +173,19 @@ input:focus, textarea:focus, select:focus { border-color: var(--mg-accent); }
 
 /* ---- overlays ---- */
 .mg-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: grid; place-items: center; z-index: 50; }
+/* The login card can be taller than the viewport (phone keyboard, landscape
+   window). Scroll the overlay and let auto margins centre the card only while
+   it fits, so the Continue button and the error line are always reachable. */
+#login { display: flex; overflow-y: auto; }
+#login .mg-login { margin: auto; }
 .mg-card { background: var(--mg-bg-2); border: 1px solid var(--mg-border); border-radius: calc(var(--mg-radius) * 1.5); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
 .mg-login { width: min(420px, 92vw); padding: 28px; display: flex; flex-direction: column; gap: 12px; text-align: center; }
 .mg-login h1 { margin: 0; font-size: 1.4em; }
 .mg-login-logo { width: 72px; margin: 0 auto; }
 .mg-login #login-fields { display: flex; flex-direction: column; gap: 8px; text-align: left; }
 .mg-login label { font-size: .85em; color: var(--mg-muted); }
+.mg-login-actions { display: flex; gap: 8px; }
+.mg-login-actions .mg-btn { flex: 1; }
 
 .mg-settings { width: min(1000px, 94vw); height: min(720px, 90vh); display: flex; overflow: hidden; }
 .mg-settings-nav { width: 200px; padding: 16px 8px; background: var(--mg-bg); display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }

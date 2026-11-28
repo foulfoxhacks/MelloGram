@@ -48,7 +48,7 @@ pub fn run() {
             // Reconnect in the background if credentials are already saved.
             let connection_state = Arc::clone(&state);
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = connection_state.connect_if_configured().await {
+                if let Err(e) = connection_state.ensure_connected(crate::state::CONNECT_TIMEOUT).await {
                     tracing::warn!("auto-connect failed: {e}");
                 }
             });
@@ -108,6 +108,8 @@ pub fn run() {
             commands::set_credentials,
             commands::login_state,
             commands::request_code,
+            commands::resend_code,
+            commands::cancel_code,
             commands::submit_code,
             commands::submit_password,
             commands::logout,

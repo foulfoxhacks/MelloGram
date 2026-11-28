@@ -55,6 +55,47 @@
   }
   const PHONE = /^\+[1-9]\d{6,14}$/;
 
+  // Telegram chooses how the code is delivered and, for third-party clients,
+  // can refuse SMS entirely. The backend reports the channel, so point the
+  // user at the right place instead of always claiming an SMS is coming.
+  function methodName(via) {
+    switch (via) {
+      case "sms": return "SMS";
+      case "call": return "a phone call";
+      case "flash-call": return "a flash call";
+      case "missed-call": return "a missed call";
+      case "fragment": return "Fragment";
+      case "email": return "email";
+      default: return "another method";
+    }
+  }
+
+  function deliveryHelp(s) {
+    const d = s?.delivery || {};
+    const phone = s?.phone || "your phone";
+    const digits = d.length ? ` (${d.length} digits)` : "";
+    switch (d.via) {
+      case "app":
+        return `Telegram sent the code${digits} as a message from “Telegram” to your other signed-in Telegram apps — not by SMS. Open Telegram on another device to read it.`;
+      case "sms":
+        return `Telegram sent the code${digits} by SMS to ${phone}. It can take a minute; the message comes from Telegram, not MelloGram.`;
+      case "call":
+        return `Telegram is calling ${phone} and will read the code${digits} aloud.`;
+      case "flash-call":
+        return `Telegram will call ${phone} and hang up. The number that calls contains the code${d.pattern ? ` (${d.pattern})` : ""}.`;
+      case "missed-call":
+        return `Telegram will call ${phone} and hang up. The last digits of the missed call are the code${d.prefix ? ` (starting ${d.prefix})` : ""}.`;
+      case "email":
+        return `Telegram sent the code${digits} to ${d.email || "your login email"}. Check that inbox, including spam.`;
+      case "fragment":
+        return `Telegram will only deliver this code through Fragment. Open ${d.url || "fragment.com"} and sign in with your wallet to see it.`;
+      case "firebase":
+        return `Telegram chose an SMS method this app cannot complete. Tap “Resend code” to ask for ${methodName(d.next)}.`;
+      default:
+        return `Telegram accepted the code request for ${phone}. If nothing arrives, tap “Resend code”${d.next ? ` to try ${methodName(d.next)}` : ""}.`;
+    }
+  }
+
   // A long-lived MTProto request (a blocked network, a dead proxy, Telegram
   // holding the connection open) would otherwise leave the button disabled and
   // the screen exactly as it was, which reads as "nothing happened".
@@ -101,7 +142,7 @@
     },
     "need-code": {
       busy: "Signing in…",
-      help: (s) => `We sent a code to your Telegram app${s.phone ? ` for ${s.phone}` : ""}. If no other device is signed in, it arrives by SMS.`,
+      help: deliveryHelp,
       fields: () => [field("Login code", h("input", { type: "text", name: "code", inputmode: "numeric", required: true, autocomplete: "one-time-code" }))],
       submit: (f) => withDeadline(Bridge.invoke("submit_code", { code: f.code.value }), UNREACHABLE),
     },
@@ -130,6 +171,39 @@
   let loginStep = null;
   // True once boot learned that the app has API credentials of its own.
   let hasSavedCredentials = false;
+
+  let resendTimer = null;
+  function stopResendCountdown() {
+    if (resendTimer) { clearInterval(resendTimer); resendTimer = null; }
+  }
+  function startResendCountdown(delivery) {
+    const btn = $("login-resend");
+    const label = delivery?.next ? `Resend via ${methodName(delivery.next)}` : "Resend code";
+    let left = Number(delivery?.timeout) || 0;
+    btn.textContent = label;
+    btn.disabled = left > 0;
+    if (left <= 0) return;
+    btn.textContent = `${label} in ${left}s`;
+    resendTimer = setInterval(() => {
+      left -= 1;
+      if (left <= 0) {
+        stopResendCountdown();
+        btn.disabled = false;
+        btn.textContent = label;
+      } else {
+        btn.textContent = `${label} in ${left}s`;
+      }
+    }, 1000);
+  }
+
+  function showLoginError(err) {
+    const line = $("login-error");
+    line.textContent = String(err?.message || err);
+    line.hidden = false;
+    // On a phone the keyboard can push this below the fold; show it.
+    line.scrollIntoView?.({ block: "nearest" });
+  }
+
   function showLogin(s) {
     const key = s ? s.state : (hasSavedCredentials ? "offline" : "credentials");
     if (key === "ready") { $("login").hidden = true; onReady(s.me); return; }
@@ -139,6 +213,10 @@
     $("login-fields").replaceChildren(...step.fields());
     $("login-error").hidden = true;
     $("login").hidden = false;
+    // Resending only makes sense while a code is pending.
+    stopResendCountdown();
+    $("login-actions").hidden = key !== "need-code";
+    if (key === "need-code") startResendCountdown(s.delivery);
     $("login-fields").querySelector("input")?.focus();
   }
 
@@ -155,14 +233,41 @@
     try {
       showLogin(await step.submit(e.target.elements));
     } catch (err) {
-      const line = $("login-error");
-      line.textContent = String(err?.message || err);
-      line.hidden = false;
-      // On a phone the keyboard can push this below the fold; show it.
-      line.scrollIntoView?.({ block: "nearest" });
+      showLoginError(err);
     } finally {
       btn.disabled = false;
       btn.textContent = label;
+    }
+  });
+
+  $("login-resend").addEventListener("click", async () => {
+    const btn = $("login-resend");
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Asking Telegram…";
+    $("login-error").hidden = true;
+    try {
+      showLogin(await withDeadline(Bridge.invoke("resend_code"), UNREACHABLE));
+    } catch (err) {
+      btn.textContent = label;
+      btn.disabled = Boolean(resendTimer);
+      showLoginError(err);
+    }
+  });
+
+  $("login-change").addEventListener("click", async () => {
+    const btn = $("login-change");
+    btn.disabled = true;
+    $("login-error").hidden = true;
+    try {
+      // The local state is cleared first, so an offline cancel still returns
+      // to the phone field; invalidating the code on Telegram is best effort.
+      await Bridge.invoke("cancel_code").catch(() => {});
+      showLogin(await Bridge.invoke("login_state"));
+    } catch (err) {
+      showLoginError(err);
+    } finally {
+      btn.disabled = false;
     }
   });
 

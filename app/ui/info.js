@@ -53,9 +53,10 @@
     const handle = chat.username ? `@${chat.username}` : "";
     if (chat.kind === "user") {
       const p = presenceFor(chat);
-      sub.replaceChildren(
+      sub.replaceChildren(...[
         h("span", { class: `mg-presence${isOnline(p) ? " mg-online" : ""}`, title: p?.state === "last-seen" ? new Date(p.at * 1000).toString() : "", text: formatPresence(p) }),
-        handle ? h("span", { class: "mg-muted", text: formatPresence(p) ? ` · ${handle}` : handle }) : null);
+        handle ? h("span", { class: "mg-muted", text: formatPresence(p) ? ` · ${handle}` : handle }) : null,
+      ].filter(Boolean));
       return;
     }
     sub.textContent = [handle, chat.kind].filter(Boolean).join(" · ");

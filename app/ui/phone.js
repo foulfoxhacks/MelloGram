@@ -12,6 +12,7 @@
 (() => {
   const { h } = window.MelloGram;
   const $ = (id) => document.getElementById(id);
+  const visible = (el) => !!el && !el.hidden;
   const body = document.body;
   const app = $("app");
 
@@ -87,14 +88,39 @@
     h("div", { class: "mg-ph-drawer-sep", text: "Plugin shortcuts" }),
     drawerPlugins);
   const scrim = h("div", { class: "mg-ph-scrim", hidden: true, onclick: () => closeDrawer() });
-  function openDrawer() { drawer.hidden = false; scrim.hidden = false; requestAnimationFrame(() => drawer.classList.add("mg-open")); }
+
+  // The drawer sits above every overlay (z-index 61). Opening it over the
+  // login form, the lock screen or a dialog would cover the control the user
+  // is trying to reach, so it belongs to the signed-in chat list only.
+  function drawerAllowed() {
+    if (!isPhone() || app.classList.contains("mg-show-chat")) return false;
+    if (visible($("login")) || visible($("lock"))) return false;
+    if (document.querySelector(".mg-overlay:not([hidden])")) return false;
+    if (visible(document.querySelector(".mg-info-panel"))) return false;
+    if (visible($("context-menu"))) return false;
+    return true;
+  }
+  function openDrawer() {
+    if (!drawerAllowed()) return;
+    drawer.hidden = false;
+    scrim.hidden = false;
+    // Force a reflow so the slide transition starts from the closed position,
+    // then add the class synchronously. requestAnimationFrame can be paused in
+    // a background webview, which would leave the drawer hidden off-screen.
+    void drawer.offsetWidth;
+    drawer.classList.add("mg-open");
+  }
   function closeDrawer() { drawer.classList.remove("mg-open"); scrim.hidden = true; drawer.hidden = true; }
   menuBtn.addEventListener("click", openDrawer);
+  // If the session ends while the drawer is open, the login form must not be
+  // hidden behind it.
+  new MutationObserver(() => { if (!$("login").hidden) closeDrawer(); })
+    .observe($("login"), { attributes: true, attributeFilter: ["hidden"] });
   // Swipe from the left edge opens the drawer on the chat list.
   let edge = null;
   document.addEventListener("touchstart", (e) => {
     const t = e.touches[0];
-    edge = isPhone() && !app.classList.contains("mg-show-chat") && t.clientX < 24 ? t.clientX : null;
+    edge = t && drawerAllowed() && t.clientX < 24 ? t.clientX : null;
   }, { passive: true });
   document.addEventListener("touchmove", (e) => {
     if (edge != null && e.touches[0].clientX - edge > 60) { edge = null; openDrawer(); }

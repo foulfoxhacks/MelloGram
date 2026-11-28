@@ -199,6 +199,24 @@ pub struct TelegramSettings {
 const BUILTIN_TELEGRAM_API_ID: i32 = 30886269;
 const BUILTIN_TELEGRAM_API_HASH: &str = "957f1de9d7ccb6e6639fec6ef79ad217";
 
+impl TelegramSettings {
+    /// A settings file written by an older build, a hand edit or a failed write
+    /// can hold explicit `null`s or blank strings. An entirely empty pair
+    /// means "use the built-in application". Keep incomplete custom pairs
+    /// incomplete so their components are not mixed with built-in values.
+    pub fn normalized(mut self) -> Self {
+        let builtin = Self::default();
+        self.api_id = self.api_id.filter(|id| *id > 0);
+        self.api_hash = self.api_hash.as_deref().map(str::trim).filter(|hash| !hash.is_empty()).map(str::to_owned);
+        // The ID and hash belong to the same Telegram application. Never mix
+        // half of a custom pair with half of the built-in pair.
+        if self.api_id.is_none() && self.api_hash.is_none() {
+            return builtin;
+        }
+        self
+    }
+}
+
 impl Default for TelegramSettings {
     fn default() -> Self {
         let api_id = option_env!("MELLOGRAM_TELEGRAM_API_ID")
@@ -307,7 +325,7 @@ impl SettingsStore {
     pub fn open(dir: &Path) -> Result<Self> {
         fs::create_dir_all(dir)?;
         let path = dir.join("settings.json");
-        let settings = match fs::read_to_string(&path) {
+        let mut settings = match fs::read_to_string(&path) {
             Ok(text) => match serde_json::from_str::<Settings>(&text) {
                 Ok(s) => s,
                 Err(e) => {
@@ -319,6 +337,9 @@ impl SettingsStore {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Settings::default(),
             Err(e) => return Err(e.into()),
         };
+        // Normalise before anything reads the credentials: a null/blank pair on
+        // disk must not look like "Telegram is not set up".
+        settings.telegram = settings.telegram.normalized();
         Ok(Self { path, settings })
     }
 
@@ -462,6 +483,26 @@ mod tests {
         let evil = r#"{"format":"mellogram-backup","version":1,"created_at":"","app_version":"","settings":{},
             "themes":[{"file":"../../evil.css","css":""}]}"#;
         assert!(store.import(evil).is_err());
+    }
+
+    #[test]
+    fn blank_credentials_fall_back_to_builtins() {
+        let dir = tempdir("settings-e");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("settings.json"), r#"{"telegram":{"api_id":null,"api_hash":"  "}}"#).unwrap();
+        let store = SettingsStore::open(&dir).unwrap();
+        assert!(store.settings.telegram.api_id.is_some_and(|id| id > 0));
+        assert_eq!(store.settings.telegram.api_hash.as_deref().map(str::len), Some(32));
+    }
+
+    #[test]
+    fn partial_custom_credentials_are_not_mixed_with_builtins() {
+        let id_only = TelegramSettings { api_id: Some(12345), api_hash: None }.normalized();
+        assert_eq!(id_only.api_id, Some(12345));
+        assert_eq!(id_only.api_hash, None);
+        let hash_only = TelegramSettings { api_id: None, api_hash: Some("custom".into()) }.normalized();
+        assert_eq!(hash_only.api_id, None);
+        assert_eq!(hash_only.api_hash.as_deref(), Some("custom"));
     }
 
     #[test]

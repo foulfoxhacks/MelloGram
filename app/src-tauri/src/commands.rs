@@ -206,12 +206,12 @@ pub async fn login_state(state: S<'_>) -> R<Option<LoginState>> {
     // UI reads `None` as "nothing saved" and falls back to the API ID / hash
     // form, which nobody can fill in: those values are compiled in. Connect
     // here when the client is missing, and report the failure instead of
-    // pretending nothing is configured.
-    if state.tg.lock().await.is_none() {
-        if let Err(e) = state.connect_if_configured().await {
-            tracing::warn!("login_state could not connect: {e}");
-            return Err(e);
-        }
+    // pretending nothing is configured. `ensure_connected` is bounded (so this
+    // command always answers) and reuses a client the startup task opened while
+    // we waited, rather than stacking a duplicate connection.
+    if let Err(e) = state.ensure_connected(crate::state::CONNECT_TIMEOUT).await {
+        tracing::warn!("login_state could not connect: {e}");
+        return Err(e);
     }
     let Some(tg) = state.tg.lock().await.clone() else { return Ok(None) };
     tg.login_state().await.map(Some).map_err(err)
@@ -224,10 +224,32 @@ pub async fn request_code(state: S<'_>, phone: String) -> R<LoginState> {
     tracing::info!("request_code: asking Telegram for a login code");
     let login = state.telegram().await?.request_code(&phone).await;
     match &login {
-        Ok(_) => tracing::info!("request_code: code sent"),
+        Ok(LoginState::NeedCode { delivery, .. }) => {
+            tracing::info!("request_code: code sent via {}", delivery.via)
+        }
+        Ok(_) => tracing::info!("request_code: already signed in"),
         Err(e) => tracing::warn!("request_code failed: {e}"),
     }
-    login.map_err(err)
+    after_login(&state, login.map_err(err)?).await
+}
+
+#[tauri::command]
+pub async fn resend_code(state: S<'_>) -> R<LoginState> {
+    tracing::info!("resend_code: asking Telegram for another login code");
+    let login = state.telegram().await?.resend_code().await;
+    match &login {
+        Ok(LoginState::NeedCode { delivery, .. }) => {
+            tracing::info!("resend_code: code sent via {}", delivery.via)
+        }
+        Ok(_) => tracing::info!("resend_code: already signed in"),
+        Err(e) => tracing::warn!("resend_code failed: {e}"),
+    }
+    after_login(&state, login.map_err(err)?).await
+}
+
+#[tauri::command]
+pub async fn cancel_code(state: S<'_>) -> R<()> {
+    state.telegram().await?.cancel_code().await.map_err(err)
 }
 
 #[tauri::command]
@@ -246,8 +268,11 @@ pub async fn submit_password(state: S<'_>, password: String) -> R<LoginState> {
 pub async fn logout(state: S<'_>) -> R<()> {
     state.telegram().await?.logout().await.map_err(err)?;
     *state.tg.lock().await = None;
+    // The loop belongs to the client that just signed out; leave it running and
+    // it would keep delivering events for a session that no longer exists.
+    state.stop_updates().await;
     let _ = std::fs::remove_file(state.session_path());
-    state.connect_if_configured().await
+    state.ensure_connected(crate::state::CONNECT_TIMEOUT).await
 }
 
 // ---- chats -----------------------------------------------------------------------

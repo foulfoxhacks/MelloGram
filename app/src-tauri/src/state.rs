@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -12,7 +12,7 @@ use mellorpc_core::PresenceRegistry;
 use mellogram_telegram::{Telegram, TelegramConfig, TgEvent};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
-use tokio::sync::{mpsc, Mutex as AsyncMutex};
+use tokio::sync::{mpsc, watch, Mutex as AsyncMutex};
 
 use mellogram_e2e::{E2eState, GroupDistribution};
 
@@ -22,6 +22,11 @@ const MESSAGE_CACHE: usize = 20_000;
 /// Hard cap on a roster read. Large groups are followed to this many members;
 /// above it the read is reported as incomplete, never as a full roster.
 const SWEEP_MEMBER_CAP: usize = 5_000;
+
+/// Upper bound for one connect attempt (dial, auth key, `initConnection`). The
+/// login screen gives `login_state` 15 s, so a real error arrives before its
+/// own generic "unreachable" message.
+pub const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(12);
 
 #[derive(Default)]
 pub struct MessageCache {
@@ -104,6 +109,17 @@ pub struct AppState {
     pub background: crate::background::BackgroundState,
     pub media: crate::media::MediaState,
     pub tg: AsyncMutex<Option<Arc<Telegram>>>,
+    /// Held across a connect attempt: concurrent callers wait for the one in
+    /// flight instead of opening a second socket and update loop.
+    pub connect_lock: AsyncMutex<()>,
+    /// The client whose update loop is feeding the UI, with its stop signal, so a
+    /// replaced client can be shut down instead of delivering every update twice
+    /// (and so starting updates twice for one client is a no-op).
+    pub updates_stop: AsyncMutex<Option<(Arc<Telegram>, watch::Sender<bool>)>>,
+    /// Set when the published client's update stream ended for good. A client in
+    /// that state can still answer requests but will never deliver updates, so
+    /// `ensure_connected` re-dials instead of reusing it.
+    pub connection_stale: AtomicBool,
     /// End-to-end privacy overlay: identity, sessions and per-chat mode.
     pub e2e: E2eState,
     /// Redacted record of network exchanges (Settings → Traffic Log plugin).
@@ -168,6 +184,9 @@ impl AppState {
             background: Default::default(),
             media: Default::default(),
             tg: AsyncMutex::new(None),
+            connect_lock: AsyncMutex::new(()),
+            updates_stop: AsyncMutex::new(None),
+            connection_stale: AtomicBool::new(false),
             e2e,
             traffic: crate::traffic::TrafficLog::default(),
             secrets,
@@ -202,15 +221,60 @@ impl AppState {
         self.dir.join("telegram.session")
     }
 
-    pub async fn connect_if_configured(self: &Arc<Self>) -> Result<(), String> {
-        let creds = self.store.lock().unwrap().settings.telegram.clone();
+    /// Connects with the saved credentials, bounded by `timeout` and serialised
+    /// with every other connect attempt. Safe to call from a command: if the
+    /// startup task already connected while this waited, the existing client is
+    /// reused instead of a second one being stacked on top of it.
+    pub async fn ensure_connected(self: &Arc<Self>, timeout: std::time::Duration) -> Result<(), String> {
+        if self.has_live_client().await {
+            return Ok(());
+        }
+        let attempt = async {
+            let _serial = self.connect_lock.lock().await;
+            if self.has_live_client().await {
+                return Ok(());
+            }
+            self.connect_configured_locked().await
+        };
+        match tokio::time::timeout(timeout, attempt).await {
+            Ok(result) => result,
+            Err(_) => Err(format!(
+                "Telegram did not answer within {}s. Check the connection and try again.",
+                timeout.as_secs()
+            )),
+        }
+    }
+
+    /// A published client only counts while its update loop is alive. One whose
+    /// stream died stays visible to `telegram()` (requests may still work) but is
+    /// re-dialled by the next connect, which is what makes Retry recover.
+    async fn has_live_client(&self) -> bool {
+        self.tg.lock().await.is_some() && !self.connection_stale.load(Ordering::Relaxed)
+    }
+
+    /// Caller must hold `connect_lock`.
+    async fn connect_configured_locked(self: &Arc<Self>) -> Result<(), String> {
+        // Normalised again here so a credential cleared at runtime still falls
+        // back to the built-in application instead of silently disabling connect.
+        let creds = self.store.lock().unwrap().settings.telegram.clone().normalized();
         match (creds.api_id, creds.api_hash) {
-            (Some(id), Some(hash)) if !hash.is_empty() => self.connect(id, hash).await,
+            (Some(id), Some(hash)) => self.connect_locked(id, hash).await,
             _ => Ok(()),
         }
     }
 
     pub async fn connect(self: &Arc<Self>, api_id: i32, api_hash: String) -> Result<(), String> {
+        let _serial = self.connect_lock.lock().await;
+        self.connect_locked(api_id, api_hash).await
+    }
+
+    /// Caller must hold `connect_lock`. Nothing is written to `self.tg` until the
+    /// whole attempt has succeeded: a dial that fails, an update loop that
+    /// refuses to start, or a timeout that cancels this future all leave shared
+    /// state exactly as they found it (no client for a first connect, the
+    /// working client for a credential change). Publishing first would let
+    /// `login_state`'s fast path hand out a client that never delivers updates.
+    async fn connect_locked(self: &Arc<Self>, api_id: i32, api_hash: String) -> Result<(), String> {
         let net = self.store.lock().unwrap().settings.network.clone();
         let proxy_url = crate::network::proxy_for_connect(self, net.proxy_url).filter(|u| mellogram_core::settings::validate_proxy_url(u).is_ok());
         let tg = Telegram::connect(TelegramConfig {
@@ -223,14 +287,34 @@ impl AppState {
         })
             .await
             .map_err(|e| e.to_string())?;
-        *self.tg.lock().await = Some(Arc::clone(&tg));
-        if tg.client().is_authorized().await.unwrap_or(false) {
+        let authorized = tg.client().is_authorized().await.unwrap_or(false);
+        // Past this point the attempt replaces whatever is published, so the old
+        // client's loop is stopped: two live loops would deliver the same update
+        // twice. Until the new client is published the old one is marked stale,
+        // so a failure here sends the next connect (Retry) back to the dialler
+        // instead of reusing a client whose loop just went quiet.
+        // Stale first: if this attempt is cancelled between the two calls below,
+        // the old client is already marked as having no loop, so the next connect
+        // re-dials instead of trusting it.
+        self.connection_stale.store(true, Ordering::Relaxed);
+        self.stop_updates().await;
+        // Keep the published client locked until the new loop and client are
+        // installed. An immediately exiting loop can then mark the new client
+        // stale after publication rather than being mistaken for an old loop.
+        let mut published = self.tg.lock().await;
+        if authorized {
             // The overlay binds messages to our own user id.
             if let Ok(mellogram_telegram::LoginState::Ready { me }) = tg.login_state().await {
                 self.e2e.set_self_id(me.id);
             }
-            self.start_updates().await?;
+            // Errors from here leave `self.tg` untouched, so the attempt has
+            // nothing half-connected to clean up.
+            self.start_updates_for(Arc::clone(&tg)).await?;
         }
+        // Last step: only a client whose update loop is already running is
+        // published, so every caller that sees it can rely on it.
+        *published = Some(tg);
+        self.connection_stale.store(false, Ordering::Relaxed);
         Ok(())
     }
 
@@ -318,11 +402,64 @@ impl AppState {
     /// Pipes Telegram updates through the plugin hooks to the UI.
     pub async fn start_updates(self: &Arc<Self>) -> Result<(), String> {
         let tg = self.telegram().await?;
+        self.start_updates_for(tg).await
+    }
+
+    /// Stops the running update loop, if any. Called when the client it belongs
+    /// to is replaced or signed out, so no loop outlives its client.
+    pub async fn stop_updates(&self) {
+        if let Some((_, stop)) = self.updates_stop.lock().await.take() {
+            let _ = stop.send(true);
+        }
+    }
+
+    /// Starts the update loop for `tg`, which does not have to be published in
+    /// `self.tg` yet. `connect_locked` uses this to start updates *before*
+    /// publishing, so a failure here leaves no client behind. If the caller is
+    /// cancelled after the loop starts, its receiver is dropped and the loop
+    /// ends on its next send.
+    async fn start_updates_for(self: &Arc<Self>, tg: Arc<Telegram>) -> Result<(), String> {
         let (tx, mut rx) = mpsc::unbounded_channel();
         tg.start_updates(tx).await.map_err(|e| e.to_string())?;
+        // The new subscription is live by now, so the previous loop is told to
+        // stop: only one loop may feed the UI, or a replaced client keeps
+        // delivering alongside its replacement. `watch` remembers the value, so
+        // a stop sent before the old loop next waits for it is not lost.
+        let (stop_tx, mut stop_rx) = watch::channel(false);
+        {
+            let mut slot = self.updates_stop.lock().await;
+            // `Telegram::start_updates` is idempotent: for a client that is already
+            // feeding the UI it returns without starting a second stream. Keep
+            // that loop, instead of stopping it and spawning one that can never
+            // receive anything.
+            if slot.as_ref().is_some_and(|(owner, _)| Arc::ptr_eq(owner, &tg)) {
+                return Ok(());
+            }
+            if let Some((_, previous)) = slot.replace((Arc::clone(&tg), stop_tx)) {
+                let _ = previous.send(true);
+            }
+        }
+        let client = tg;
         let state = Arc::clone(self);
         tauri::async_runtime::spawn(async move {
-            while let Some(event) = rx.recv().await {
+            // Set only when this loop is asked to stop. Every other way it ends
+            // leaves a client that will never deliver updates again.
+            let mut stopped = false;
+            loop {
+                // `biased` checks the stop first every iteration. Without it a
+                // backlog of queued updates can win the poll and a replaced loop
+                // delivers several more events before it notices it was stopped.
+                let event = tokio::select! {
+                    biased;
+                    _ = stop_rx.changed() => {
+                        // Only a `true` is our stop; a sender that went away
+                        // without saying so is an unexpected exit.
+                        stopped = *stop_rx.borrow();
+                        None
+                    }
+                    event = rx.recv() => event,
+                };
+                let Some(event) = event else { break };
                 match &event {
                     TgEvent::NewMessage(m) => {
                         Counters::bump(&state.counters.messages);
@@ -354,6 +491,17 @@ impl AppState {
                     crate::background::notify_message(&state, m);
                 }
                 let _ = state.app.emit("mg://event", ui);
+            }
+            // Exiting any other way — the stream ended, or its sender vanished —
+            // means this client will never deliver again. It can still answer
+            // requests, so it has to be marked stale or the next connect would
+            // trust it and Retry would never re-dial. Only while it is still the
+            // published client, never one that is being replaced right now.
+            if !stopped {
+                let current = state.tg.lock().await;
+                if current.as_ref().is_some_and(|c| Arc::ptr_eq(c, &client)) {
+                    state.connection_stale.store(true, Ordering::Relaxed);
+                }
             }
         });
         self.start_key_sweep();
