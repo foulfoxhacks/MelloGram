@@ -291,10 +291,16 @@ export function openChats(client, sdk, user, onExit) {
       status.textContent = "Telegram did not confirm sign-out. Retry, or use Forget this browser and end the session in Telegram Settings → Devices.";
     }
   }, { signal });
-  forget.addEventListener("click", () => {
+  forget.addEventListener("click", async () => {
     if (leaving || sending) return;
+    leaving = true;
+    buttons();
+    status.textContent = "Clearing this browser…";
+    // Close the connection before deleting the database, or the deletion is
+    // blocked by the open client and the session survives the "clear".
+    await client.destroy().catch(() => {});
+    await sdk.forgetDevice().catch(() => {});
     close("This browser was cleared. If the session was not signed out, end it in Telegram Settings → Devices.");
-    void sdk.forgetDevice();
   }, { signal });
 
   choose();
