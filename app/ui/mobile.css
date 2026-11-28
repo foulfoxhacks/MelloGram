@@ -173,6 +173,11 @@ body.mg-mobile .melloid-editor-layout { grid-template-columns: 1fr; overflow-y: 
 body.mg-mobile .melloid-editor-scroll { border-right: 0; overflow: visible; }
 body.mg-mobile .melloid-preview { overflow: visible; }
 body.mg-mobile .mg-login { width: 100%; max-width: 420px; border-radius: 0; border: 0; box-shadow: none; }
+/* With the keyboard up the card is taller than the viewport. Centred without
+   scrolling, that clips the Continue button and any error line below it, so the
+   screen looks like it ignored the tap. Start at the top and let it scroll. */
+body.mg-mobile #login { align-items: start; overflow-y: auto; padding: 12px 0 calc(12px + var(--mg-safe-bottom, 0px)); }
+body.mg-mobile #login .mg-login { margin: 0 auto; }
 
 /* Toasts sit above the composer and the gesture bar. */
 body.mg-mobile .mg-toasts { left: 8px !important; right: 8px !important; }
