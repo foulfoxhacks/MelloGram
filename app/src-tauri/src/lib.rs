@@ -3,10 +3,14 @@
 // No hand-written unsafe code; Tauri macro expansions are exempt.
 #![deny(unsafe_code)]
 
+mod activity;
 mod background;
+mod secrets;
+mod traffic;
 mod commands;
 mod e2e;
 mod media;
+mod network;
 mod extras;
 mod mellorpc;
 mod state;
@@ -81,6 +85,15 @@ pub fn run() {
             media::media_file,
             media::media_lottie,
             media::chat_photo,
+            activity::traffic_log,
+            activity::traffic_clear,
+            activity::wakatime_status,
+            activity::wakatime_set_key,
+            activity::wakatime_heartbeat,
+            activity::melloid_badges,
+            commands::check_for_update,
+            network::get_network_settings,
+            network::set_network_settings,
             media::save_media,
             media::send_location,
             media::get_media_settings,

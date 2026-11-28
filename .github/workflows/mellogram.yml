@@ -11,12 +11,39 @@ on:
 permissions:
   contents: write
 
+# Baked into the app so it can tell whether a newer release exists.
+env:
+  MELLOGRAM_BUILD: ${{ github.run_number }}
+
 concurrency:
   group: mellogram-${{ github.ref }}
   # Do not kill long native Android builds when another commit is pushed.
   cancel-in-progress: false
 
 jobs:
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # Fails on known vulnerabilities (RustSec); unmaintained-crate notices
+      # from upstream Tauri/GTK dependencies are reported but do not fail.
+      - name: cargo audit
+        run: |
+          cargo install cargo-audit --locked --quiet
+          cargo audit
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: npm audit (services, high and critical)
+        run: |
+          for dir in services/melloid-public services/web-client; do
+            if [ -f "$dir/package-lock.json" ]; then
+              (cd "$dir" && npm audit --omit=dev --audit-level=high)
+            fi
+          done
+
   test:
     name: Rust tests
     runs-on: ubuntu-22.04
@@ -275,7 +302,18 @@ jobs:
 
           aab="$(find "$out/bundle" -type f -name '*.aab' -print | head -n 1)"
           test -n "$aab" || { echo "No Android App Bundle was produced"; exit 1; }
-          cp "$aab" dist/MelloGram-android-unsigned.aab
+          if [ -n "${KEYSTORE_B64:-}" ]; then
+            # Play Store upload: sign the bundle with the same release key.
+            printf '%s' "$KEYSTORE_B64" | base64 --decode > release.jks
+            cp "$aab" dist/MelloGram-android.aab
+            jarsigner -sigalg SHA256withRSA -digestalg SHA-256 -keystore release.jks \
+              -storepass:env KEYSTORE_PASSWORD -keypass:env KEY_PASSWORD \
+              dist/MelloGram-android.aab "$KEY_ALIAS"
+            jarsigner -verify dist/MelloGram-android.aab
+            rm -f release.jks
+          else
+            cp "$aab" dist/MelloGram-android-unsigned.aab
+          fi
           echo "Validated Android APK artifacts:"
           ls -lh dist/
       - uses: actions/upload-artifact@v4
@@ -375,7 +413,7 @@ jobs:
             release-assets/MelloGram-linux-x86_64.rpm
             release-assets/MelloGram-linux-x86_64.AppImage
             release-assets/MelloGram-android.apk
-            release-assets/MelloGram-android-unsigned.aab
+            release-assets/MelloGram-android*.aab
             release-assets/SHA256SUMS
 
   melloid-public-service:

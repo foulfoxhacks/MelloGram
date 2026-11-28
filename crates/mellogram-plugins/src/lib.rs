@@ -76,6 +76,10 @@ pub fn builtin() -> Vec<Arc<dyn Plugin>> {
         Arc::new(productivity::ChatExport),
         Arc::new(productivity::LinkCollection),
         Arc::new(productivity::CopyEnhancer),
+        Arc::new(productivity::SendLater),
+        Arc::new(productivity::TrafficLog),
+        Arc::new(productivity::ActivityTracker),
+        Arc::new(productivity::GlobalBadges),
     ]
 }
 
@@ -102,7 +106,7 @@ mod tests {
         assert!(!out.link_preview);
         assert!(m.commands().iter().any(|c| c.name == "silent"));
         assert!(!m.css().is_empty());
-        assert_eq!(m.ui_scripts().len(), 17);
+        assert_eq!(m.ui_scripts().len(), 21);
         // Secret Guard runs last and blocks secrets even after other rewrites.
         assert!(m.process_outgoing(OutgoingMessage::text(1, "teh key AKIAIOSFODNN7EXAMPLE")).is_err());
         assert_eq!(m.process_outgoing(OutgoingMessage::text(1, "/calc 6*7")).unwrap().text, "6*7 = 42");

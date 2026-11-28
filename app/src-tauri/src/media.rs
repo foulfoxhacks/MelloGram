@@ -94,7 +94,8 @@ pub async fn media_file(state: S<'_>, chat_id: i64, message_id: i32, variant: St
         Arc::clone(map.entry(stem.clone()).or_default())
     };
     let _guard = lock.lock().await;
-    if !final_path.is_file() {
+    let downloaded = !final_path.is_file();
+    if downloaded {
         let tg = state.telegram().await?;
         let raw = dir.join(format!("{stem}.{ext}.dl"));
         let variant = if thumb { MediaVariant::Thumbnail } else { MediaVariant::Full };
@@ -111,6 +112,9 @@ pub async fn media_file(state: S<'_>, chat_id: i64, message_id: i32, variant: St
     }
     state.media.inflight.lock().unwrap().remove(&stem);
     let bytes = std::fs::metadata(&final_path).map(|m| m.len()).unwrap_or(0);
+    if downloaded {
+        state.traffic.record("in", "telegram", "upload.getFile", bytes, if thumb { "media thumbnail" } else { "media file" });
+    }
     Ok(Some(MediaFile { url: crate::wallpapers::asset_url(&final_path), bytes }))
 }
 
@@ -131,7 +135,8 @@ pub async fn chat_photo(state: S<'_>, chat_id: i64, photo_id: String, big: Optio
         Arc::clone(map.entry(stem.clone()).or_default())
     };
     let _guard = lock.lock().await;
-    let result = if path.is_file() {
+    let cached = path.is_file();
+    let result = if cached {
         Ok(true)
     } else {
         match state.telegram().await {
@@ -140,7 +145,11 @@ pub async fn chat_photo(state: S<'_>, chat_id: i64, photo_id: String, big: Optio
         }
     };
     state.media.inflight.lock().unwrap().remove(&stem);
-    Ok(result?.then(|| crate::wallpapers::asset_url(&path)))
+    let ok = result?;
+    if ok && !cached {
+        state.traffic.record("in", "telegram", "upload.getFile", std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0), "profile photo");
+    }
+    Ok(ok.then(|| crate::wallpapers::asset_url(&path)))
 }
 
 /// Lottie JSON for an animated (TGS) sticker, delivered over IPC so the UI

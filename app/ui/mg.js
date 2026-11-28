@@ -157,6 +157,7 @@ function createPluginApi(id, settings, app) {
         return track(() => Hooks.messageActions.delete(key));
       },
       onRender: (fn) => { const off = addTo(Hooks.messageRender, fn); app.rerenderMessages(); return off; },
+      rerender: () => app.rerenderMessages(),
       setTimeFormatter: (fn) => {
         Hooks.timeFormatter = fn;
         app.rerenderMessages();

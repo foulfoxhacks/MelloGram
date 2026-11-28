@@ -212,3 +212,10 @@ test("worker: HTTPS redirect, HSTS and unconfigured sign-in", async () => {
   const page = await worker.fetch(new Request("https://id.example.com/"), env);
   assert.match(page.headers.get("strict-transport-security"), /max-age=/);
 });
+
+test("badge lookup ids are validated, de-duplicated and capped", async () => {
+  const { parseBadgeIds } = await import("../src/worker.js");
+  assert.deepEqual(parseBadgeIds("12, 12,abc,0,-5,99999999999999999,34"), ["12", "34"]);
+  assert.equal(parseBadgeIds(Array.from({ length: 80 }, (_, i) => i + 1).join(",")).length, 50);
+  assert.deepEqual(parseBadgeIds(""), []);
+});

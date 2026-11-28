@@ -215,7 +215,6 @@ ${Object.keys(byCategory).sort().map((k) => `
       <h3>${esc(p.name)}</h3>
       <p>${esc(p.description)}</p>
       <p class="tags">${p.default_on ? '<span class="tag on">On by default</span>' : ""}${p.has_ui ? '<span class="tag">Adds interface</span>' : ""}${p.settings ? `<span class="tag">${p.settings} setting${p.settings === 1 ? "" : "s"}</span>` : ""}${(p.permissions || []).filter((x) => x !== "ui").map((x) => `<span class="tag perm">${PERMISSION[x] || x}</span>`).join("")}</p>
-      ${p.inspired_by ? `<p class="muted small">Adapts: ${esc(p.inspired_by)}</p>` : ""}
     </li>`).join("")}
   </ul>
 </section>`).join("")}
